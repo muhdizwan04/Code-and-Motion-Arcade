@@ -236,7 +236,7 @@ const engine = {
   hand: null,        // mirrored screen-space landmarks [{x,y}] or null
   norm: null,        // mirrored normalized landmarks
   hands: [], handsNorm: [],
-  lastVideoTime: -1, frameUpdated: false, lastSeenAt: 0,
+  lastVideoTime: -1, frameUpdated: false, lastSeenAt: 0, frameAt: 0, frameDelta: 0,
   async init(onStatus) {
     if (!this.ready) {
       onStatus(t("loading"));
@@ -245,9 +245,9 @@ const engine = {
         baseOptions: { modelAssetPath: "vendor/hand_landmarker.task", delegate },
         runningMode: "VIDEO",
         numHands: 2,
-        minHandDetectionConfidence: 0.42,
-        minHandPresenceConfidence: 0.42,
-        minTrackingConfidence: 0.55,
+        minHandDetectionConfidence: 0.62,
+        minHandPresenceConfidence: 0.62,
+        minTrackingConfidence: 0.60,
       });
       try {
         this.landmarker = await HandLandmarker.createFromOptions(fileset, options("GPU"));
@@ -286,6 +286,8 @@ const engine = {
     this.handsNorm = [];
     this.frameUpdated = false;
     this.lastSeenAt = 0;
+    this.frameAt = 0;
+    this.frameDelta = 0;
     handStatus.classList.remove("seen");
   },
   detect() {
@@ -294,7 +296,10 @@ const engine = {
     if (cam.currentTime === this.lastVideoTime) return false; // same frame, keep previous
     this.lastVideoTime = cam.currentTime;
     this.frameUpdated = true;
-    const res = this.landmarker.detectForVideo(cam, performance.now());
+    const frameNow = performance.now();
+    this.frameDelta = this.frameAt ? Math.min(0.1, Math.max(0.01, (frameNow - this.frameAt) / 1000)) : 0;
+    this.frameAt = frameNow;
+    const res = this.landmarker.detectForVideo(cam, frameNow);
     if (res.landmarks && res.landmarks.length) {
       // video uses object-fit: cover -> compute the crop mapping
       const vw = cam.videoWidth, vh = cam.videoHeight;
@@ -1034,7 +1039,7 @@ const SIGN = {
   mode: null, wordIdx: 0, letterIdx: 0, holdT: 0, current: null, lockUntil: 0,
   dom: [], phraseTarget: null, phraseTitle: "", phrasePhoto: "", phrase: null,
   signSamples: [], phraseStep: 0, phraseState: null,
-  latestScores: {},
+  latestScores: {}, targetSince: 0, targetFrames: 0,
 
   start() {
     this.clearDom();
@@ -1101,6 +1106,7 @@ const SIGN = {
     this.holdT = 0;
     this.current = null;
     this.signSamples = [];
+    this.resetTargetConfirmation();
     this.phraseStep = 0;
     this.phraseState = {
       startedAt: performance.now(), lastX: null, minX: 1, maxX: 0,
@@ -1112,6 +1118,7 @@ const SIGN = {
   },
   begin(mode) {
     this.mode = mode; this.letterIdx = 0; this.holdT = 0; this.current = null; this.signSamples = [];
+    this.resetTargetConfirmation();
     show(null); ui.classList.add("passthrough");
     this.buildDom();
   },
@@ -1195,6 +1202,22 @@ const SIGN = {
     const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
     return ranked.length && ranked[0][1] >= 4 ? ranked[0][0] : null;
   },
+  resetTargetConfirmation() {
+    this.targetSince = 0;
+    this.targetFrames = 0;
+  },
+  targetProgress(matches, now) {
+    if (engine.frameUpdated) {
+      if (matches) {
+        if (!this.targetSince) this.targetSince = engine.frameAt || now;
+        this.targetFrames++;
+      } else {
+        this.resetTargetConfirmation();
+      }
+    }
+    if (!this.targetSince) return 0;
+    return Math.min(1, (now - this.targetSince) / 1100);
+  },
   setPhraseFeedback(progress, status) {
     const bar = document.getElementById("phraseProgress");
     const statusEl = document.getElementById("phraseStatus");
@@ -1222,16 +1245,18 @@ const SIGN = {
     }
     const f = fingerStates(hand);
     const stepText = () => t("phraseStep")(Math.min(this.phraseStep + 1, steps.length), steps.length, steps[Math.min(this.phraseStep, steps.length - 1)]);
-    const holdMatch = (matched, seconds = 0.65) => {
-      if (matched) this.holdT += dt;
-      else this.holdT = Math.max(0, this.holdT - dt * 0.55);
+    const holdMatch = (matched, seconds = 0.9) => {
+      if (engine.frameUpdated) {
+        if (matched) this.holdT += engine.frameDelta || 0.03;
+        else this.holdT = Math.max(0, this.holdT - (engine.frameDelta || 0.03) * 1.2);
+      }
       this.setPhraseFeedback(this.holdT / seconds, matched ? t("holdIt") : `${stepText()} · ${t("keepTrying")}`);
       return this.holdT >= seconds;
     };
 
     if (phrase.kind === "static") {
       const score = this.latestScores[phrase.target] || 0;
-      if (holdMatch(score >= 0.67) && this.mode === "phrase") this.phraseComplete();
+      if (holdMatch(score >= 0.80 && sign === phrase.target, 1.1) && this.mode === "phrase") this.phraseComplete();
       return;
     }
 
@@ -1361,19 +1386,14 @@ const SIGN = {
     /* spell mode: hold the target handshape */
     const target = this.targetLetter();
     const targetScore = this.latestScores[target] || 0;
-    if (targetScore >= 0.67) {
-      this.holdT += dt;
-      const frac = Math.min(1, this.holdT / 0.65);
-      if (ring) ring.style.strokeDashoffset = 352 * (1 - frac);
-      if (this.holdT >= 0.65) {
+    const targetMatches = sign === target && targetScore >= 0.80;
+    const frac = this.targetProgress(targetMatches, now);
+    if (ring) ring.style.strokeDashoffset = 352 * (1 - frac);
+    if (targetMatches && frac >= 1 && this.targetFrames >= 18) {
         sfx.good();
-        this.holdT = 0;
+        this.resetTargetConfirmation();
         this.lockUntil = now + 700;
         this.advance();
-      }
-    } else {
-      this.holdT = Math.max(0, this.holdT - dt * 0.55);
-      if (ring) ring.style.strokeDashoffset = 352 * (1 - Math.min(1, this.holdT / 0.65));
     }
   },
 
