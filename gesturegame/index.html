@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0b0518">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>AI Hand Arcade</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- animated background blobs (menu) -->
+  <div class="bg-blobs"><i></i><i></i><i></i></div>
+
+  <!-- camera + game layers -->
+  <video id="cam" autoplay playsinline muted></video>
+  <canvas id="game"></canvas>
+
+  <!-- top bar -->
+  <header id="topbar">
+    <button id="homeBtn" class="chip big hidden">🏠</button>
+    <div id="handStatus" class="hidden">✋</div>
+    <div class="spacer"></div>
+    <button id="soundBtn" class="chip">🔊</button>
+    <button id="langBtn" class="chip">BM</button>
+  </header>
+
+  <!-- UI screens -->
+  <main id="ui"></main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
