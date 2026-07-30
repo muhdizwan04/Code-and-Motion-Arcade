@@ -103,7 +103,7 @@ const STR = {
     reset: "RESET",
     snakePointer: "Point your index finger inside the grid to steer",
     // blast
-    blastTitle: "Block Blast",
+    blastTitle: "Hand Blast",
     blastDesc: "Pinch, drag and drop blocks — clear rows to score!",
     blastHow: "Hover over a block, PINCH 👌 to grab it. Drag onto the grid and release to place. Fill a row or column to clear it! 🧱",
     lines: "Lines",
@@ -203,7 +203,7 @@ const STR = {
     reset: "RESET",
     snakePointer: "Tuding jari telunjuk ke dalam grid untuk mengawal",
     // blast
-    blastTitle: "Block Blast",
+    blastTitle: "Hand Blast",
     blastDesc: "Cubit, seret dan letak blok — kosongkan baris untuk skor!",
     blastHow: "Tuding ke atas blok, CUBIT 👌 untuk mengambilnya. Seret ke grid dan lepaskan untuk meletakkan. Penuhkan baris atau lajur untuk mengosongkannya! 🧱",
     lines: "Baris",
@@ -266,7 +266,11 @@ resize();
 addEventListener("resize", resize);
 
 const el = (html) => { const d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstChild; };
-function show(node) { ui.innerHTML = ""; if (node) { ui.appendChild(node); node.classList.add("fade-in"); } }
+function show(node) {
+  ui.innerHTML = "";
+  ui.scrollTop = 0; // a new screen always starts at the top, never mid-scroll
+  if (node) { ui.appendChild(node); node.classList.add("fade-in"); }
+}
 
 /* ---------------- hand engine ---------------- */
 const engine = {
@@ -383,6 +387,22 @@ const engine = {
     return true;
   },
 };
+
+/* Older iPadOS Safari (< 16.4) has no roundRect; without this the whole
+   canvas frame throws and the board never draws. */
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+    const radius = Math.min(typeof r === "number" ? r : (Array.isArray(r) ? r[0] : 0) || 0, w / 2, h / 2);
+    this.beginPath();
+    this.moveTo(x + radius, y);
+    this.arcTo(x + w, y, x + w, y + h, radius);
+    this.arcTo(x + w, y + h, x, y + h, radius);
+    this.arcTo(x, y + h, x, y, radius);
+    this.arcTo(x, y, x + w, y, radius);
+    this.closePath();
+    return this;
+  };
+}
 
 /* ---------------- hand maths ---------------- */
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -1515,24 +1535,31 @@ const SIGN = {
 /* ================================================
    GAME 4 : HAND SNAKE
 ================================================ */
+/* Free-movement snake: the head IS the smoothed fingertip position every
+   frame — there is no grid tick to fall behind on, so it can never "outrun"
+   detection the way a fixed-speed grid step could. The body is a rope of
+   recent head positions, trimmed to a length budget that grows on each food. */
 const SNAKE = {
   emoji: "🐍", titleKey: "snakeTitle", howKey: "snakeHow",
-  body: [], food: null, trail: [], score: 0, moveT: 0, dir: { x: 1, y: 0 },
-  cols: 0, rows: 0, cell: 26, field: null, hud: null, resetBtn: null, running: false,
+  head: null, dir: { x: 1, y: 0 }, path: [], budget: 0, thickness: 22,
+  score: 0, food: null, tracking: false, field: null, bg: null,
+  hud: null, resetBtn: null, running: false,
 
   start() {
     this.cleanup();
     const safeTop = 122, safeBottom = 76;
-    const maxWidth = Math.max(280, innerWidth - 28), maxHeight = Math.max(280, innerHeight - safeTop - safeBottom);
-    this.cell = Math.max(19, Math.min(34, Math.floor(Math.min(maxWidth / 17, maxHeight / 15))));
-    this.cols = Math.max(12, Math.floor(maxWidth / this.cell));
-    this.rows = Math.max(12, Math.floor(maxHeight / this.cell));
-    const width = this.cols * this.cell, height = this.rows * this.cell;
-    this.field = { x: Math.round((innerWidth - width) / 2), y: Math.round(safeTop + (maxHeight - height) / 2), width, height };
-    const cx = Math.floor(this.cols / 2), cy = Math.floor(this.rows / 2);
-    this.body = [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
-    this.dir = { x: 1, y: 0 }; this.score = 0; this.moveT = 0; this.trail = [];
-    this.food = this.newFood(); this.running = true;
+    const width = Math.max(260, Math.min(620, innerWidth - 28));
+    const height = Math.max(260, Math.min(620, innerHeight - safeTop - safeBottom));
+    this.field = { x: Math.round((innerWidth - width) / 2), y: Math.round(safeTop + Math.max(0, (innerHeight - safeTop - safeBottom - height) / 2)), width, height };
+    this.thickness = Math.max(16, Math.min(30, Math.min(width, height) / 16));
+    this.segUnit = this.thickness * 2.6;
+    this.head = { x: this.field.x + width / 2, y: this.field.y + height / 2 };
+    this.path = [{ ...this.head }];
+    this.dir = { x: 1, y: 0 };
+    this.budget = this.segUnit * 3; // starts at "length 3" to match the old game's feel
+    this.score = 0; this.tracking = false; this.running = true;
+    this.food = this.newFood();
+    this.buildBackground();
     this.hud = el(`<div class="hud">
       <div class="stat"><div class="lbl">${t("score")}</div><div class="num cyan" id="sScore">0</div></div>
       <div class="stat"><div class="lbl">${t("length")}</div><div class="num lime" id="sLength">3</div></div>
@@ -1544,79 +1571,136 @@ const SNAKE = {
 
   cleanup() {
     this.hud?.remove(); this.resetBtn?.remove();
-    this.hud = null; this.resetBtn = null; this.running = false;
+    this.hud = null; this.resetBtn = null; this.running = false; this.bg = null;
+  },
+
+  /* The arena frame never changes during a run, so it is rendered once into
+     an offscreen canvas and blitted — no grid lines this time, since the
+     snake is no longer bound to a grid. */
+  buildBackground() {
+    const pad = 14;
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    const c = document.createElement("canvas");
+    c.width = Math.ceil((this.field.width + pad * 2) * dpr);
+    c.height = Math.ceil((this.field.height + pad * 2) * dpr);
+    const g = c.getContext("2d");
+    g.scale(dpr, dpr);
+    g.fillStyle = "rgba(7,14,35,.52)";
+    g.strokeStyle = "rgba(34,211,238,.72)";
+    g.lineWidth = 2;
+    g.shadowColor = "#22d3ee"; g.shadowBlur = 16;
+    g.beginPath(); g.roundRect(pad - 9, pad - 9, this.field.width + 18, this.field.height + 18, 22);
+    g.fill(); g.stroke();
+    this.bg = { canvas: c, pad, w: this.field.width + pad * 2, h: this.field.height + pad * 2 };
   },
 
   newFood() {
-    const free = [];
-    for (let y = 1; y < this.rows - 1; y++) for (let x = 1; x < this.cols - 1; x++) {
-      if (!this.body.some(p => p.x === x && p.y === y)) free.push({ x, y });
+    const margin = this.thickness * 1.6;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const p = {
+        x: this.field.x + margin + Math.random() * (this.field.width - margin * 2),
+        y: this.field.y + margin + Math.random() * (this.field.height - margin * 2),
+      };
+      if (!this.head || Math.hypot(p.x - this.head.x, p.y - this.head.y) > this.thickness * 4) return p;
     }
-    return free[Math.floor(Math.random() * free.length)] || { x: 2, y: 2 };
+    return { x: this.field.x + this.field.width / 2, y: this.field.y + this.field.height / 2 };
   },
 
-  steer() {
-    const tip = engine.hand?.[8];
-    if (!tip || !this.field) return;
-    const head = this.body[0];
-    const hx = this.field.x + (head.x + .5) * this.cell, hy = this.field.y + (head.y + .5) * this.cell;
-    const tx = Math.max(this.field.x, Math.min(this.field.x + this.field.width, tip.x));
-    const ty = Math.max(this.field.y, Math.min(this.field.y + this.field.height, tip.y));
-    const dx = tx - hx, dy = ty - hy;
-    // Ignore tiny sensor tremors; only a deliberate finger move changes lane.
-    if (Math.max(Math.abs(dx), Math.abs(dy)) < this.cell * .65) return;
-    const next = Math.abs(dx) > Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
-    if ((next.x || next.y) && !(next.x === -this.dir.x && next.y === -this.dir.y)) this.dir = next;
-  },
-
-  move() {
-    const head = this.body[0];
-    const next = {
-      x: (head.x + this.dir.x + this.cols) % this.cols,
-      y: (head.y + this.dir.y + this.rows) % this.rows,
-    };
-    if (this.body.some(p => p.x === next.x && p.y === next.y)) { this.end(); return; }
-    this.trail.push({ x: this.field.x + (head.x + .5) * this.cell, y: this.field.y + (head.y + .5) * this.cell, life: 1 });
-    this.body.unshift(next);
-    if (next.x === this.food.x && next.y === this.food.y) {
-      this.score += 10; this.food = this.newFood(); sfx.good();
-      const score = this.hud?.querySelector("#sScore"), length = this.hud?.querySelector("#sLength");
-      if (score) { score.textContent = this.score; score.classList.remove("score-punch"); void score.offsetWidth; score.classList.add("score-punch"); }
-      if (length) length.textContent = this.body.length;
-    } else this.body.pop();
+  /* Keep only as much trailing path as the current length budget allows —
+     this is what makes the tail "follow" at a fixed rope length instead of
+     recording an ever-growing history. */
+  trimPath() {
+    let acc = 0;
+    for (let i = this.path.length - 1; i > 0; i--) {
+      acc += dist(this.path[i], this.path[i - 1]);
+      if (acc > this.budget) { this.path.splice(0, i); return; }
+    }
   },
 
   onFrame(dt) {
     if (!this.running) return;
-    this.steer();
-    this.moveT += dt;
-    const speed = Math.max(.07, .18 - this.score * .0022);
-    while (this.moveT >= speed && this.running) { this.moveT -= speed; this.move(); }
-    this.trail.forEach(p => p.life -= dt * 2.3); this.trail = this.trail.filter(p => p.life > 0);
-    const tip = engine.hand?.[8];
     const field = this.field;
+    const tipRaw = engine.hand?.[8] || null;
+
+    if (tipRaw) {
+      const m = this.thickness / 2;
+      const clampedX = Math.max(field.x + m, Math.min(field.x + field.width - m, tipRaw.x));
+      const clampedY = Math.max(field.y + m, Math.min(field.y + field.height - m, tipRaw.y));
+      // A very light ease removes camera micro-jitter without adding lag —
+      // there's no grid tick to hide behind now, the head really is the
+      // fingertip, so this has to stay responsive even during a fast swipe.
+      const k = 1 - Math.pow(1e-7, dt);
+      if (!this.tracking) { this.head = { x: clampedX, y: clampedY }; }
+      else { this.head.x += (clampedX - this.head.x) * k; this.head.y += (clampedY - this.head.y) * k; }
+      this.tracking = true;
+
+      const last = this.path[this.path.length - 1];
+      if (!last || dist(this.head, last) > 3) {
+        if (last) {
+          const dx = this.head.x - last.x, dy = this.head.y - last.y;
+          const len = Math.hypot(dx, dy) || 1;
+          this.dir = { x: dx / len, y: dy / len };
+        }
+        this.path.push({ x: this.head.x, y: this.head.y });
+        this.trimPath();
+
+        /* food */
+        if (dist(this.head, this.food) < this.thickness * .85) {
+          this.score += 10; this.budget += this.segUnit; sfx.good();
+          this.food = this.newFood();
+          const score = this.hud?.querySelector("#sScore"), length = this.hud?.querySelector("#sLength");
+          if (score) { score.textContent = this.score; score.classList.remove("score-punch"); void score.offsetWidth; score.classList.add("score-punch"); }
+          if (length) length.textContent = Math.round(this.budget / this.segUnit);
+        }
+
+        /* self-collision: skip a short arc right behind the head (that's
+           just the neck, always close) then check the rest of the trail. */
+        const skipArc = this.thickness * 3.6, hitR = this.thickness * .5;
+        let acc = 0, cut = 0;
+        for (let i = this.path.length - 1; i > 0; i--) {
+          acc += dist(this.path[i], this.path[i - 1]);
+          if (acc > skipArc) { cut = i; break; }
+        }
+        for (let j = 0; j < cut; j++) {
+          if (dist(this.head, this.path[j]) < hitR) { this.end(); return; }
+        }
+      }
+    } else {
+      this.tracking = false; // hand lost: freeze in place rather than crash
+    }
+
+    const now = performance.now();
     ctx.save();
     ctx.fillStyle = "rgba(5,8,28,.22)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
-    ctx.fillStyle = "rgba(7,14,35,.52)"; ctx.strokeStyle = "rgba(34,211,238,.72)"; ctx.lineWidth = 2;
-    ctx.shadowColor = "#22d3ee"; ctx.shadowBlur = 18;
-    ctx.beginPath(); ctx.roundRect(field.x - 9, field.y - 9, field.width + 18, field.height + 18, 22); ctx.fill(); ctx.stroke();
-    ctx.shadowBlur = 0; ctx.strokeStyle = "rgba(34,211,238,.13)"; ctx.lineWidth = 1;
-    for (let x = 0; x <= this.cols; x++) { ctx.beginPath(); ctx.moveTo(field.x + x * this.cell, field.y); ctx.lineTo(field.x + x * this.cell, field.y + field.height); ctx.stroke(); }
-    for (let y = 0; y <= this.rows; y++) { ctx.beginPath(); ctx.moveTo(field.x, field.y + y * this.cell); ctx.lineTo(field.x + field.width, field.y + y * this.cell); ctx.stroke(); }
-    this.trail.forEach(p => { ctx.fillStyle = `rgba(168,85,247,${p.life * .25})`; ctx.beginPath(); ctx.arc(p.x, p.y, this.cell * (1.1 - p.life * .3), 0, 7); ctx.fill(); });
-    const fx = field.x + (this.food.x + .5) * this.cell, fy = field.y + (this.food.y + .5) * this.cell;
-    ctx.shadowColor = "#ec4899"; ctx.shadowBlur = 25; ctx.fillStyle = "#f9a8d4"; ctx.beginPath(); ctx.arc(fx, fy, this.cell * .26, 0, 7); ctx.fill();
-    this.body.slice().reverse().forEach((p, index) => {
-      const headIndex = this.body.length - 1 - index, shade = Math.max(.35, 1 - headIndex / (this.body.length + 3));
-      const x = field.x + p.x * this.cell + 2, y = field.y + p.y * this.cell + 2, size = this.cell - 4;
-      ctx.shadowColor = headIndex === 0 ? "#22d3ee" : "#a855f7"; ctx.shadowBlur = 15;
-      ctx.fillStyle = headIndex === 0 ? "#67e8f9" : `rgba(168,85,247,${shade})`;
-      ctx.beginPath(); ctx.roundRect(x, y, size, size, Math.max(6, this.cell * .28)); ctx.fill();
-      if (headIndex === 0) { ctx.fillStyle = "#0b0518"; ctx.shadowBlur = 0; ctx.beginPath(); ctx.arc(x + size * .68, y + size * .35, 2.4, 0, 7); ctx.fill(); }
-    });
+    if (this.bg) ctx.drawImage(this.bg.canvas, field.x - this.bg.pad, field.y - this.bg.pad, this.bg.w, this.bg.h);
+
+    /* food */
+    ctx.shadowColor = "#ec4899"; ctx.shadowBlur = 22; ctx.fillStyle = "#f9a8d4";
+    ctx.beginPath(); ctx.arc(this.food.x, this.food.y, this.thickness * (.42 + Math.sin(now / 260) * .05), 0, 7); ctx.fill();
+
+    /* body as one continuous rounded ribbon */
+    const width = this.thickness;
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.shadowColor = "#a855f7"; ctx.shadowBlur = 14;
+    ctx.strokeStyle = "rgba(168,85,247,.92)";
+    ctx.lineWidth = width;
+    if (this.path.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(this.path[0].x, this.path[0].y);
+      for (let i = 1; i < this.path.length; i++) ctx.lineTo(this.path[i].x, this.path[i].y);
+      ctx.stroke();
+    }
+
+    /* head, with eyes oriented toward the direction of travel */
+    ctx.shadowColor = "#22d3ee"; ctx.shadowBlur = 16; ctx.fillStyle = "#67e8f9";
+    ctx.beginPath(); ctx.arc(this.head.x, this.head.y, width * .62, 0, 7); ctx.fill();
+    ctx.shadowBlur = 0; ctx.fillStyle = "#0b0518";
+    const ex = this.dir.x * width * .2, ey = this.dir.y * width * .2;
+    ctx.beginPath(); ctx.arc(this.head.x + ex - this.dir.y * width * .2, this.head.y + ey + this.dir.x * width * .2, 2.4, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(this.head.x + ex + this.dir.y * width * .2, this.head.y + ey - this.dir.x * width * .2, 2.4, 0, 7); ctx.fill();
+
     ctx.font = "800 12px system-ui"; ctx.textAlign = "center"; ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,255,255,.88)";
     ctx.fillText(t("snakePointer"), innerWidth / 2, Math.min(innerHeight - 14, field.y + field.height + 42));
-    if (tip) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.shadowColor = "#22d3ee"; ctx.shadowBlur = 18; ctx.beginPath(); ctx.arc(tip.x, tip.y, 15, 0, 7); ctx.stroke(); }
     ctx.restore();
   },
 
@@ -1634,20 +1718,53 @@ const SNAKE = {
 /* ================================================
    GAME 5 : BLOCK BLAST
 ================================================ */
+/* Weighted shape bag — small pieces stay common so the board keeps breathing,
+   while the rarer 5–9 cell shapes give older students something to plan around. */
 const BLAST_SHAPES = [
-  [[0,0]], [[0,0],[1,0]], [[0,0],[0,1]], [[0,0],[1,0],[2,0]], [[0,0],[0,1],[0,2]],
-  [[0,0],[1,0],[0,1],[1,1]], [[0,0],[1,0],[1,1]], [[0,0],[0,1],[1,1]], [[0,0],[1,0],[2,0],[1,1]],
+  { w: 3, s: [[0,0]] },
+  { w: 6, s: [[0,0],[1,0]] },
+  { w: 6, s: [[0,0],[0,1]] },
+  { w: 5, s: [[0,0],[1,0],[2,0]] },
+  { w: 5, s: [[0,0],[0,1],[0,2]] },
+  { w: 5, s: [[0,0],[1,0],[0,1],[1,1]] },
+  { w: 4, s: [[0,0],[1,0],[1,1]] },
+  { w: 4, s: [[0,0],[0,1],[1,1]] },
+  { w: 4, s: [[0,0],[1,0],[0,1]] },
+  { w: 4, s: [[1,0],[0,1],[1,1]] },
+  { w: 3, s: [[0,0],[1,0],[2,0],[3,0]] },
+  { w: 3, s: [[0,0],[0,1],[0,2],[0,3]] },
+  { w: 3, s: [[0,0],[1,0],[2,0],[1,1]] },
+  { w: 3, s: [[1,0],[0,1],[1,1],[2,1]] },
+  { w: 3, s: [[0,0],[0,1],[0,2],[1,2]] },
+  { w: 3, s: [[1,0],[1,1],[0,2],[1,2]] },
+  { w: 3, s: [[0,0],[1,0],[2,0],[2,1]] },
+  { w: 3, s: [[0,0],[1,0],[2,0],[0,1]] },
+  { w: 2, s: [[0,0],[1,0],[1,1],[2,1]] },
+  { w: 2, s: [[1,0],[2,0],[0,1],[1,1]] },
+  { w: 2, s: [[0,0],[0,1],[1,1],[1,2]] },
+  { w: 2, s: [[1,0],[0,1],[1,1],[0,2]] },
+  { w: 2, s: [[0,0],[1,0],[2,0],[0,1],[0,2]] },
+  { w: 2, s: [[0,0],[1,0],[2,0],[2,1],[2,2]] },
+  { w: 2, s: [[0,0],[1,0],[2,0],[0,1],[1,1],[2,1]] },
+  { w: 2, s: [[0,0],[1,0],[0,1],[1,1],[0,2],[1,2]] },
+  { w: 1, s: [[0,0],[1,0],[2,0],[0,1],[1,1],[2,1],[0,2],[1,2],[2,2]] },
 ];
+const BLAST_BAG_TOTAL = BLAST_SHAPES.reduce((sum, entry) => sum + entry.w, 0);
 const BLAST_COLORS = ["#22d3ee", "#a855f7", "#ec4899", "#a3e635", "#fbbf24"];
 const BLAST = {
   emoji: "🧱", titleKey: "blastTitle", howKey: "blastHow",
-  board: [], pieces: [], score: 0, lines: 0, dragging: null, wasPinching: false,
+  board: [], pieces: [], score: 0, lines: 0, dragging: null,
   flashCells: [], flashT: 0, hud: null, resetBtn: null, running: false,
+
+  cursorPos: null, dragPos: null, bg: null, bgKey: "",
+  pinchLog: [], openSince: 0, handLostSince: 0,
 
   start() {
     this.cleanup();
     this.board = Array.from({ length: 8 }, () => Array(8).fill(null));
-    this.score = 0; this.lines = 0; this.dragging = null; this.wasPinching = false; this.flashCells = []; this.flashT = 0;
+    this.score = 0; this.lines = 0; this.dragging = null; this.flashCells = []; this.flashT = 0;
+    this.cursorPos = null; this.dragPos = null; this.bg = null; this.bgKey = "";
+    this.pinchLog = []; this.openSince = 0; this.handLostSince = 0;
     this.spawnPieces(); this.running = true;
     this.hud = el(`<div class="hud"><div class="stat"><div class="lbl">${t("score")}</div><div class="num cyan" id="bScore">0</div></div><div class="stat"><div class="lbl">${t("lines")}</div><div class="num pink" id="bLines">0</div></div></div>`);
     this.resetBtn = el(`<button class="reset-btn" type="button">↺ ${t("reset")}</button>`);
@@ -1655,26 +1772,50 @@ const BLAST = {
     document.body.append(this.hud, this.resetBtn);
   },
 
-  cleanup() { this.hud?.remove(); this.resetBtn?.remove(); this.hud = null; this.resetBtn = null; this.running = false; },
-  spawnPieces() {
-    this.pieces = Array.from({ length: 3 }, (_, i) => ({
-      shape: BLAST_SHAPES[Math.floor(Math.random() * BLAST_SHAPES.length)], color: BLAST_COLORS[(this.score / 10 + i) % BLAST_COLORS.length | 0],
-    }));
+  cleanup() {
+    this.hud?.remove(); this.resetBtn?.remove();
+    this.hud = null; this.resetBtn = null; this.running = false; this.bg = null;
   },
+
+  randomShape() {
+    let roll = Math.random() * BLAST_BAG_TOTAL;
+    for (const entry of BLAST_SHAPES) { roll -= entry.w; if (roll <= 0) return entry.s; }
+    return BLAST_SHAPES[0].s;
+  },
+  makePiece() {
+    return { shape: this.randomShape(), color: BLAST_COLORS[Math.floor(Math.random() * BLAST_COLORS.length)] };
+  },
+  spawnPieces() {
+    // Never hand out a set that is dead on arrival.
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const set = [0, 1, 2].map(() => this.makePiece());
+      if (set.some(p => this.canFit(p.shape))) { this.pieces = set; return; }
+    }
+    this.pieces = [0, 1, 2].map(() => ({ shape: [[0, 0]], color: BLAST_COLORS[0] }));
+  },
+
+  /* Pieces stacked in a column down the left edge, board to the right — a
+     vertical tray is far easier to reach into with one hand than a bottom row. */
   layout() {
-    const portrait = innerHeight > innerWidth;
-    const size = Math.min(portrait ? innerWidth * .84 : innerWidth * .56, portrait ? innerHeight * .50 : innerHeight * .62, 470);
-    const cell = Math.max(20, Math.floor(size / 8)); const boardSize = cell * 8;
-    const gx = Math.round((innerWidth - boardSize) / 2);
-    const gy = portrait ? Math.max(105, Math.round(innerHeight * .16)) : Math.max(102, Math.round((innerHeight - boardSize) / 2 - 12));
-    const trayY = Math.min(innerHeight - 54, gy + boardSize + Math.min(72, Math.max(42, innerHeight - (gy + boardSize) - 25)));
-    return { gx, gy, cell, boardSize, trayY };
+    const topSafe = 104, bottomSafe = 66;
+    const availH = Math.max(220, innerHeight - topSafe - bottomSafe);
+    const trayW = Math.round(Math.min(150, Math.max(92, innerWidth * .2)));
+    const availW = Math.max(200, innerWidth - trayW - 26);
+    const cell = Math.max(15, Math.floor(Math.min(availW * .92, availH * .96, 336) / 8));
+    const boardSize = cell * 8;
+    const gx = Math.round(trayW + 18 + Math.max(0, (availW - boardSize) / 2));
+    const gy = Math.round(topSafe + Math.max(0, (availH - boardSize) / 2));
+    const trayCell = Math.max(11, Math.min(Math.round(cell * .7), Math.floor((trayW - 26) / 4)));
+    const trayX = Math.round(trayW / 2 + 6);
+    return { gx, gy, cell, boardSize, trayW, trayX, trayCell };
   },
   pieceOrigin(piece) {
     const maxX = Math.max(...piece.shape.map(p => p[0])), maxY = Math.max(...piece.shape.map(p => p[1]));
     return { w: maxX + 1, h: maxY + 1 };
   },
-  trayPosition(index, layout) { return { x: innerWidth * ((index + 1) / 4), y: layout.trayY }; },
+  trayPosition(index, layout) {
+    return { x: layout.trayX, y: layout.gy + layout.boardSize * ((index + .5) / 3) };
+  },
   valid(shape, col, row) {
     return shape.every(([x, y]) => row + y >= 0 && row + y < 8 && col + x >= 0 && col + x < 8 && !this.board[row + y][col + x]);
   },
@@ -1682,14 +1823,16 @@ const BLAST = {
     for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) if (this.valid(shape, x, y)) return true;
     return false;
   },
-  cursor() { return pinchState()?.center || null; },
   hoveredPiece(layout, cursor) {
     if (!cursor) return -1;
     return this.pieces.findIndex((piece, index) => {
       if (!piece) return false;
       const p = this.trayPosition(index, layout), d = this.pieceOrigin(piece);
-      const w = d.w * layout.cell, h = d.h * layout.cell;
-      return cursor.x >= p.x - w / 2 - 20 && cursor.x <= p.x + w / 2 + 20 && cursor.y >= p.y - h / 2 - 20 && cursor.y <= p.y + h / 2 + 20;
+      const w = d.w * layout.trayCell, h = d.h * layout.trayCell;
+      // Generous grab box: the fingertip never has to be pixel-accurate.
+      const padX = 34, padY = Math.max(24, layout.boardSize / 9);
+      return cursor.x >= p.x - w / 2 - padX && cursor.x <= p.x + w / 2 + padX &&
+             cursor.y >= p.y - h / 2 - padY && cursor.y <= p.y + h / 2 + padY;
     });
   },
   dragCell(layout, cursor, piece) {
@@ -1716,43 +1859,180 @@ const BLAST = {
     this.updateHud();
     if (!this.pieces.some(p => p && this.canFit(p.shape))) this.end();
   },
-  drawPiece(piece, x, y, layout, alpha = 1, valid = true) {
-    if (!piece) return;
-    const d = this.pieceOrigin(piece), startX = x - d.w * layout.cell / 2, startY = y - d.h * layout.cell / 2;
-    ctx.save(); ctx.globalAlpha = alpha; ctx.shadowColor = valid ? piece.color : "#f43f5e"; ctx.shadowBlur = 18;
-    piece.shape.forEach(([sx, sy]) => { const px = startX + sx * layout.cell + 3, py = startY + sy * layout.cell + 3; ctx.fillStyle = valid ? piece.color : "#f43f5e"; ctx.beginPath(); ctx.roundRect(px, py, layout.cell - 6, layout.cell - 6, 7); ctx.fill(); });
+
+  /* Empty board frame + grid cached offscreen: it is identical every frame and
+     the per-cell shadow pass used to cost more than the rest of the game. */
+  buildBackground(layout) {
+    const key = `${layout.gx}:${layout.gy}:${layout.cell}`;
+    if (this.bgKey === key && this.bg) return;
+    const pad = 14, dpr = Math.min(2, devicePixelRatio || 1);
+    const size = layout.boardSize + pad * 2;
+    const c = document.createElement("canvas");
+    c.width = c.height = Math.ceil(size * dpr);
+    const g = c.getContext("2d");
+    g.scale(dpr, dpr);
+    g.fillStyle = "rgba(11,5,24,.65)"; g.strokeStyle = "rgba(34,211,238,.55)"; g.lineWidth = 2;
+    g.shadowColor = "#22d3ee"; g.shadowBlur = 16;
+    g.beginPath(); g.roundRect(pad - 9, pad - 9, layout.boardSize + 18, layout.boardSize + 18, 18);
+    g.fill(); g.stroke();
+    g.shadowBlur = 0;
+    g.fillStyle = "rgba(255,255,255,.055)"; g.strokeStyle = "rgba(255,255,255,.12)"; g.lineWidth = 1;
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+      g.beginPath();
+      g.roundRect(pad + x * layout.cell + 2, pad + y * layout.cell + 2, layout.cell - 4, layout.cell - 4, 6);
+      g.fill(); g.stroke();
+    }
+    this.bg = { canvas: c, pad, size };
+    this.bgKey = key;
+  },
+
+  drawCells(cells, x, y, cell, color, alpha = 1, glow = 0) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    if (glow) { ctx.shadowColor = color; ctx.shadowBlur = glow; }
+    cells.forEach(([sx, sy]) => {
+      ctx.beginPath();
+      ctx.roundRect(x + sx * cell + 2, y + sy * cell + 2, cell - 4, cell - 4, Math.max(4, cell * .2));
+      ctx.fill();
+    });
     ctx.restore();
   },
+  drawPiece(piece, cx, cy, cell, alpha = 1, color = null, glow = 0) {
+    if (!piece) return;
+    const d = this.pieceOrigin(piece);
+    this.drawCells(piece.shape, cx - d.w * cell / 2, cy - d.h * cell / 2, cell, color || piece.color, alpha, glow);
+  },
+
   onFrame(dt) {
     if (!this.running) return;
-    const layout = this.layout(), pinch = pinchState(), cursor = pinch?.center || null;
-    // Hysteresis prevents tiny camera jitter from dropping a block early.
-    const pinching = !!pinch && (this.wasPinching ? pinch.pinch < .58 : pinch.pinch < .42);
-    if (pinching && !this.wasPinching && this.dragging === null) {
-      const index = this.hoveredPiece(layout, cursor); if (index >= 0) { this.dragging = index; sfx.click(); }
+    const layout = this.layout();
+    this.buildBackground(layout);
+    const pinch = pinchState();
+    const raw = pinch?.center || null;
+    const now = performance.now();
+
+    /* Ease the cursor and the carried block. The tracker is already filtered,
+       but a second light ease is what turns "twitchy" into "glides". */
+    if (raw) {
+      const k = 1 - Math.pow(1e-9, dt); // frame-rate independent, ~0.29 at 60fps
+      if (!this.cursorPos) this.cursorPos = { x: raw.x, y: raw.y };
+      else { this.cursorPos.x += (raw.x - this.cursorPos.x) * k; this.cursorPos.y += (raw.y - this.cursorPos.y) * k; }
+    } else this.cursorPos = null;
+    const cursor = this.cursorPos;
+
+    /* Rolling short pinch log: a fast pinch-and-swipe can produce one or two
+       blurry camera frames where the fingertip gap briefly reads "open" even
+       though the student's fingers are together. Remembering the most-closed
+       raw reading from the last ~160ms means a single clean frame is enough
+       to register the grab, instead of needing every single frame to agree. */
+    if (pinch) this.pinchLog.push({ t: now, v: pinch.pinch, cursor: { x: pinch.center.x, y: pinch.center.y } });
+    while (this.pinchLog.length && now - this.pinchLog[0].t > 160) this.pinchLog.shift();
+
+    let pinching = false;
+    if (this.dragging === null) {
+      const closest = this.pinchLog.reduce((best, e) => (!best || e.v < best.v ? e : best), null);
+      if (closest && closest.v < .48) {
+        const index = this.hoveredPiece(layout, closest.cursor);
+        if (index >= 0) {
+          this.dragging = index; sfx.click();
+          this.dragPos = { x: closest.cursor.x, y: closest.cursor.y };
+          this.openSince = 0;
+        }
+      }
+      pinching = !!pinch && pinch.pinch < .5;
+    } else if (!pinch) {
+      // Hand briefly lost mid-swipe (common during a fast motion blur):
+      // pause the drag in place instead of dropping the block wherever it
+      // last was. Only give up and hand the piece back after a real gap.
+      this.handLostSince = this.handLostSince || now;
+      if (now - this.handLostSince > 900) { this.dragging = null; this.dragPos = null; sfx.bad(); }
+      pinching = true;
+    } else {
+      this.handLostSince = 0;
+      // Require the fingers to read "open" for a short stretch before
+      // committing to a release, so one noisy frame during a fast swipe
+      // can't drop the piece early.
+      if (pinch.pinch >= .62) this.openSince = this.openSince || now;
+      else this.openSince = 0;
+      if (this.openSince && now - this.openSince > 70 && this.dragPos) {
+        this.place(this.dragging, layout, this.dragPos);
+        this.dragging = null; this.dragPos = null; this.openSince = 0;
+      }
+      pinching = pinch.pinch < .58;
     }
-    if (!pinching && this.wasPinching && this.dragging !== null && cursor) { this.place(this.dragging, layout, cursor); this.dragging = null; }
-    this.wasPinching = pinching; this.flashT = Math.max(0, this.flashT - dt);
-    ctx.save(); ctx.fillStyle = "rgba(5,8,28,.34)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
-    ctx.fillStyle = "rgba(11,5,24,.65)"; ctx.strokeStyle = "rgba(34,211,238,.55)"; ctx.lineWidth = 2; ctx.shadowColor = "#22d3ee"; ctx.shadowBlur = 18; ctx.beginPath(); ctx.roundRect(layout.gx - 9, layout.gy - 9, layout.boardSize + 18, layout.boardSize + 18, 18); ctx.fill(); ctx.stroke();
+    this.flashT = Math.max(0, this.flashT - dt);
+    if (this.dragging !== null && cursor) {
+      const k = 1 - Math.pow(1e-11, dt); // the held block chases a touch faster
+      if (!this.dragPos) this.dragPos = { x: cursor.x, y: cursor.y };
+      else { this.dragPos.x += (cursor.x - this.dragPos.x) * k; this.dragPos.y += (cursor.y - this.dragPos.y) * k; }
+    }
+
+    ctx.save();
+    ctx.fillStyle = "rgba(5,8,28,.34)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    if (this.bg) ctx.drawImage(this.bg.canvas, layout.gx - this.bg.pad, layout.gy - this.bg.pad, this.bg.size, this.bg.size);
+
+    /* filled cells */
     for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
-      const px = layout.gx + x * layout.cell, py = layout.gy + y * layout.cell, color = this.board[y][x];
-      ctx.shadowBlur = color ? 14 : 0; ctx.shadowColor = color || "transparent"; ctx.fillStyle = color || "rgba(255,255,255,.055)"; ctx.strokeStyle = color ? `${color}bb` : "rgba(255,255,255,.12)";
-      ctx.beginPath(); ctx.roundRect(px + 2, py + 2, layout.cell - 4, layout.cell - 4, 6); ctx.fill(); ctx.stroke();
+      const color = this.board[y][x];
+      if (!color) continue;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.roundRect(layout.gx + x * layout.cell + 2, layout.gy + y * layout.cell + 2, layout.cell - 4, layout.cell - 4, 6);
+      ctx.fill();
     }
-    if (this.flashT) { ctx.fillStyle = `rgba(255,255,255,${this.flashT * 1.7})`; this.flashCells.forEach(([x,y]) => ctx.fillRect(layout.gx + x * layout.cell, layout.gy + y * layout.cell, layout.cell, layout.cell)); }
+    if (this.flashT) {
+      ctx.fillStyle = `rgba(255,255,255,${this.flashT * 1.7})`;
+      this.flashCells.forEach(([x, y]) => ctx.fillRect(layout.gx + x * layout.cell, layout.gy + y * layout.cell, layout.cell, layout.cell));
+    }
+
+    /* side tray */
     const hover = this.hoveredPiece(layout, cursor);
-    this.pieces.forEach((piece, index) => { if (!piece || index === this.dragging) return; const p = this.trayPosition(index, layout); this.drawPiece(piece, p.x, p.y, layout, index === hover ? 1 : .72); });
-    if (this.dragging !== null && cursor) { const piece = this.pieces[this.dragging], cell = this.dragCell(layout, cursor, piece); this.drawPiece(piece, layout.gx + (cell.col + this.pieceOrigin(piece).w / 2) * layout.cell, layout.gy + (cell.row + this.pieceOrigin(piece).h / 2) * layout.cell, layout, .9, this.valid(piece.shape, cell.col, cell.row)); }
-    ctx.font = "800 13px system-ui"; ctx.textAlign = "center"; ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillText(t("pinchHint"), innerWidth / 2, Math.min(innerHeight - 12, layout.trayY + 54));
+    ctx.save();
+    ctx.fillStyle = "rgba(11,5,24,.5)"; ctx.strokeStyle = "rgba(168,85,247,.35)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(layout.trayX - layout.trayW / 2, layout.gy - 10, layout.trayW, layout.boardSize + 20, 18);
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+    this.pieces.forEach((piece, index) => {
+      if (!piece || index === this.dragging) return;
+      const p = this.trayPosition(index, layout);
+      const active = index === hover;
+      if (active) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(34,211,238,.7)"; ctx.lineWidth = 2;
+        ctx.shadowColor = "#22d3ee"; ctx.shadowBlur = 14;
+        const d = this.pieceOrigin(piece);
+        const w = d.w * layout.trayCell + 22, h = d.h * layout.trayCell + 22;
+        ctx.beginPath(); ctx.roundRect(p.x - w / 2, p.y - h / 2, w, h, 12); ctx.stroke();
+        ctx.restore();
+      }
+      this.drawPiece(piece, p.x, p.y, layout.trayCell, active ? 1 : .78, null, active ? 14 : 0);
+    });
+
+    /* carried block + snapped landing ghost */
+    if (this.dragging !== null && this.dragPos) {
+      const piece = this.pieces[this.dragging];
+      const cell = this.dragCell(layout, this.dragPos, piece);
+      const ok = this.valid(piece.shape, cell.col, cell.row);
+      this.drawCells(piece.shape, layout.gx + cell.col * layout.cell, layout.gy + cell.row * layout.cell,
+        layout.cell, ok ? "#ffffff" : "#f43f5e", ok ? .28 : .22);
+      this.drawPiece(piece, this.dragPos.x, this.dragPos.y - layout.cell * .35, layout.cell, .95,
+        ok ? piece.color : "#f43f5e", 18);
+    }
+
+    ctx.font = "800 13px system-ui"; ctx.textAlign = "center"; ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,255,255,.9)";
+    ctx.fillText(t("pinchHint"), innerWidth / 2, innerHeight - 22);
     if (pinch) {
       const color = pinching ? "#f9a8d4" : "#67e8f9";
-      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3; ctx.shadowColor = pinching ? "#ec4899" : "#22d3ee"; ctx.shadowBlur = 18;
+      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3; ctx.shadowColor = pinching ? "#ec4899" : "#22d3ee"; ctx.shadowBlur = 16;
       ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(pinch.thumb.x, pinch.thumb.y); ctx.lineTo(pinch.index.x, pinch.index.y); ctx.stroke(); ctx.setLineDash([]);
       [pinch.thumb, pinch.index].forEach((point) => { ctx.beginPath(); ctx.arc(point.x, point.y, 10, 0, 7); ctx.stroke(); });
-      ctx.fillStyle = pinching ? "rgba(236,72,153,.92)" : "rgba(34,211,238,.82)"; ctx.beginPath(); ctx.arc(pinch.center.x, pinch.center.y, pinching ? 8 : 6, 0, 7); ctx.fill();
-      ctx.shadowBlur = 0; ctx.font = "800 11px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "#fff";
-      ctx.fillText(pinching ? t("pinchClosed") : t("pinchOpen"), pinch.center.x, pinch.center.y - 20);
+      if (cursor) {
+        ctx.fillStyle = pinching ? "rgba(236,72,153,.92)" : "rgba(34,211,238,.82)";
+        ctx.beginPath(); ctx.arc(cursor.x, cursor.y, pinching ? 8 : 6, 0, 7); ctx.fill();
+        ctx.shadowBlur = 0; ctx.font = "800 11px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "#fff";
+        ctx.fillText(pinching ? t("pinchClosed") : t("pinchOpen"), cursor.x, cursor.y - 20);
+      }
     }
     ctx.restore();
   },
