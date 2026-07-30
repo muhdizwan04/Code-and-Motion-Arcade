@@ -101,6 +101,7 @@ const STR = {
     length: "Length",
     gameOver: "GAME OVER",
     reset: "RESET",
+    snakePointer: "Point your index finger inside the grid to steer",
     // blast
     blastTitle: "Block Blast",
     blastDesc: "Pinch, drag and drop blocks — clear rows to score!",
@@ -109,6 +110,8 @@ const STR = {
     noMoves: "NO MOVES LEFT!",
     blastRanks: ["🧱 BLOCK MASTER", "⚡ LINE BREAKER", "🔰 STACKER"],
     pinchHint: "👌 PINCH to grab · release to place",
+    pinchOpen: "OPEN",
+    pinchClosed: "PINCHED",
   },
   bm: {
     langBtn: "EN",
@@ -198,6 +201,7 @@ const STR = {
     length: "Panjang",
     gameOver: "TAMAT!",
     reset: "RESET",
+    snakePointer: "Tuding jari telunjuk ke dalam grid untuk mengawal",
     // blast
     blastTitle: "Block Blast",
     blastDesc: "Cubit, seret dan letak blok — kosongkan baris untuk skor!",
@@ -206,6 +210,8 @@ const STR = {
     noMoves: "TIADA LANGKAH LAGI!",
     blastRanks: ["🧱 TUAN BLOK", "⚡ PEMECAH BARIS", "🔰 PENYUSUN"],
     pinchHint: "👌 CUBIT untuk ambil · lepas untuk letak",
+    pinchOpen: "BUKA",
+    pinchClosed: "DICUBIT",
   },
 };
 let lang = localStorage.getItem("ha-lang") || "en";
@@ -277,9 +283,11 @@ const engine = {
         baseOptions: { modelAssetPath: "vendor/hand_landmarker.task", delegate },
         runningMode: "VIDEO",
         numHands: 2,
-        minHandDetectionConfidence: 0.62,
-        minHandPresenceConfidence: 0.62,
-        minTrackingConfidence: 0.60,
+        // A slightly more forgiving entrance threshold helps on phone cameras,
+        // while the temporal filter below keeps the cursor calm once tracked.
+        minHandDetectionConfidence: 0.52,
+        minHandPresenceConfidence: 0.54,
+        minTrackingConfidence: 0.52,
       });
       try {
         this.landmarker = await HandLandmarker.createFromOptions(fileset, options("GPU"));
@@ -294,9 +302,10 @@ const engine = {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "user",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30, min: 24 },
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 },
+          frameRate: { ideal: 30, min: 20 },
+          resizeMode: "crop-and-scale",
         },
         audio: false,
       });
@@ -347,8 +356,11 @@ const engine = {
       if (!this.norm) {
         this.norm = raw;
       } else {
-        const wristMotion = dist(raw[0], this.norm[0]);
-        const alpha = Math.max(0.38, Math.min(0.82, 0.38 + wristMotion * 4.5));
+        // Adaptive smoothing: steady hands are filtered strongly, but a quick
+        // fingertip movement still feels immediate. This is much less jumpy on
+        // lower-light phone cameras than smoothing from wrist motion alone.
+        const motion = raw.reduce((sum, p, i) => sum + dist(p, this.norm[i]), 0) / raw.length;
+        const alpha = Math.max(0.20, Math.min(0.80, 0.20 + motion * 7.5));
         this.norm = raw.map((p, i) => ({
           x: this.norm[i].x + (p.x - this.norm[i].x) * alpha,
           y: this.norm[i].y + (p.y - this.norm[i].y) * alpha,
@@ -360,7 +372,7 @@ const engine = {
       this.hands = rawHands.map(toScreen);
       this.hand = toScreen(this.norm);
       this.lastSeenAt = performance.now();
-    } else if (performance.now() - this.lastSeenAt > 140) {
+    } else if (performance.now() - this.lastSeenAt > 220) {
       // Ignore a few dropped inference frames so the cursor/sign does not flicker.
       this.hand = null;
       this.norm = null;
@@ -397,6 +409,17 @@ function fingerStates(lms) {
     indexOut: dist(lms[8], lms[0]) / hs,
     palmX: (lms[0].x + lms[5].x + lms[17].x) / 3,
     palmY: (lms[0].y + lms[5].y + lms[17].y) / 3,
+  };
+}
+function pinchState() {
+  if (!engine.norm || !engine.hand) return null;
+  const fingers = fingerStates(engine.norm);
+  const thumb = engine.hand[4], index = engine.hand[8];
+  return {
+    ...fingers,
+    thumb,
+    index,
+    center: { x: (thumb.x + index.x) / 2, y: (thumb.y + index.y) / 2 },
   };
 }
 const clamp01 = value => Math.max(0, Math.min(1, value));
@@ -1495,13 +1518,17 @@ const SIGN = {
 const SNAKE = {
   emoji: "🐍", titleKey: "snakeTitle", howKey: "snakeHow",
   body: [], food: null, trail: [], score: 0, moveT: 0, dir: { x: 1, y: 0 },
-  cols: 0, rows: 0, cell: 26, hud: null, resetBtn: null, running: false,
+  cols: 0, rows: 0, cell: 26, field: null, hud: null, resetBtn: null, running: false,
 
   start() {
     this.cleanup();
-    this.cell = Math.max(20, Math.min(34, Math.floor(Math.min(innerWidth, innerHeight) / 19)));
-    this.cols = Math.max(12, Math.floor(innerWidth / this.cell));
-    this.rows = Math.max(12, Math.floor(innerHeight / this.cell));
+    const safeTop = 122, safeBottom = 76;
+    const maxWidth = Math.max(280, innerWidth - 28), maxHeight = Math.max(280, innerHeight - safeTop - safeBottom);
+    this.cell = Math.max(19, Math.min(34, Math.floor(Math.min(maxWidth / 17, maxHeight / 15))));
+    this.cols = Math.max(12, Math.floor(maxWidth / this.cell));
+    this.rows = Math.max(12, Math.floor(maxHeight / this.cell));
+    const width = this.cols * this.cell, height = this.rows * this.cell;
+    this.field = { x: Math.round((innerWidth - width) / 2), y: Math.round(safeTop + (maxHeight - height) / 2), width, height };
     const cx = Math.floor(this.cols / 2), cy = Math.floor(this.rows / 2);
     this.body = [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
     this.dir = { x: 1, y: 0 }; this.score = 0; this.moveT = 0; this.trail = [];
@@ -1530,10 +1557,14 @@ const SNAKE = {
 
   steer() {
     const tip = engine.hand?.[8];
-    if (!tip) return;
+    if (!tip || !this.field) return;
     const head = this.body[0];
-    const hx = (head.x + .5) * this.cell, hy = (head.y + .5) * this.cell;
-    const dx = tip.x - hx, dy = tip.y - hy;
+    const hx = this.field.x + (head.x + .5) * this.cell, hy = this.field.y + (head.y + .5) * this.cell;
+    const tx = Math.max(this.field.x, Math.min(this.field.x + this.field.width, tip.x));
+    const ty = Math.max(this.field.y, Math.min(this.field.y + this.field.height, tip.y));
+    const dx = tx - hx, dy = ty - hy;
+    // Ignore tiny sensor tremors; only a deliberate finger move changes lane.
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < this.cell * .65) return;
     const next = Math.abs(dx) > Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
     if ((next.x || next.y) && !(next.x === -this.dir.x && next.y === -this.dir.y)) this.dir = next;
   },
@@ -1545,7 +1576,7 @@ const SNAKE = {
       y: (head.y + this.dir.y + this.rows) % this.rows,
     };
     if (this.body.some(p => p.x === next.x && p.y === next.y)) { this.end(); return; }
-    this.trail.push({ x: (head.x + .5) * this.cell, y: (head.y + .5) * this.cell, life: 1 });
+    this.trail.push({ x: this.field.x + (head.x + .5) * this.cell, y: this.field.y + (head.y + .5) * this.cell, life: 1 });
     this.body.unshift(next);
     if (next.x === this.food.x && next.y === this.food.y) {
       this.score += 10; this.food = this.newFood(); sfx.good();
@@ -1563,22 +1594,28 @@ const SNAKE = {
     while (this.moveT >= speed && this.running) { this.moveT -= speed; this.move(); }
     this.trail.forEach(p => p.life -= dt * 2.3); this.trail = this.trail.filter(p => p.life > 0);
     const tip = engine.hand?.[8];
+    const field = this.field;
     ctx.save();
-    ctx.fillStyle = "rgba(5,8,28,.28)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
-    ctx.strokeStyle = "rgba(34,211,238,.07)"; ctx.lineWidth = 1;
-    for (let x = 0; x <= innerWidth; x += this.cell) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, innerHeight); ctx.stroke(); }
-    for (let y = 0; y <= innerHeight; y += this.cell) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(innerWidth, y); ctx.stroke(); }
+    ctx.fillStyle = "rgba(5,8,28,.22)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    ctx.fillStyle = "rgba(7,14,35,.52)"; ctx.strokeStyle = "rgba(34,211,238,.72)"; ctx.lineWidth = 2;
+    ctx.shadowColor = "#22d3ee"; ctx.shadowBlur = 18;
+    ctx.beginPath(); ctx.roundRect(field.x - 9, field.y - 9, field.width + 18, field.height + 18, 22); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0; ctx.strokeStyle = "rgba(34,211,238,.13)"; ctx.lineWidth = 1;
+    for (let x = 0; x <= this.cols; x++) { ctx.beginPath(); ctx.moveTo(field.x + x * this.cell, field.y); ctx.lineTo(field.x + x * this.cell, field.y + field.height); ctx.stroke(); }
+    for (let y = 0; y <= this.rows; y++) { ctx.beginPath(); ctx.moveTo(field.x, field.y + y * this.cell); ctx.lineTo(field.x + field.width, field.y + y * this.cell); ctx.stroke(); }
     this.trail.forEach(p => { ctx.fillStyle = `rgba(168,85,247,${p.life * .25})`; ctx.beginPath(); ctx.arc(p.x, p.y, this.cell * (1.1 - p.life * .3), 0, 7); ctx.fill(); });
-    const fx = (this.food.x + .5) * this.cell, fy = (this.food.y + .5) * this.cell;
+    const fx = field.x + (this.food.x + .5) * this.cell, fy = field.y + (this.food.y + .5) * this.cell;
     ctx.shadowColor = "#ec4899"; ctx.shadowBlur = 25; ctx.fillStyle = "#f9a8d4"; ctx.beginPath(); ctx.arc(fx, fy, this.cell * .26, 0, 7); ctx.fill();
     this.body.slice().reverse().forEach((p, index) => {
       const headIndex = this.body.length - 1 - index, shade = Math.max(.35, 1 - headIndex / (this.body.length + 3));
-      const x = p.x * this.cell + 2, y = p.y * this.cell + 2, size = this.cell - 4;
+      const x = field.x + p.x * this.cell + 2, y = field.y + p.y * this.cell + 2, size = this.cell - 4;
       ctx.shadowColor = headIndex === 0 ? "#22d3ee" : "#a855f7"; ctx.shadowBlur = 15;
       ctx.fillStyle = headIndex === 0 ? "#67e8f9" : `rgba(168,85,247,${shade})`;
       ctx.beginPath(); ctx.roundRect(x, y, size, size, Math.max(6, this.cell * .28)); ctx.fill();
       if (headIndex === 0) { ctx.fillStyle = "#0b0518"; ctx.shadowBlur = 0; ctx.beginPath(); ctx.arc(x + size * .68, y + size * .35, 2.4, 0, 7); ctx.fill(); }
     });
+    ctx.font = "800 12px system-ui"; ctx.textAlign = "center"; ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,255,255,.88)";
+    ctx.fillText(t("snakePointer"), innerWidth / 2, Math.min(innerHeight - 14, field.y + field.height + 42));
     if (tip) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.shadowColor = "#22d3ee"; ctx.shadowBlur = 18; ctx.beginPath(); ctx.arc(tip.x, tip.y, 15, 0, 7); ctx.stroke(); }
     ctx.restore();
   },
@@ -1645,7 +1682,7 @@ const BLAST = {
     for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) if (this.valid(shape, x, y)) return true;
     return false;
   },
-  cursor() { return engine.hand?.[8] || null; },
+  cursor() { return pinchState()?.center || null; },
   hoveredPiece(layout, cursor) {
     if (!cursor) return -1;
     return this.pieces.findIndex((piece, index) => {
@@ -1688,8 +1725,9 @@ const BLAST = {
   },
   onFrame(dt) {
     if (!this.running) return;
-    const layout = this.layout(), cursor = this.cursor(), f = engine.norm ? fingerStates(engine.norm) : null;
-    const pinching = !!f && f.pinch < .46;
+    const layout = this.layout(), pinch = pinchState(), cursor = pinch?.center || null;
+    // Hysteresis prevents tiny camera jitter from dropping a block early.
+    const pinching = !!pinch && (this.wasPinching ? pinch.pinch < .58 : pinch.pinch < .42);
     if (pinching && !this.wasPinching && this.dragging === null) {
       const index = this.hoveredPiece(layout, cursor); if (index >= 0) { this.dragging = index; sfx.click(); }
     }
@@ -1707,7 +1745,15 @@ const BLAST = {
     this.pieces.forEach((piece, index) => { if (!piece || index === this.dragging) return; const p = this.trayPosition(index, layout); this.drawPiece(piece, p.x, p.y, layout, index === hover ? 1 : .72); });
     if (this.dragging !== null && cursor) { const piece = this.pieces[this.dragging], cell = this.dragCell(layout, cursor, piece); this.drawPiece(piece, layout.gx + (cell.col + this.pieceOrigin(piece).w / 2) * layout.cell, layout.gy + (cell.row + this.pieceOrigin(piece).h / 2) * layout.cell, layout, .9, this.valid(piece.shape, cell.col, cell.row)); }
     ctx.font = "800 13px system-ui"; ctx.textAlign = "center"; ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillText(t("pinchHint"), innerWidth / 2, Math.min(innerHeight - 12, layout.trayY + 54));
-    if (cursor) { ctx.strokeStyle = pinching ? "#f9a8d4" : "#fff"; ctx.lineWidth = 3; ctx.shadowColor = pinching ? "#ec4899" : "#22d3ee"; ctx.shadowBlur = 18; ctx.beginPath(); ctx.arc(cursor.x, cursor.y, pinching ? 11 : 16, 0, 7); ctx.stroke(); }
+    if (pinch) {
+      const color = pinching ? "#f9a8d4" : "#67e8f9";
+      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3; ctx.shadowColor = pinching ? "#ec4899" : "#22d3ee"; ctx.shadowBlur = 18;
+      ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(pinch.thumb.x, pinch.thumb.y); ctx.lineTo(pinch.index.x, pinch.index.y); ctx.stroke(); ctx.setLineDash([]);
+      [pinch.thumb, pinch.index].forEach((point) => { ctx.beginPath(); ctx.arc(point.x, point.y, 10, 0, 7); ctx.stroke(); });
+      ctx.fillStyle = pinching ? "rgba(236,72,153,.92)" : "rgba(34,211,238,.82)"; ctx.beginPath(); ctx.arc(pinch.center.x, pinch.center.y, pinching ? 8 : 6, 0, 7); ctx.fill();
+      ctx.shadowBlur = 0; ctx.font = "800 11px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "#fff";
+      ctx.fillText(pinching ? t("pinchClosed") : t("pinchOpen"), pinch.center.x, pinch.center.y - 20);
+    }
     ctx.restore();
   },
   end() {
