@@ -93,6 +93,22 @@ const STR = {
       U: "2 fingers together", V: "Peace sign ✌️ spread", W: "3 fingers up", Y: "Thumb + pinky 🤙",
       ILY: "🤟 thumb + pointer + pinky", HI: "Open hand 🖐",
     },
+    // snake
+    snakeTitle: "Hand Snake",
+    snakeDesc: "Your finger is the snake — eat, grow, survive!",
+    snakeHow: "Move your INDEX FINGER to steer the snake 🐍 Eat the glowing food to grow longer. Don't crash into yourself!",
+    snakeRanks: ["🐍 SERPENT KING", "🔥 VENOM STRIKER", "🐛 BABY WORM"],
+    length: "Length",
+    gameOver: "GAME OVER",
+    reset: "RESET",
+    // blast
+    blastTitle: "Block Blast",
+    blastDesc: "Pinch, drag and drop blocks — clear rows to score!",
+    blastHow: "Hover over a block, PINCH 👌 to grab it. Drag onto the grid and release to place. Fill a row or column to clear it! 🧱",
+    lines: "Lines",
+    noMoves: "NO MOVES LEFT!",
+    blastRanks: ["🧱 BLOCK MASTER", "⚡ LINE BREAKER", "🔰 STACKER"],
+    pinchHint: "👌 PINCH to grab · release to place",
   },
   bm: {
     langBtn: "EN",
@@ -174,6 +190,22 @@ const STR = {
       U: "2 jari rapat", V: "Isyarat peace ✌️ jarak", W: "3 jari tegak", Y: "Ibu jari + kelingking 🤙",
       ILY: "🤟 ibu jari + telunjuk + kelingking", HI: "Tangan terbuka 🖐",
     },
+    // snake
+    snakeTitle: "Ular Tangan",
+    snakeDesc: "Jari anda ialah ular — makan, membesar, bertahan!",
+    snakeHow: "Gerakkan JARI TELUNJUK untuk mengawal ular 🐍 Makan makanan bercahaya untuk membesar. Jangan langgar diri sendiri!",
+    snakeRanks: ["🐍 RAJA ULAR", "🔥 PENYERANG BISA", "🐛 ULAT KECIL"],
+    length: "Panjang",
+    gameOver: "TAMAT!",
+    reset: "RESET",
+    // blast
+    blastTitle: "Block Blast",
+    blastDesc: "Cubit, seret dan letak blok — kosongkan baris untuk skor!",
+    blastHow: "Tuding ke atas blok, CUBIT 👌 untuk mengambilnya. Seret ke grid dan lepaskan untuk meletakkan. Penuhkan baris atau lajur untuk mengosongkannya! 🧱",
+    lines: "Baris",
+    noMoves: "TIADA LANGKAH LAGI!",
+    blastRanks: ["🧱 TUAN BLOK", "⚡ PEMECAH BARIS", "🔰 PENYUSUN"],
+    pinchHint: "👌 CUBIT untuk ambil · lepas untuk letak",
   },
 };
 let lang = localStorage.getItem("ha-lang") || "en";
@@ -492,12 +524,22 @@ function menu() {
         <div class="emo">🤟</div>
         <div><h3>${t("signTitle")} <span style="font-size:14px">📖</span></h3><p>${t("signDesc")}</p></div>
       </div>
+      <div class="card snake" id="cSnake">
+        <div class="emo">🐍</div>
+        <div><h3>${t("snakeTitle")} <span style="font-size:14px">🎮</span></h3><p>${t("snakeDesc")}</p></div>
+      </div>
+      <div class="card blast" id="cBlast">
+        <div class="emo">🧱</div>
+        <div><h3>${t("blastTitle")} <span style="font-size:14px">🧩</span></h3><p>${t("blastDesc")}</p></div>
+      </div>
     </div>
     <div class="made-with">🤖 ${t("madeWith")}</div>
   </div>`);
   node.querySelector("#cNinja").onclick = () => { sfx.click(); intro(NINJA); };
   node.querySelector("#cBattle").onclick = () => { sfx.click(); intro(BATTLE); };
   node.querySelector("#cSign").onclick = () => { sfx.click(); intro(SIGN); };
+  node.querySelector("#cSnake").onclick = () => { sfx.click(); intro(SNAKE); };
+  node.querySelector("#cBlast").onclick = () => { sfx.click(); intro(BLAST); };
   show(node);
 }
 
@@ -1447,6 +1489,238 @@ const SIGN = {
   },
 };
 
+/* ================================================
+   GAME 4 : HAND SNAKE
+================================================ */
+const SNAKE = {
+  emoji: "🐍", titleKey: "snakeTitle", howKey: "snakeHow",
+  body: [], food: null, trail: [], score: 0, moveT: 0, dir: { x: 1, y: 0 },
+  cols: 0, rows: 0, cell: 26, hud: null, resetBtn: null, running: false,
+
+  start() {
+    this.cleanup();
+    this.cell = Math.max(20, Math.min(34, Math.floor(Math.min(innerWidth, innerHeight) / 19)));
+    this.cols = Math.max(12, Math.floor(innerWidth / this.cell));
+    this.rows = Math.max(12, Math.floor(innerHeight / this.cell));
+    const cx = Math.floor(this.cols / 2), cy = Math.floor(this.rows / 2);
+    this.body = [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
+    this.dir = { x: 1, y: 0 }; this.score = 0; this.moveT = 0; this.trail = [];
+    this.food = this.newFood(); this.running = true;
+    this.hud = el(`<div class="hud">
+      <div class="stat"><div class="lbl">${t("score")}</div><div class="num cyan" id="sScore">0</div></div>
+      <div class="stat"><div class="lbl">${t("length")}</div><div class="num lime" id="sLength">3</div></div>
+    </div>`);
+    this.resetBtn = el(`<button class="reset-btn" type="button">↺ ${t("reset")}</button>`);
+    this.resetBtn.onclick = () => { sfx.click(); this.start(); };
+    document.body.append(this.hud, this.resetBtn);
+  },
+
+  cleanup() {
+    this.hud?.remove(); this.resetBtn?.remove();
+    this.hud = null; this.resetBtn = null; this.running = false;
+  },
+
+  newFood() {
+    const free = [];
+    for (let y = 1; y < this.rows - 1; y++) for (let x = 1; x < this.cols - 1; x++) {
+      if (!this.body.some(p => p.x === x && p.y === y)) free.push({ x, y });
+    }
+    return free[Math.floor(Math.random() * free.length)] || { x: 2, y: 2 };
+  },
+
+  steer() {
+    const tip = engine.hand?.[8];
+    if (!tip) return;
+    const head = this.body[0];
+    const hx = (head.x + .5) * this.cell, hy = (head.y + .5) * this.cell;
+    const dx = tip.x - hx, dy = tip.y - hy;
+    const next = Math.abs(dx) > Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
+    if ((next.x || next.y) && !(next.x === -this.dir.x && next.y === -this.dir.y)) this.dir = next;
+  },
+
+  move() {
+    const head = this.body[0];
+    const next = {
+      x: (head.x + this.dir.x + this.cols) % this.cols,
+      y: (head.y + this.dir.y + this.rows) % this.rows,
+    };
+    if (this.body.some(p => p.x === next.x && p.y === next.y)) { this.end(); return; }
+    this.trail.push({ x: (head.x + .5) * this.cell, y: (head.y + .5) * this.cell, life: 1 });
+    this.body.unshift(next);
+    if (next.x === this.food.x && next.y === this.food.y) {
+      this.score += 10; this.food = this.newFood(); sfx.good();
+      const score = this.hud?.querySelector("#sScore"), length = this.hud?.querySelector("#sLength");
+      if (score) { score.textContent = this.score; score.classList.remove("score-punch"); void score.offsetWidth; score.classList.add("score-punch"); }
+      if (length) length.textContent = this.body.length;
+    } else this.body.pop();
+  },
+
+  onFrame(dt) {
+    if (!this.running) return;
+    this.steer();
+    this.moveT += dt;
+    const speed = Math.max(.07, .18 - this.score * .0022);
+    while (this.moveT >= speed && this.running) { this.moveT -= speed; this.move(); }
+    this.trail.forEach(p => p.life -= dt * 2.3); this.trail = this.trail.filter(p => p.life > 0);
+    const tip = engine.hand?.[8];
+    ctx.save();
+    ctx.fillStyle = "rgba(5,8,28,.28)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    ctx.strokeStyle = "rgba(34,211,238,.07)"; ctx.lineWidth = 1;
+    for (let x = 0; x <= innerWidth; x += this.cell) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, innerHeight); ctx.stroke(); }
+    for (let y = 0; y <= innerHeight; y += this.cell) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(innerWidth, y); ctx.stroke(); }
+    this.trail.forEach(p => { ctx.fillStyle = `rgba(168,85,247,${p.life * .25})`; ctx.beginPath(); ctx.arc(p.x, p.y, this.cell * (1.1 - p.life * .3), 0, 7); ctx.fill(); });
+    const fx = (this.food.x + .5) * this.cell, fy = (this.food.y + .5) * this.cell;
+    ctx.shadowColor = "#ec4899"; ctx.shadowBlur = 25; ctx.fillStyle = "#f9a8d4"; ctx.beginPath(); ctx.arc(fx, fy, this.cell * .26, 0, 7); ctx.fill();
+    this.body.slice().reverse().forEach((p, index) => {
+      const headIndex = this.body.length - 1 - index, shade = Math.max(.35, 1 - headIndex / (this.body.length + 3));
+      const x = p.x * this.cell + 2, y = p.y * this.cell + 2, size = this.cell - 4;
+      ctx.shadowColor = headIndex === 0 ? "#22d3ee" : "#a855f7"; ctx.shadowBlur = 15;
+      ctx.fillStyle = headIndex === 0 ? "#67e8f9" : `rgba(168,85,247,${shade})`;
+      ctx.beginPath(); ctx.roundRect(x, y, size, size, Math.max(6, this.cell * .28)); ctx.fill();
+      if (headIndex === 0) { ctx.fillStyle = "#0b0518"; ctx.shadowBlur = 0; ctx.beginPath(); ctx.arc(x + size * .68, y + size * .35, 2.4, 0, 7); ctx.fill(); }
+    });
+    if (tip) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.shadowColor = "#22d3ee"; ctx.shadowBlur = 18; ctx.beginPath(); ctx.arc(tip.x, tip.y, 15, 0, 7); ctx.stroke(); }
+    ctx.restore();
+  },
+
+  end() {
+    if (!this.running) return;
+    const score = this.score, rank = score >= 180 ? 0 : score >= 80 ? 1 : 2;
+    this.cleanup(); sfx.bad(); ui.classList.remove("passthrough");
+    const node = el(`<div class="panel"><div class="big-emoji">🐍</div><h2>${t("gameOver")}</h2><div class="score-line">${score}</div><div class="result-rank">${t("snakeRanks")[rank]}</div><button class="btn" id="againBtn">${t("again")}</button><br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button></div>`);
+    node.querySelector("#againBtn").onclick = () => { sfx.click(); show(null); ui.classList.add("passthrough"); this.start(); };
+    node.querySelector("#menuBtn").onclick = () => { sfx.click(); menu(); };
+    show(node);
+  },
+};
+
+/* ================================================
+   GAME 5 : BLOCK BLAST
+================================================ */
+const BLAST_SHAPES = [
+  [[0,0]], [[0,0],[1,0]], [[0,0],[0,1]], [[0,0],[1,0],[2,0]], [[0,0],[0,1],[0,2]],
+  [[0,0],[1,0],[0,1],[1,1]], [[0,0],[1,0],[1,1]], [[0,0],[0,1],[1,1]], [[0,0],[1,0],[2,0],[1,1]],
+];
+const BLAST_COLORS = ["#22d3ee", "#a855f7", "#ec4899", "#a3e635", "#fbbf24"];
+const BLAST = {
+  emoji: "🧱", titleKey: "blastTitle", howKey: "blastHow",
+  board: [], pieces: [], score: 0, lines: 0, dragging: null, wasPinching: false,
+  flashCells: [], flashT: 0, hud: null, resetBtn: null, running: false,
+
+  start() {
+    this.cleanup();
+    this.board = Array.from({ length: 8 }, () => Array(8).fill(null));
+    this.score = 0; this.lines = 0; this.dragging = null; this.wasPinching = false; this.flashCells = []; this.flashT = 0;
+    this.spawnPieces(); this.running = true;
+    this.hud = el(`<div class="hud"><div class="stat"><div class="lbl">${t("score")}</div><div class="num cyan" id="bScore">0</div></div><div class="stat"><div class="lbl">${t("lines")}</div><div class="num pink" id="bLines">0</div></div></div>`);
+    this.resetBtn = el(`<button class="reset-btn" type="button">↺ ${t("reset")}</button>`);
+    this.resetBtn.onclick = () => { sfx.click(); this.start(); };
+    document.body.append(this.hud, this.resetBtn);
+  },
+
+  cleanup() { this.hud?.remove(); this.resetBtn?.remove(); this.hud = null; this.resetBtn = null; this.running = false; },
+  spawnPieces() {
+    this.pieces = Array.from({ length: 3 }, (_, i) => ({
+      shape: BLAST_SHAPES[Math.floor(Math.random() * BLAST_SHAPES.length)], color: BLAST_COLORS[(this.score / 10 + i) % BLAST_COLORS.length | 0],
+    }));
+  },
+  layout() {
+    const portrait = innerHeight > innerWidth;
+    const size = Math.min(portrait ? innerWidth * .84 : innerWidth * .56, portrait ? innerHeight * .50 : innerHeight * .62, 470);
+    const cell = Math.max(20, Math.floor(size / 8)); const boardSize = cell * 8;
+    const gx = Math.round((innerWidth - boardSize) / 2);
+    const gy = portrait ? Math.max(105, Math.round(innerHeight * .16)) : Math.max(102, Math.round((innerHeight - boardSize) / 2 - 12));
+    const trayY = Math.min(innerHeight - 54, gy + boardSize + Math.min(72, Math.max(42, innerHeight - (gy + boardSize) - 25)));
+    return { gx, gy, cell, boardSize, trayY };
+  },
+  pieceOrigin(piece) {
+    const maxX = Math.max(...piece.shape.map(p => p[0])), maxY = Math.max(...piece.shape.map(p => p[1]));
+    return { w: maxX + 1, h: maxY + 1 };
+  },
+  trayPosition(index, layout) { return { x: innerWidth * ((index + 1) / 4), y: layout.trayY }; },
+  valid(shape, col, row) {
+    return shape.every(([x, y]) => row + y >= 0 && row + y < 8 && col + x >= 0 && col + x < 8 && !this.board[row + y][col + x]);
+  },
+  canFit(shape) {
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) if (this.valid(shape, x, y)) return true;
+    return false;
+  },
+  cursor() { return engine.hand?.[8] || null; },
+  hoveredPiece(layout, cursor) {
+    if (!cursor) return -1;
+    return this.pieces.findIndex((piece, index) => {
+      if (!piece) return false;
+      const p = this.trayPosition(index, layout), d = this.pieceOrigin(piece);
+      const w = d.w * layout.cell, h = d.h * layout.cell;
+      return cursor.x >= p.x - w / 2 - 20 && cursor.x <= p.x + w / 2 + 20 && cursor.y >= p.y - h / 2 - 20 && cursor.y <= p.y + h / 2 + 20;
+    });
+  },
+  dragCell(layout, cursor, piece) {
+    const d = this.pieceOrigin(piece);
+    return { col: Math.round((cursor.x - layout.gx) / layout.cell - d.w / 2), row: Math.round((cursor.y - layout.gy) / layout.cell - d.h / 2) };
+  },
+  updateHud() {
+    const score = this.hud?.querySelector("#bScore"), lines = this.hud?.querySelector("#bLines");
+    if (score) { score.textContent = this.score; score.classList.remove("score-punch"); void score.offsetWidth; score.classList.add("score-punch"); }
+    if (lines) lines.textContent = this.lines;
+  },
+  place(index, layout, cursor) {
+    const piece = this.pieces[index], { col, row } = this.dragCell(layout, cursor, piece);
+    if (!this.valid(piece.shape, col, row)) { sfx.bad(); return; }
+    piece.shape.forEach(([x, y]) => { this.board[row + y][col + x] = piece.color; });
+    this.pieces[index] = null; this.score += piece.shape.length * 10;
+    const clear = [];
+    this.board.forEach((r, y) => { if (r.every(Boolean)) for (let x = 0; x < 8; x++) clear.push([x, y]); });
+    for (let x = 0; x < 8; x++) if (this.board.every(r => r[x])) for (let y = 0; y < 8; y++) clear.push([x, y]);
+    const unique = [...new Map(clear.map(p => [`${p[0]},${p[1]}`, p])).values()];
+    if (unique.length) { unique.forEach(([x, y]) => { this.board[y][x] = null; }); this.lines += Math.round(unique.length / 8); this.score += Math.round(unique.length / 8) * 100; this.flashCells = unique; this.flashT = .42; sfx.good(); }
+    else sfx.slice();
+    if (this.pieces.every(p => !p)) this.spawnPieces();
+    this.updateHud();
+    if (!this.pieces.some(p => p && this.canFit(p.shape))) this.end();
+  },
+  drawPiece(piece, x, y, layout, alpha = 1, valid = true) {
+    if (!piece) return;
+    const d = this.pieceOrigin(piece), startX = x - d.w * layout.cell / 2, startY = y - d.h * layout.cell / 2;
+    ctx.save(); ctx.globalAlpha = alpha; ctx.shadowColor = valid ? piece.color : "#f43f5e"; ctx.shadowBlur = 18;
+    piece.shape.forEach(([sx, sy]) => { const px = startX + sx * layout.cell + 3, py = startY + sy * layout.cell + 3; ctx.fillStyle = valid ? piece.color : "#f43f5e"; ctx.beginPath(); ctx.roundRect(px, py, layout.cell - 6, layout.cell - 6, 7); ctx.fill(); });
+    ctx.restore();
+  },
+  onFrame(dt) {
+    if (!this.running) return;
+    const layout = this.layout(), cursor = this.cursor(), f = engine.norm ? fingerStates(engine.norm) : null;
+    const pinching = !!f && f.pinch < .46;
+    if (pinching && !this.wasPinching && this.dragging === null) {
+      const index = this.hoveredPiece(layout, cursor); if (index >= 0) { this.dragging = index; sfx.click(); }
+    }
+    if (!pinching && this.wasPinching && this.dragging !== null && cursor) { this.place(this.dragging, layout, cursor); this.dragging = null; }
+    this.wasPinching = pinching; this.flashT = Math.max(0, this.flashT - dt);
+    ctx.save(); ctx.fillStyle = "rgba(5,8,28,.34)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    ctx.fillStyle = "rgba(11,5,24,.65)"; ctx.strokeStyle = "rgba(34,211,238,.55)"; ctx.lineWidth = 2; ctx.shadowColor = "#22d3ee"; ctx.shadowBlur = 18; ctx.beginPath(); ctx.roundRect(layout.gx - 9, layout.gy - 9, layout.boardSize + 18, layout.boardSize + 18, 18); ctx.fill(); ctx.stroke();
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+      const px = layout.gx + x * layout.cell, py = layout.gy + y * layout.cell, color = this.board[y][x];
+      ctx.shadowBlur = color ? 14 : 0; ctx.shadowColor = color || "transparent"; ctx.fillStyle = color || "rgba(255,255,255,.055)"; ctx.strokeStyle = color ? `${color}bb` : "rgba(255,255,255,.12)";
+      ctx.beginPath(); ctx.roundRect(px + 2, py + 2, layout.cell - 4, layout.cell - 4, 6); ctx.fill(); ctx.stroke();
+    }
+    if (this.flashT) { ctx.fillStyle = `rgba(255,255,255,${this.flashT * 1.7})`; this.flashCells.forEach(([x,y]) => ctx.fillRect(layout.gx + x * layout.cell, layout.gy + y * layout.cell, layout.cell, layout.cell)); }
+    const hover = this.hoveredPiece(layout, cursor);
+    this.pieces.forEach((piece, index) => { if (!piece || index === this.dragging) return; const p = this.trayPosition(index, layout); this.drawPiece(piece, p.x, p.y, layout, index === hover ? 1 : .72); });
+    if (this.dragging !== null && cursor) { const piece = this.pieces[this.dragging], cell = this.dragCell(layout, cursor, piece); this.drawPiece(piece, layout.gx + (cell.col + this.pieceOrigin(piece).w / 2) * layout.cell, layout.gy + (cell.row + this.pieceOrigin(piece).h / 2) * layout.cell, layout, .9, this.valid(piece.shape, cell.col, cell.row)); }
+    ctx.font = "800 13px system-ui"; ctx.textAlign = "center"; ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillText(t("pinchHint"), innerWidth / 2, Math.min(innerHeight - 12, layout.trayY + 54));
+    if (cursor) { ctx.strokeStyle = pinching ? "#f9a8d4" : "#fff"; ctx.lineWidth = 3; ctx.shadowColor = pinching ? "#ec4899" : "#22d3ee"; ctx.shadowBlur = 18; ctx.beginPath(); ctx.arc(cursor.x, cursor.y, pinching ? 11 : 16, 0, 7); ctx.stroke(); }
+    ctx.restore();
+  },
+  end() {
+    if (!this.running) return;
+    const score = this.score, rank = score >= 500 ? 0 : score >= 200 ? 1 : 2;
+    this.cleanup(); sfx.bad(); ui.classList.remove("passthrough");
+    const node = el(`<div class="panel"><div class="big-emoji">🧱</div><h2>${t("noMoves")}</h2><div class="score-line">${score}</div><div class="result-rank">${t("blastRanks")[rank]}</div><button class="btn" id="againBtn">${t("again")}</button><br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button></div>`);
+    node.querySelector("#againBtn").onclick = () => { sfx.click(); show(null); ui.classList.add("passthrough"); this.start(); };
+    node.querySelector("#menuBtn").onclick = () => { sfx.click(); menu(); };
+    show(node);
+  },
+};
+
 /* ---------------- top bar ---------------- */
 document.getElementById("langBtn").onclick = () => {
   lang = lang === "en" ? "bm" : "en";
@@ -1470,6 +1744,6 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 }
 
 /* debug hook (harmless in production) */
-window.__ha = { engine, NINJA, BATTLE, SIGN, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60) };
+window.__ha = { engine, NINJA, BATTLE, SIGN, SNAKE, BLAST, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60) };
 
 menu();

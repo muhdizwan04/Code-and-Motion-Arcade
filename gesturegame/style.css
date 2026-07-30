@@ -114,6 +114,8 @@ h1.arcade {
 .card.ninja .emo { background: linear-gradient(135deg, #16a34a44, #22d3ee33); }
 .card.battle .emo { background: linear-gradient(135deg, #dc262644, #fbbf2433); }
 .card.sign .emo { background: linear-gradient(135deg, #7c3aed44, #ec489933); }
+.card.snake .emo { background: linear-gradient(135deg, #22d3ee44, #a855f744); }
+.card.blast .emo { background: linear-gradient(135deg, #ec489944, #fbbf2444); }
 .card h3 { font-size: clamp(18px, 5vw, 23px); font-weight: 800; }
 .card p { font-size: clamp(12px, 3.3vw, 14px); opacity: .75; margin-top: 3px; line-height: 1.4; }
 .made-with { opacity: .45; font-size: 12px; margin-top: 14px; }
@@ -172,6 +174,14 @@ h1.arcade {
 .hud .stat .num { font-size: clamp(20px, 6vw, 30px); font-weight: 900; }
 .hud .stat .num.cyan { color: var(--cyan); } .hud .stat .num.amber { color: var(--amber); }
 .hud .stat .num.lime { color: var(--lime); } .hud .stat .num.pink { color: var(--pink); }
+.reset-btn {
+  position: fixed; z-index: 28; right: 14px; top: calc(64px + env(safe-area-inset-top));
+  padding: 8px 12px; border: 1px solid rgba(255,255,255,.32); border-radius: 999px;
+  background: rgba(11,5,24,.68); color: var(--text); font: 800 12px/1 inherit;
+  letter-spacing: .7px; cursor: pointer; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 0 18px rgba(34,211,238,.15);
+}
+.reset-btn:active { transform: scale(.94); background: rgba(255,255,255,.18); }
 .score-punch { animation: scorepunch .35s cubic-bezier(.2,1.8,.4,1); }
 @keyframes scorepunch { 45% { transform: scale(1.45) rotate(-4deg); text-shadow: 0 0 22px var(--pink); } }
 .combo-burst {
