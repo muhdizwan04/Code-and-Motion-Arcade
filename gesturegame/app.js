@@ -115,8 +115,8 @@ const STR = {
     // lab
     labTitle: "Hand Lab",
     labDesc: "Pinch and combine elements — how many can you discover?",
-    labHow: "PINCH 👌 an element from the shelf and drag it onto another element — they'll combine automatically! Hold still on one to see its name. Discover them all!",
-    labSlotHint: "Drag one element onto another to combine",
+    labHow: "PINCH 👌 a tag from the library or workbench, then drag it onto another tag to combine. Your library stays open while you experiment!",
+    labSlotHint: "PINCH a tag · drag onto another to combine",
     labShelf: "ELEMENT LIBRARY",
     labBook: n => `📖 ${n}`,
     labBookTitle: "Discoveries",
@@ -229,8 +229,8 @@ const STR = {
     // lab
     labTitle: "Hand Lab",
     labDesc: "Cubit dan gabungkan unsur — berapa banyak boleh anda jumpa?",
-    labHow: "CUBIT 👌 satu unsur dari rak dan seret ke atas unsur lain — ia akan bergabung sendiri! Tahan lama di satu unsur untuk lihat namanya. Jumpa semuanya!",
-    labSlotHint: "Seret satu unsur ke atas unsur lain untuk gabung",
+    labHow: "CUBIT 👌 tag daripada perpustakaan atau meja kerja, kemudian seret ke atas tag lain untuk gabung. Perpustakaan kekal terbuka semasa anda mencuba!",
+    labSlotHint: "CUBIT tag · seret ke atas tag lain untuk gabung",
     labShelf: "PERPUSTAKAAN UNSUR",
     labBook: n => `📖 ${n}`,
     labBookTitle: "Penemuan",
@@ -2127,7 +2127,7 @@ const LAB_RECIPES = {
 };
 const LAB_TOTAL = Object.keys(LAB_ELEMENTS).length;
 
-const LAB = {
+const LEGACY_LAB = {
   emoji: "🧪", titleKey: "labTitle", howKey: "labHow",
   found: new Set(), bookOpen: false,
   cursorPos: null, dragEl: null, dragPos: null, dragFromIndex: -1,
@@ -2401,6 +2401,213 @@ const LAB = {
     }
     ctx.font = "800 13px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,255,255,.9)";
     ctx.fillText(t("pinchHint"), innerWidth / 2, innerHeight - 22);
+    ctx.restore();
+  },
+};
+
+/* The original shelf-only prototype is kept above as a reference while this
+   workbench version owns the active Hand Lab experience below. */
+const LAB = {
+  emoji: "🧪", titleKey: "labTitle", howKey: "labHow",
+  found: new Set(), workspace: [], drag: null, cursorPos: null, pinchLog: [],
+  openSince: 0, dwellKey: "", dwellSince: 0, bookOpen: false,
+  bookBtn: null, bookNode: null, running: false,
+
+  start() {
+    this.cleanup();
+    this.found = new Set(LAB_BASE);
+    const initial = this.layout();
+    this.workspace = LAB_BASE.map((id, index) => ({
+      id,
+      x: initial.workspace.x + initial.workspace.w * (index % 2 ? .70 : .30),
+      y: initial.workspace.y + Math.min(initial.workspace.h - 30, 82 + Math.floor(index / 2) * 82),
+    }));
+    this.drag = null; this.cursorPos = null; this.pinchLog = [];
+    this.openSince = 0; this.dwellKey = ""; this.dwellSince = 0; this.bookOpen = false; this.running = true;
+    this.bookBtn = el(`<button class="reset-btn" id="labBookBtn" type="button">${t("labBook")(`${this.found.size}/${LAB_TOTAL}`)}</button>`);
+    this.bookBtn.onclick = () => { sfx.click(); this.toggleBook(); };
+    document.body.appendChild(this.bookBtn);
+  },
+
+  cleanup() {
+    this.bookBtn?.remove(); this.bookNode?.remove();
+    this.bookBtn = null; this.bookNode = null; this.running = false;
+  },
+
+  layout() {
+    const items = [...this.found], top = 98, safeBottom = 16;
+    const availableW = innerWidth - 20;
+    const cols = Math.max(4, Math.min(7, Math.floor(availableW / 82)));
+    const rows = Math.max(1, Math.ceil(items.length / cols));
+    const maximumLibraryHeight = Math.max(130, innerHeight * .43);
+    const cellH = Math.max(32, Math.min(54, Math.floor((maximumLibraryHeight - 54) / rows)));
+    const libraryH = Math.min(maximumLibraryHeight, rows * cellH + 54);
+    const libraryY = innerHeight - safeBottom - libraryH;
+    const cellW = availableW / cols;
+    return {
+      items, cols, rows, cellW, cellH, libraryY, libraryH,
+      workspace: { x: 12, y: top, w: innerWidth - 24, h: Math.max(90, libraryY - top - 16) },
+    };
+  },
+  libraryPos(index, layout) {
+    const col = index % layout.cols, row = Math.floor(index / layout.cols);
+    return { x: 10 + col * layout.cellW + layout.cellW / 2, y: layout.libraryY + 48 + row * layout.cellH + layout.cellH / 2 };
+  },
+  tagMetrics(id, compact = false) {
+    ctx.save(); ctx.font = `${compact ? 700 : 800} ${compact ? 10 : 13}px system-ui`;
+    const width = Math.min(compact ? 92 : 126, ctx.measureText(LAB_ELEMENTS[id][lang].name).width + (compact ? 37 : 47));
+    ctx.restore();
+    return { w: width, h: compact ? 24 : 32 };
+  },
+  hitTag(point, x, y, id, compact = false) {
+    if (!point) return false;
+    const m = this.tagMetrics(id, compact);
+    return point.x >= x - m.w / 2 - 8 && point.x <= x + m.w / 2 + 8 && point.y >= y - m.h / 2 - 8 && point.y <= y + m.h / 2 + 8;
+  },
+  hitLibrary(layout, point) {
+    for (let i = layout.items.length - 1; i >= 0; i--) {
+      const id = layout.items[i], p = this.libraryPos(i, layout);
+      if (this.hitTag(point, p.x, p.y, id, true)) return i;
+    }
+    return -1;
+  },
+  hitWorkspace(point, skip = -1) {
+    for (let i = this.workspace.length - 1; i >= 0; i--) {
+      const item = this.workspace[i];
+      if (i !== skip && this.hitTag(point, item.x, item.y, item.id)) return i;
+    }
+    return -1;
+  },
+  clampToWorkbench(point, layout) {
+    return {
+      x: Math.max(layout.workspace.x + 66, Math.min(layout.workspace.x + layout.workspace.w - 66, point.x)),
+      y: Math.max(layout.workspace.y + 28, Math.min(layout.workspace.y + layout.workspace.h - 28, point.y)),
+    };
+  },
+  drawTag(x, y, id, options = {}) {
+    const compact = !!options.compact, target = !!options.target, alpha = options.alpha ?? 1;
+    const m = this.tagMetrics(id, compact), info = LAB_ELEMENTS[id][lang];
+    ctx.save(); ctx.globalAlpha = alpha; ctx.shadowColor = target ? "#22d3ee" : "rgba(15,23,42,.24)"; ctx.shadowBlur = target ? 18 : 5;
+    ctx.fillStyle = target ? "#ecfeff" : "#fff"; ctx.strokeStyle = target ? "#06b6d4" : "#334155"; ctx.lineWidth = target ? 2.5 : 1.25;
+    ctx.beginPath(); ctx.roundRect(x - m.w / 2, y - m.h / 2, m.w, m.h, compact ? 8 : 12); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0; ctx.font = `${compact ? 13 : 17}px sans-serif`; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = "#111827";
+    ctx.fillText(LAB_ELEMENTS[id].emoji, x - m.w / 2 + (compact ? 6 : 9), y + 1);
+    ctx.font = `${compact ? 700 : 800} ${compact ? 10 : 13}px system-ui`; ctx.fillStyle = "#1e293b";
+    ctx.fillText(info.name, x - m.w / 2 + (compact ? 24 : 31), y + 1);
+    ctx.restore();
+  },
+  drawFact(x, y, id, layout) {
+    const info = LAB_ELEMENTS[id][lang];
+    ctx.save(); ctx.font = "700 12px system-ui";
+    const maxW = Math.min(250, layout.workspace.w - 24), words = info.fact.split(" ");
+    const lines = []; let line = "";
+    words.forEach(word => { const next = line ? `${line} ${word}` : word; if (ctx.measureText(next).width > maxW - 22 && line) { lines.push(line); line = word; } else line = next; });
+    if (line) lines.push(line);
+    const h = lines.length * 16 + 20, w = Math.max(...lines.map(l => ctx.measureText(l).width), 100) + 22;
+    const px = Math.max(12, Math.min(innerWidth - w - 12, x - w / 2)), py = Math.max(layout.workspace.y + 8, y - 58 - h);
+    ctx.fillStyle = "rgba(15,23,42,.94)"; ctx.beginPath(); ctx.roundRect(px, py, w, h, 12); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    lines.forEach((lineText, i) => ctx.fillText(lineText, px + w / 2, py + 14 + i * 16));
+    ctx.restore();
+  },
+  toggleBook() {
+    this.bookOpen = !this.bookOpen;
+    if (!this.bookOpen) { this.bookNode?.remove(); this.bookNode = null; return; }
+    const cards = Object.keys(LAB_ELEMENTS).map(id => {
+      const known = this.found.has(id), info = LAB_ELEMENTS[id];
+      return `<div class="lab-card ${known ? "known" : ""}"><div class="lab-card-emo">${known ? info.emoji : "❔"}</div><div class="lab-card-name">${known ? info[lang].name : "?"}</div></div>`;
+    }).join("");
+    this.bookNode = el(`<div class="lab-book"><div class="lab-book-panel"><h2>${t("labBookTitle")}</h2><div class="desc">${t("labDiscovered")(this.found.size, LAB_TOTAL)}</div><div class="lab-book-grid">${cards}</div><button class="btn" id="labBookClose">${t("labClose")}</button></div></div>`);
+    this.bookNode.querySelector("#labBookClose").onclick = () => { sfx.click(); this.toggleBook(); };
+    document.body.appendChild(this.bookNode);
+  },
+  combine(sourceId, targetId, targetPoint) {
+    const resultId = LAB_RECIPES[[sourceId, targetId].sort().join("+")];
+    if (!resultId) { sfx.bad(); this.showReveal(null, false); return null; }
+    const isNew = !this.found.has(resultId); this.found.add(resultId);
+    this.bookBtn.textContent = t("labBook")(`${this.found.size}/${LAB_TOTAL}`);
+    sfx.win(); this.showReveal(resultId, isNew); return resultId;
+  },
+  showReveal(resultId, isNew) {
+    const info = resultId ? LAB_ELEMENTS[resultId] : null;
+    const card = el(`<div class="lab-reveal ${resultId ? (isNew ? "new" : "known") : "fizzle"}">${info ? `<div class="lab-reveal-emo">${info.emoji}</div><div class="lab-reveal-name">${info[lang].name}</div>${isNew ? `<div class="lab-reveal-badge">${t("labNew")}</div><div class="lab-reveal-fact">${info[lang].fact}</div>` : `<div class="lab-reveal-badge known">${t("labAlready")}</div>`}` : `<div class="lab-reveal-fizzle">${t("labFizzle")}</div>`}</div>`);
+    document.body.appendChild(card); setTimeout(() => card.remove(), resultId ? (isNew ? 2400 : 1200) : 900);
+  },
+  release(layout, point) {
+    if (!this.drag) return;
+    const source = this.drag, targetIndex = this.hitWorkspace(point, source.type === "workspace" ? source.index : -1);
+    if (targetIndex >= 0) {
+      const target = this.workspace[targetIndex], result = this.combine(source.id, target.id, target);
+      if (result) {
+        if (source.type === "workspace") this.workspace = this.workspace.filter((_, i) => i !== source.index && i !== targetIndex);
+        else this.workspace.splice(targetIndex, 1);
+        this.workspace.push({ id: result, x: target.x, y: target.y });
+      }
+    } else if (source.type === "library") {
+      this.workspace.push({ id: source.id, ...this.clampToWorkbench(point, layout) });
+    } else {
+      this.workspace[source.index] = { id: source.id, ...this.clampToWorkbench(point, layout) };
+    }
+    this.drag = null; this.openSince = 0;
+  },
+  onFrame(dt) {
+    if (!this.running || this.bookOpen) return;
+    const layout = this.layout(), pinch = pinchState(), now = performance.now(), raw = pinch?.center || null;
+    if (raw) {
+      const k = 1 - Math.pow(1e-10, dt);
+      if (!this.cursorPos) this.cursorPos = { ...raw };
+      else { this.cursorPos.x += (raw.x - this.cursorPos.x) * k; this.cursorPos.y += (raw.y - this.cursorPos.y) * k; }
+    } else this.cursorPos = null;
+    const cursor = this.cursorPos;
+    if (pinch) this.pinchLog.push({ t: now, v: pinch.pinch, point: { ...pinch.center } });
+    while (this.pinchLog.length && now - this.pinchLog[0].t > 150) this.pinchLog.shift();
+
+    if (!this.drag) {
+      const closed = this.pinchLog.reduce((best, sample) => !best || sample.v < best.v ? sample : best, null);
+      if (closed && closed.v < .46) {
+        const workIndex = this.hitWorkspace(closed.point);
+        if (workIndex >= 0) this.drag = { type: "workspace", index: workIndex, id: this.workspace[workIndex].id, origin: { ...this.workspace[workIndex] } };
+        else {
+          const libraryIndex = this.hitLibrary(layout, closed.point);
+          if (libraryIndex >= 0) this.drag = { type: "library", index: libraryIndex, id: layout.items[libraryIndex] };
+        }
+        if (this.drag) { sfx.click(); this.openSince = 0; }
+      }
+    } else if (!pinch || pinch.pinch > .60) {
+      this.openSince = this.openSince || now;
+      if (now - this.openSince > 70) this.release(layout, pinch?.center || this.cursorPos || this.drag.origin);
+    } else this.openSince = 0;
+
+    let dwell = null;
+    if (!this.drag) {
+      const workspaceIndex = this.hitWorkspace(cursor);
+      if (workspaceIndex >= 0) dwell = { key: `w${workspaceIndex}`, item: this.workspace[workspaceIndex] };
+      else { const libraryIndex = this.hitLibrary(layout, cursor); if (libraryIndex >= 0) { const p = this.libraryPos(libraryIndex, layout); dwell = { key: `l${libraryIndex}`, item: { id: layout.items[libraryIndex], ...p } }; } }
+    }
+    if (dwell?.key !== this.dwellKey) { this.dwellKey = dwell?.key || ""; this.dwellSince = dwell ? now : 0; }
+
+    ctx.save();
+    ctx.fillStyle = "rgba(248,250,252,.91)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    ctx.fillStyle = "rgba(255,255,255,.84)"; ctx.strokeStyle = "rgba(148,163,184,.7)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(layout.workspace.x, layout.workspace.y, layout.workspace.w, layout.workspace.h, 20); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#0f172a"; ctx.font = "900 15px system-ui"; ctx.textAlign = "center"; ctx.fillText("ELEMENT LAB", innerWidth / 2, layout.workspace.y + 28);
+    ctx.font = "700 11px system-ui"; ctx.fillStyle = "#64748b"; ctx.fillText(t("labSlotHint"), innerWidth / 2, layout.workspace.y + 47);
+    const targetIndex = this.drag ? this.hitWorkspace(cursor, this.drag.type === "workspace" ? this.drag.index : -1) : -1;
+    this.workspace.forEach((item, index) => { if (this.drag?.type === "workspace" && this.drag.index === index) return; this.drawTag(item.x, item.y, item.id, { target: index === targetIndex }); });
+    if (this.drag && cursor) this.drawTag(cursor.x, cursor.y, this.drag.id, { alpha: .96, target: targetIndex >= 0 });
+
+    ctx.fillStyle = "rgba(30,41,59,.95)"; ctx.beginPath(); ctx.roundRect(10, layout.libraryY, innerWidth - 20, layout.libraryH, 20); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.13)"; ctx.beginPath(); ctx.roundRect(22, layout.libraryY + 12, innerWidth - 44, 27, 12); ctx.fill();
+    ctx.font = "800 12px system-ui"; ctx.textAlign = "left"; ctx.fillStyle = "#f8fafc"; ctx.fillText(`⌕  ${t("labShelf")}`, 34, layout.libraryY + 30);
+    layout.items.forEach((id, index) => { const p = this.libraryPos(index, layout); this.drawTag(p.x, p.y, id, { compact: true }); });
+    if (dwell && now - this.dwellSince > 500) this.drawFact(dwell.item.x, dwell.item.y, dwell.item.id, layout);
+    if (pinch) {
+      const closed = pinch.pinch < .5, color = closed ? "#a855f7" : "#0891b2";
+      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3; ctx.shadowColor = color; ctx.shadowBlur = 15;
+      ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(pinch.thumb.x, pinch.thumb.y); ctx.lineTo(pinch.index.x, pinch.index.y); ctx.stroke(); ctx.setLineDash([]);
+      [pinch.thumb, pinch.index].forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 9, 0, 7); ctx.stroke(); });
+      ctx.beginPath(); ctx.arc(pinch.center.x, pinch.center.y, closed ? 7 : 5, 0, 7); ctx.fill();
+    }
     ctx.restore();
   },
 };
