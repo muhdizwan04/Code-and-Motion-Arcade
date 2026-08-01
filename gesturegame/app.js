@@ -2416,17 +2416,11 @@ const LAB = {
   start() {
     this.cleanup();
     this.found = new Set(LAB_BASE);
-    const initial = this.layout();
-    this.workspace = LAB_BASE.map((id, index) => ({
-      id,
-      x: initial.workspace.x + initial.workspace.w * (index % 2 ? .70 : .30),
-      y: initial.workspace.y + Math.min(initial.workspace.h - 30, 82 + Math.floor(index / 2) * 82),
-    }));
+    // Like Infinite Craft, the board begins empty: pinch an item from the
+    // library and release it anywhere on the open canvas to create a copy.
+    this.workspace = [];
     this.drag = null; this.cursorPos = null; this.pinchLog = [];
     this.openSince = 0; this.dwellKey = ""; this.dwellSince = 0; this.bookOpen = false; this.running = true;
-    this.bookBtn = el(`<button class="reset-btn" id="labBookBtn" type="button">${t("labBook")(`${this.found.size}/${LAB_TOTAL}`)}</button>`);
-    this.bookBtn.onclick = () => { sfx.click(); this.toggleBook(); };
-    document.body.appendChild(this.bookBtn);
   },
 
   cleanup() {
@@ -2435,23 +2429,28 @@ const LAB = {
   },
 
   layout() {
-    const items = [...this.found], top = 98, safeBottom = 16;
-    const availableW = innerWidth - 20;
-    const cols = Math.max(4, Math.min(7, Math.floor(availableW / 82)));
+    const items = [...this.found];
+    const wide = innerWidth >= 760 && innerWidth > innerHeight * 1.15;
+    const library = wide
+      ? { x: Math.max(0, innerWidth - Math.min(330, Math.max(230, innerWidth * .24))), y: 0, w: Math.min(330, Math.max(230, innerWidth * .24)), h: innerHeight, wide: true }
+      : { x: 0, y: Math.max(208, innerHeight - Math.min(innerHeight * .42, 360)), w: innerWidth, h: Math.min(innerHeight * .42, 360), wide: false };
+    const workspace = wide
+      ? { x: 0, y: 0, w: library.x - 1, h: innerHeight }
+      : { x: 0, y: 0, w: innerWidth, h: library.y - 1 };
+    const cols = library.wide ? Math.max(2, Math.min(3, Math.floor((library.w - 24) / 96))) : Math.max(3, Math.min(5, Math.floor((library.w - 18) / 78)));
     const rows = Math.max(1, Math.ceil(items.length / cols));
-    const maximumLibraryHeight = Math.max(130, innerHeight * .43);
-    const cellH = Math.max(32, Math.min(54, Math.floor((maximumLibraryHeight - 54) / rows)));
-    const libraryH = Math.min(maximumLibraryHeight, rows * cellH + 54);
-    const libraryY = innerHeight - safeBottom - libraryH;
-    const cellW = availableW / cols;
+    const cellW = (library.w - 20) / cols;
+    const cellH = Math.max(24, Math.min(42, Math.floor((library.h - 62) / rows)));
     return {
-      items, cols, rows, cellW, cellH, libraryY, libraryH,
-      workspace: { x: 12, y: top, w: innerWidth - 24, h: Math.max(90, libraryY - top - 16) },
+      items, cols, rows, cellW, cellH, library, workspace,
     };
   },
   libraryPos(index, layout) {
     const col = index % layout.cols, row = Math.floor(index / layout.cols);
-    return { x: 10 + col * layout.cellW + layout.cellW / 2, y: layout.libraryY + 48 + row * layout.cellH + layout.cellH / 2 };
+    return {
+      x: layout.library.x + 10 + col * layout.cellW + layout.cellW / 2,
+      y: layout.library.y + 51 + row * layout.cellH + layout.cellH / 2,
+    };
   },
   tagMetrics(id, compact = false) {
     ctx.save(); ctx.font = `${compact ? 700 : 800} ${compact ? 10 : 13}px system-ui`;
@@ -2525,7 +2524,7 @@ const LAB = {
     const resultId = LAB_RECIPES[[sourceId, targetId].sort().join("+")];
     if (!resultId) { sfx.bad(); this.showReveal(null, false); return null; }
     const isNew = !this.found.has(resultId); this.found.add(resultId);
-    this.bookBtn.textContent = t("labBook")(`${this.found.size}/${LAB_TOTAL}`);
+    if (this.bookBtn) this.bookBtn.textContent = t("labBook")(`${this.found.size}/${LAB_TOTAL}`);
     sfx.win(); this.showReveal(resultId, isNew); return resultId;
   },
   showReveal(resultId, isNew) {
@@ -2553,6 +2552,10 @@ const LAB = {
   onFrame(dt) {
     if (!this.running || this.bookOpen) return;
     const layout = this.layout(), pinch = pinchState(), now = performance.now(), raw = pinch?.center || null;
+    this.workspace.forEach((item, index) => {
+      if (this.drag?.type === "workspace" && this.drag.index === index) return;
+      Object.assign(item, this.clampToWorkbench(item, layout));
+    });
     if (raw) {
       const k = 1 - Math.pow(1e-10, dt);
       if (!this.cursorPos) this.cursorPos = { ...raw };
@@ -2587,18 +2590,34 @@ const LAB = {
     if (dwell?.key !== this.dwellKey) { this.dwellKey = dwell?.key || ""; this.dwellSince = dwell ? now : 0; }
 
     ctx.save();
-    ctx.fillStyle = "rgba(248,250,252,.91)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
-    ctx.fillStyle = "rgba(255,255,255,.84)"; ctx.strokeStyle = "rgba(148,163,184,.7)"; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.roundRect(layout.workspace.x, layout.workspace.y, layout.workspace.w, layout.workspace.h, 20); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#0f172a"; ctx.font = "900 15px system-ui"; ctx.textAlign = "center"; ctx.fillText("ELEMENT LAB", innerWidth / 2, layout.workspace.y + 28);
-    ctx.font = "700 11px system-ui"; ctx.fillStyle = "#64748b"; ctx.fillText(t("labSlotHint"), innerWidth / 2, layout.workspace.y + 47);
+    ctx.fillStyle = "#fbfbfc"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    // A quiet constellation field gives the free canvas the same open, calm
+    // feeling as Infinite Craft without competing with the hand-controlled tags.
+    ctx.save(); ctx.beginPath(); ctx.rect(layout.workspace.x, layout.workspace.y, layout.workspace.w, layout.workspace.h); ctx.clip();
+    ctx.strokeStyle = "rgba(100,116,139,.11)"; ctx.fillStyle = "rgba(71,85,105,.18)"; ctx.lineWidth = 1;
+    for (let i = 0; i < 26; i++) {
+      const x = layout.workspace.x + ((Math.sin(i * 91.7) + 1) / 2) * layout.workspace.w;
+      const y = layout.workspace.y + ((Math.sin(i * 47.3 + 1.5) + 1) / 2) * layout.workspace.h;
+      const x2 = layout.workspace.x + ((Math.sin((i + 7) * 91.7) + 1) / 2) * layout.workspace.w;
+      const y2 = layout.workspace.y + ((Math.sin((i + 7) * 47.3 + 1.5) + 1) / 2) * layout.workspace.h;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(x, y, i % 5 === 0 ? 3 : 1.7, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+    ctx.fillStyle = "#111827"; ctx.font = "900 15px system-ui"; ctx.textAlign = "center";
+    ctx.fillText("HAND LAB", layout.workspace.x + layout.workspace.w / 2, 82);
+    ctx.font = "700 11px system-ui"; ctx.fillStyle = "#64748b";
+    ctx.fillText(t("labSlotHint"), layout.workspace.x + layout.workspace.w / 2, 101);
     const targetIndex = this.drag ? this.hitWorkspace(cursor, this.drag.type === "workspace" ? this.drag.index : -1) : -1;
     this.workspace.forEach((item, index) => { if (this.drag?.type === "workspace" && this.drag.index === index) return; this.drawTag(item.x, item.y, item.id, { target: index === targetIndex }); });
     if (this.drag && cursor) this.drawTag(cursor.x, cursor.y, this.drag.id, { alpha: .96, target: targetIndex >= 0 });
 
-    ctx.fillStyle = "rgba(30,41,59,.95)"; ctx.beginPath(); ctx.roundRect(10, layout.libraryY, innerWidth - 20, layout.libraryH, 20); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,.13)"; ctx.beginPath(); ctx.roundRect(22, layout.libraryY + 12, innerWidth - 44, 27, 12); ctx.fill();
-    ctx.font = "800 12px system-ui"; ctx.textAlign = "left"; ctx.fillStyle = "#f8fafc"; ctx.fillText(`⌕  ${t("labShelf")}`, 34, layout.libraryY + 30);
+    ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "rgba(148,163,184,.56)"; ctx.lineWidth = 1.5;
+    ctx.fillRect(layout.library.x, layout.library.y, layout.library.w, layout.library.h);
+    ctx.beginPath(); ctx.rect(layout.library.x, layout.library.y, layout.library.w, layout.library.h); ctx.stroke();
+    ctx.fillStyle = "rgba(241,245,249,.95)"; ctx.beginPath(); ctx.roundRect(layout.library.x + 11, layout.library.y + 12, layout.library.w - 22, 27, 9); ctx.fill();
+    ctx.font = "800 12px system-ui"; ctx.textAlign = "left"; ctx.fillStyle = "#0f172a";
+    ctx.fillText(`${t("labShelf")}  ·  ${t("labDiscovered")(this.found.size, LAB_TOTAL)}`, layout.library.x + 22, layout.library.y + 30);
     layout.items.forEach((id, index) => { const p = this.libraryPos(index, layout); this.drawTag(p.x, p.y, id, { compact: true }); });
     if (dwell && now - this.dwellSince > 500) this.drawFact(dwell.item.x, dwell.item.y, dwell.item.id, layout);
     if (pinch) {
