@@ -1,4 +1,4 @@
-const CACHE = "hand-arcade-v13";
+const CACHE = "hand-arcade-v14";
 const FILES = [
   ".",
   "index.html",

@@ -126,6 +126,12 @@ const STR = {
     labFizzle: "Nothing happens...",
     labClose: "CLOSE",
     labReset: "RESET",
+    labRecipes: "RECIPES",
+    labRecipesTitle: "Recipe Book",
+    labNoRecipes: "Combine elements to record recipes here.",
+    labCheatTitle: "All Combination Possibilities",
+    labCamera: "LIVE CAMERA · pinch to craft",
+    labPossibilities: n => `${n} possible recipes`,
   },
   bm: {
     langBtn: "EN",
@@ -240,6 +246,12 @@ const STR = {
     labFizzle: "Tiada apa-apa berlaku...",
     labClose: "TUTUP",
     labReset: "RESET",
+    labRecipes: "RESIPI",
+    labRecipesTitle: "Buku Resipi",
+    labNoRecipes: "Gabungkan unsur untuk merekod resipi di sini.",
+    labCheatTitle: "Semua Kemungkinan Gabungan",
+    labCamera: "KAMERA LANGSUNG · cubit untuk mencipta",
+    labPossibilities: n => `${n} resipi yang mungkin`,
   },
 };
 let lang = localStorage.getItem("ha-lang") || "en";
@@ -317,9 +329,9 @@ const engine = {
         numHands: 2,
         // A slightly more forgiving entrance threshold helps on phone cameras,
         // while the temporal filter below keeps the cursor calm once tracked.
-        minHandDetectionConfidence: 0.52,
-        minHandPresenceConfidence: 0.54,
-        minTrackingConfidence: 0.52,
+        minHandDetectionConfidence: 0.50,
+        minHandPresenceConfidence: 0.50,
+        minTrackingConfidence: 0.48,
       });
       try {
         this.landmarker = await HandLandmarker.createFromOptions(fileset, options("GPU"));
@@ -392,11 +404,19 @@ const engine = {
         // fingertip movement still feels immediate. This is much less jumpy on
         // lower-light phone cameras than smoothing from wrist motion alone.
         const motion = raw.reduce((sum, p, i) => sum + dist(p, this.norm[i]), 0) / raw.length;
-        const alpha = Math.max(0.20, Math.min(0.80, 0.20 + motion * 7.5));
         this.norm = raw.map((p, i) => ({
-          x: this.norm[i].x + (p.x - this.norm[i].x) * alpha,
-          y: this.norm[i].y + (p.y - this.norm[i].y) * alpha,
-          z: this.norm[i].z + (p.z - this.norm[i].z) * alpha,
+          // Per-landmark filtering lets thumb/index tips react quickly while
+          // the palm remains steady—a better fit for pinch-and-drag games.
+          ...(() => {
+            const localMotion = dist(p, this.norm[i]);
+            const isControlTip = i === 4 || i === 8;
+            const alpha = Math.max(isControlTip ? 0.28 : 0.17, Math.min(0.88, (isControlTip ? 0.28 : 0.17) + localMotion * 10 + motion * 2));
+            return {
+              x: this.norm[i].x + (p.x - this.norm[i].x) * alpha,
+              y: this.norm[i].y + (p.y - this.norm[i].y) * alpha,
+              z: this.norm[i].z + (p.z - this.norm[i].z) * alpha,
+            };
+          })(),
         }));
       }
       const toScreen = hand => hand.map(p => ({ x: p.x * dw + ox, y: p.y * dh + oy, z: p.z }));
@@ -404,7 +424,7 @@ const engine = {
       this.hands = rawHands.map(toScreen);
       this.hand = toScreen(this.norm);
       this.lastSeenAt = performance.now();
-    } else if (performance.now() - this.lastSeenAt > 220) {
+    } else if (performance.now() - this.lastSeenAt > 300) {
       // Ignore a few dropped inference frames so the cursor/sign does not flicker.
       this.hand = null;
       this.norm = null;
@@ -2113,6 +2133,18 @@ const LAB_ELEMENTS = {
   human: { emoji: "🧑", en: { name: "Human", fact: "Humans are animals who build tools and ideas." }, bm: { name: "Manusia", fact: "Manusia ialah haiwan yang mencipta alat dan idea." } },
   idea: { emoji: "💡", en: { name: "Idea", fact: "Every invention starts as a single idea." }, bm: { name: "Idea", fact: "Setiap ciptaan bermula sebagai satu idea." } },
   robot: { emoji: "🤖", en: { name: "Robot", fact: "A robot is an idea for a machine, built in metal." }, bm: { name: "Robot", fact: "Robot ialah idea untuk mesin, dibina daripada logam." } },
+  smoke: { emoji: "🌫️", en: { name: "Smoke", fact: "Smoke is made of tiny particles carried by hot air." }, bm: { name: "Asap", fact: "Asap terdiri daripada zarah halus yang dibawa udara panas." } },
+  volcano: { emoji: "🌋", en: { name: "Volcano", fact: "A volcano is an opening where molten rock reaches the surface." }, bm: { name: "Gunung Berapi", fact: "Gunung berapi ialah bukaan tempat batuan cair sampai ke permukaan." } },
+  stone: { emoji: "🪨", en: { name: "Stone", fact: "Stone forms when minerals are pressed, cooled or cemented together." }, bm: { name: "Batu", fact: "Batu terbentuk apabila mineral ditekan, disejukkan atau bercantum." } },
+  lake: { emoji: "🏞️", en: { name: "Lake", fact: "A lake is water surrounded by land." }, bm: { name: "Tasik", fact: "Tasik ialah air yang dikelilingi daratan." } },
+  tree: { emoji: "🌳", en: { name: "Tree", fact: "Trees store carbon and release oxygen." }, bm: { name: "Pokok", fact: "Pokok menyimpan karbon dan membebaskan oksigen." } },
+  forest: { emoji: "🌲", en: { name: "Forest", fact: "A forest is a community of trees, plants and animals." }, bm: { name: "Hutan", fact: "Hutan ialah komuniti pokok, tumbuhan dan haiwan." } },
+  electricity: { emoji: "🔌", en: { name: "Electricity", fact: "Electricity is the movement of electric charge." }, bm: { name: "Elektrik", fact: "Elektrik ialah pergerakan cas elektrik." } },
+  computer: { emoji: "💻", en: { name: "Computer", fact: "Computers follow instructions to process information." }, bm: { name: "Komputer", fact: "Komputer mengikuti arahan untuk memproses maklumat." } },
+  city: { emoji: "🏙️", en: { name: "City", fact: "Cities connect people, buildings, transport and ideas." }, bm: { name: "Bandar", fact: "Bandar menghubungkan manusia, bangunan, pengangkutan dan idea." } },
+  boat: { emoji: "⛵", en: { name: "Boat", fact: "A boat floats by displacing its weight in water." }, bm: { name: "Bot", fact: "Bot terapung dengan menyesarkan beratnya di dalam air." } },
+  bird: { emoji: "🐦", en: { name: "Bird", fact: "Most birds have lightweight bones and feathered wings." }, bm: { name: "Burung", fact: "Kebanyakan burung mempunyai tulang ringan dan sayap berbulu." } },
+  space: { emoji: "🚀", en: { name: "Space", fact: "Space begins beyond Earth's atmosphere." }, bm: { name: "Angkasa", fact: "Angkasa bermula di luar atmosfera Bumi." } },
 };
 const LAB_BASE = ["fire", "water", "earth", "air"];
 const LAB_RECIPES = {
@@ -2124,8 +2156,23 @@ const LAB_RECIPES = {
   "life+water": "plant", "mountain+wind": "sand", "life+ocean": "fish",
   "fire+mountain": "metal", "fire+sand": "glass", "energy+plant": "animal",
   "animal+energy": "human", "energy+human": "idea", "idea+metal": "robot",
+  "fire+wind": "smoke", "air+lava": "volcano", "earth+lava": "stone",
+  "mountain+water": "lake", "earth+plant": "tree", "plant+plant": "forest",
+  "energy+metal": "electricity", "electricity+idea": "computer", "brick+human": "city",
+  "metal+water": "boat", "air+animal": "bird", "idea+sun": "space",
 };
 const LAB_TOTAL = Object.keys(LAB_ELEMENTS).length;
+const LAB_FALLBACK_POOL = Object.keys(LAB_ELEMENTS).filter(id => !LAB_BASE.includes(id));
+function labCombinationResult(idA, idB) {
+  const key = [idA, idB].sort().join("+");
+  if (LAB_RECIPES[key]) return { id: LAB_RECIPES[key], exact: true, key };
+  // Infinite Craft nearly always rewards experimentation. The booth version
+  // stays offline, so unknown pairs use a stable playful fallback: the same
+  // two inputs always produce the same result on every device and session.
+  let hash = 2166136261;
+  for (const char of key) { hash ^= char.charCodeAt(0); hash = Math.imul(hash, 16777619); }
+  return { id: LAB_FALLBACK_POOL[(hash >>> 0) % LAB_FALLBACK_POOL.length], exact: false, key };
+}
 
 const LEGACY_LAB = {
   emoji: "🧪", titleKey: "labTitle", howKey: "labHow",
@@ -2410,8 +2457,8 @@ const LEGACY_LAB = {
 const LAB = {
   emoji: "🧪", titleKey: "labTitle", howKey: "labHow",
   found: new Set(), workspace: [], drag: null, cursorPos: null, pinchLog: [],
-  openSince: 0, dwellKey: "", dwellSince: 0, bookOpen: false,
-  bookBtn: null, bookNode: null, running: false,
+  openSince: 0, grabReadyAt: 0, dwellKey: "", dwellSince: 0, bookOpen: false,
+  history: new Map(), bookNode: null, recipeBtn: null, cheatBtn: null, running: false,
 
   start() {
     this.cleanup();
@@ -2420,12 +2467,18 @@ const LAB = {
     // library and release it anywhere on the open canvas to create a copy.
     this.workspace = [];
     this.drag = null; this.cursorPos = null; this.pinchLog = [];
-    this.openSince = 0; this.dwellKey = ""; this.dwellSince = 0; this.bookOpen = false; this.running = true;
+    this.history = new Map();
+    this.openSince = 0; this.grabReadyAt = 0; this.dwellKey = ""; this.dwellSince = 0; this.bookOpen = false; this.running = true;
+    this.recipeBtn = el(`<button class="lab-tool-btn recipe" type="button">📖 ${t("labRecipes")}</button>`);
+    this.cheatBtn = el(`<button class="lab-tool-btn cheat" type="button" aria-label="${t("labCheatTitle")}" title="${t("labCheatTitle")}">⌘</button>`);
+    this.recipeBtn.onclick = () => { sfx.click(); this.openRecipes(false); };
+    this.cheatBtn.onclick = () => { sfx.click(); this.openRecipes(true); };
+    document.body.append(this.recipeBtn, this.cheatBtn);
   },
 
   cleanup() {
-    this.bookBtn?.remove(); this.bookNode?.remove();
-    this.bookBtn = null; this.bookNode = null; this.running = false;
+    this.recipeBtn?.remove(); this.cheatBtn?.remove(); this.bookNode?.remove();
+    this.recipeBtn = null; this.cheatBtn = null; this.bookNode = null; this.running = false;
   },
 
   layout() {
@@ -2509,22 +2562,32 @@ const LAB = {
     lines.forEach((lineText, i) => ctx.fillText(lineText, px + w / 2, py + 14 + i * 16));
     ctx.restore();
   },
-  toggleBook() {
-    this.bookOpen = !this.bookOpen;
-    if (!this.bookOpen) { this.bookNode?.remove(); this.bookNode = null; return; }
-    const cards = Object.keys(LAB_ELEMENTS).map(id => {
-      const known = this.found.has(id), info = LAB_ELEMENTS[id];
-      return `<div class="lab-card ${known ? "known" : ""}"><div class="lab-card-emo">${known ? info.emoji : "❔"}</div><div class="lab-card-name">${known ? info[lang].name : "?"}</div></div>`;
+  openRecipes(showAll) {
+    this.bookOpen = true;
+    const recipes = new Map();
+    if (showAll) {
+      const ids = Object.keys(LAB_ELEMENTS);
+      ids.forEach((idA, a) => ids.slice(a).forEach(idB => {
+        const combination = labCombinationResult(idA, idB);
+        recipes.set(combination.key, combination.id);
+      }));
+    } else Object.entries(LAB_RECIPES).forEach(([key, result]) => {
+      if (this.found.has(result)) recipes.set(key, result);
+    });
+    this.history.forEach((result, key) => recipes.set(key, result));
+    const rows = [...recipes.entries()].sort((a, b) => LAB_ELEMENTS[a[1]][lang].name.localeCompare(LAB_ELEMENTS[b[1]][lang].name)).map(([key, result]) => {
+      const [a, b] = key.split("+"), left = LAB_ELEMENTS[a], right = LAB_ELEMENTS[b], output = LAB_ELEMENTS[result];
+      return `<div class="lab-recipe-row"><span>${left.emoji} ${left[lang].name}</span><b>+</b><span>${right.emoji} ${right[lang].name}</span><b>=</b><strong>${output.emoji} ${output[lang].name}</strong></div>`;
     }).join("");
-    this.bookNode = el(`<div class="lab-book"><div class="lab-book-panel"><h2>${t("labBookTitle")}</h2><div class="desc">${t("labDiscovered")(this.found.size, LAB_TOTAL)}</div><div class="lab-book-grid">${cards}</div><button class="btn" id="labBookClose">${t("labClose")}</button></div></div>`);
-    this.bookNode.querySelector("#labBookClose").onclick = () => { sfx.click(); this.toggleBook(); };
+    this.bookNode?.remove();
+    this.bookNode = el(`<div class="lab-book"><div class="lab-book-panel recipe-panel"><h2>${showAll ? t("labCheatTitle") : t("labRecipesTitle")}</h2><div class="desc">${showAll ? t("labPossibilities")(recipes.size) : t("labDiscovered")(this.found.size, LAB_TOTAL)}</div><div class="lab-recipe-list">${rows || `<div class="lab-empty-recipes">${t("labNoRecipes")}</div>`}</div><button class="btn" id="labBookClose">${t("labClose")}</button></div></div>`);
+    this.bookNode.querySelector("#labBookClose").onclick = () => { sfx.click(); this.bookOpen = false; this.bookNode?.remove(); this.bookNode = null; };
     document.body.appendChild(this.bookNode);
   },
   combine(sourceId, targetId, targetPoint) {
-    const resultId = LAB_RECIPES[[sourceId, targetId].sort().join("+")];
-    if (!resultId) { sfx.bad(); this.showReveal(null, false); return null; }
+    const combination = labCombinationResult(sourceId, targetId), resultId = combination.id;
+    this.history.set(combination.key, resultId);
     const isNew = !this.found.has(resultId); this.found.add(resultId);
-    if (this.bookBtn) this.bookBtn.textContent = t("labBook")(`${this.found.size}/${LAB_TOTAL}`);
     sfx.win(); this.showReveal(resultId, isNew); return resultId;
   },
   showReveal(resultId, isNew) {
@@ -2534,6 +2597,7 @@ const LAB = {
   },
   release(layout, point) {
     if (!this.drag) return;
+    if (!point) { this.drag = null; this.pinchLog = []; this.openSince = 0; this.grabReadyAt = performance.now() + 240; return; }
     const source = this.drag, targetIndex = this.hitWorkspace(point, source.type === "workspace" ? source.index : -1);
     if (targetIndex >= 0) {
       const target = this.workspace[targetIndex], result = this.combine(source.id, target.id, target);
@@ -2547,7 +2611,7 @@ const LAB = {
     } else {
       this.workspace[source.index] = { id: source.id, ...this.clampToWorkbench(point, layout) };
     }
-    this.drag = null; this.openSince = 0;
+    this.drag = null; this.pinchLog = []; this.openSince = 0; this.grabReadyAt = performance.now() + 240;
   },
   onFrame(dt) {
     if (!this.running || this.bookOpen) return;
@@ -2565,7 +2629,7 @@ const LAB = {
     if (pinch) this.pinchLog.push({ t: now, v: pinch.pinch, point: { ...pinch.center } });
     while (this.pinchLog.length && now - this.pinchLog[0].t > 150) this.pinchLog.shift();
 
-    if (!this.drag) {
+    if (!this.drag && now >= this.grabReadyAt) {
       const closed = this.pinchLog.reduce((best, sample) => !best || sample.v < best.v ? sample : best, null);
       if (closed && closed.v < .46) {
         const workIndex = this.hitWorkspace(closed.point);
@@ -2590,7 +2654,9 @@ const LAB = {
     if (dwell?.key !== this.dwellKey) { this.dwellKey = dwell?.key || ""; this.dwellSince = dwell ? now : 0; }
 
     ctx.save();
-    ctx.fillStyle = "#fbfbfc"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    // Keep the camera unmistakably visible so players understand that their
+    // real hand is the controller; the light tint only protects text contrast.
+    ctx.fillStyle = "rgba(248,250,252,.46)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
     // A quiet constellation field gives the free canvas the same open, calm
     // feeling as Infinite Craft without competing with the hand-controlled tags.
     ctx.save(); ctx.beginPath(); ctx.rect(layout.workspace.x, layout.workspace.y, layout.workspace.w, layout.workspace.h); ctx.clip();
@@ -2608,11 +2674,13 @@ const LAB = {
     ctx.fillText("HAND LAB", layout.workspace.x + layout.workspace.w / 2, 82);
     ctx.font = "700 11px system-ui"; ctx.fillStyle = "#64748b";
     ctx.fillText(t("labSlotHint"), layout.workspace.x + layout.workspace.w / 2, 101);
+    ctx.font = "800 10px system-ui"; ctx.fillStyle = "rgba(15,118,110,.9)";
+    ctx.fillText(`● ${t("labCamera")}`, layout.workspace.x + layout.workspace.w / 2, 118);
     const targetIndex = this.drag ? this.hitWorkspace(cursor, this.drag.type === "workspace" ? this.drag.index : -1) : -1;
     this.workspace.forEach((item, index) => { if (this.drag?.type === "workspace" && this.drag.index === index) return; this.drawTag(item.x, item.y, item.id, { target: index === targetIndex }); });
     if (this.drag && cursor) this.drawTag(cursor.x, cursor.y, this.drag.id, { alpha: .96, target: targetIndex >= 0 });
 
-    ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "rgba(148,163,184,.56)"; ctx.lineWidth = 1.5;
+    ctx.fillStyle = "rgba(255,255,255,.88)"; ctx.strokeStyle = "rgba(148,163,184,.72)"; ctx.lineWidth = 1.5;
     ctx.fillRect(layout.library.x, layout.library.y, layout.library.w, layout.library.h);
     ctx.beginPath(); ctx.rect(layout.library.x, layout.library.y, layout.library.w, layout.library.h); ctx.stroke();
     ctx.fillStyle = "rgba(241,245,249,.95)"; ctx.beginPath(); ctx.roundRect(layout.library.x + 11, layout.library.y + 12, layout.library.w - 22, 27, 9); ctx.fill();
