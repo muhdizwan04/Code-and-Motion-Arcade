@@ -122,6 +122,7 @@ h1.arcade {
 .card.sign .emo { background: linear-gradient(135deg, #7c3aed44, #ec489933); }
 .card.snake .emo { background: linear-gradient(135deg, #22d3ee44, #a855f744); }
 .card.blast .emo { background: linear-gradient(135deg, #ec489944, #fbbf2444); }
+.card.lab .emo { background: linear-gradient(135deg, #a3e63644, #22d3ee44); }
 .card h3 { font-size: clamp(18px, 5vw, 23px); font-weight: 800; }
 .card p { font-size: clamp(12px, 3.3vw, 14px); opacity: .75; margin-top: 3px; line-height: 1.4; }
 .made-with { opacity: .45; font-size: 12px; margin-top: 14px; }
@@ -418,6 +419,62 @@ h1.arcade {
 .result-rank { font-size: clamp(24px, 7vw, 38px); font-weight: 900; color: var(--amber); margin: 6px 0; }
 .score-line { font-size: clamp(38px, 12vw, 64px); font-weight: 900; color: var(--cyan); }
 .best-line { opacity: .8; margin-top: 4px; }
+
+/* hand lab */
+.lab-book {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(5,3,12,.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.lab-book-panel {
+  width: min(94vw, 640px); max-height: 86vh; overflow-y: auto;
+  background: rgba(17,10,32,.9); border: 1px solid rgba(255,255,255,.16); border-radius: 24px;
+  padding: 22px; text-align: center;
+}
+.lab-book-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 10px; margin: 16px 0;
+}
+.lab-card {
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px; padding: 10px 4px; opacity: .5;
+}
+.lab-card.known { opacity: 1; border-color: rgba(163,230,53,.45); background: rgba(163,230,53,.08); }
+.lab-card-emo { font-size: 26px; }
+.lab-card-name { font-size: 10px; opacity: .85; margin-top: 4px; }
+.lab-reveal {
+  position: fixed; z-index: 45; left: 50%; top: 40%; transform: translate(-50%,-50%);
+  padding: 18px 26px; border-radius: 22px; text-align: center; pointer-events: none;
+  background: rgba(11,5,24,.9); border: 2px solid rgba(255,255,255,.22);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  max-width: min(86vw, 380px);
+}
+.lab-reveal-emo { font-size: clamp(48px, 14vw, 76px); filter: drop-shadow(0 4px 16px rgba(0,0,0,.5)); }
+.lab-reveal-name { font-size: clamp(18px, 5vw, 26px); font-weight: 900; margin-top: 4px; }
+.lab-reveal-badge {
+  display: inline-block; margin-top: 8px; padding: 4px 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 800; letter-spacing: .5px;
+  background: rgba(251,191,36,.15); color: var(--amber); border: 1px solid rgba(251,191,36,.4);
+}
+.lab-reveal-badge.known { background: rgba(34,211,238,.12); color: var(--cyan); border-color: rgba(34,211,238,.4); }
+.lab-reveal-fact { margin-top: 10px; font-size: 13px; line-height: 1.45; opacity: .85; }
+.lab-reveal-fizzle { font-size: clamp(15px, 4vw, 19px); font-weight: 800; color: rgba(255,255,255,.65); }
+.lab-reveal.new {
+  border-color: var(--amber); box-shadow: 0 0 40px rgba(251,191,36,.35);
+  animation: labrevealnew 2.4s both;
+}
+.lab-reveal.known { border-color: var(--cyan); animation: labrevealknown 1.2s both; }
+.lab-reveal.fizzle { animation: labrevealknown .9s both; }
+@keyframes labrevealnew {
+  0% { opacity: 0; transform: translate(-50%,-40%) scale(.6) rotate(-4deg); }
+  12%,82% { opacity: 1; transform: translate(-50%,-50%) scale(1) rotate(0); }
+  100% { opacity: 0; transform: translate(-50%,-58%) scale(1.08); }
+}
+@keyframes labrevealknown {
+  0% { opacity: 0; transform: translate(-50%,-45%) scale(.75); }
+  18%,78% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-58%) scale(1.05); }
+}
 
 @media (max-width: 620px) {
   .ref-hand { top: calc(105px + env(safe-area-inset-top)); right: 8px; padding: 7px; }

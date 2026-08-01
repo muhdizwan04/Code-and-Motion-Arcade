@@ -112,6 +112,20 @@ const STR = {
     pinchHint: "👌 PINCH to grab · release to place",
     pinchOpen: "OPEN",
     pinchClosed: "PINCHED",
+    // lab
+    labTitle: "Hand Lab",
+    labDesc: "Pinch and combine elements — how many can you discover?",
+    labHow: "PINCH 👌 an element from the shelf and drag it onto another element — they'll combine automatically! Hold still on one to see its name. Discover them all!",
+    labSlotHint: "Drag one element onto another to combine",
+    labShelf: "ELEMENT LIBRARY",
+    labBook: n => `📖 ${n}`,
+    labBookTitle: "Discoveries",
+    labDiscovered: (n, total) => `${n} / ${total} discovered`,
+    labNew: "✨ NEW DISCOVERY!",
+    labAlready: "Already discovered",
+    labFizzle: "Nothing happens...",
+    labClose: "CLOSE",
+    labReset: "RESET",
   },
   bm: {
     langBtn: "EN",
@@ -212,6 +226,20 @@ const STR = {
     pinchHint: "👌 CUBIT untuk ambil · lepas untuk letak",
     pinchOpen: "BUKA",
     pinchClosed: "DICUBIT",
+    // lab
+    labTitle: "Hand Lab",
+    labDesc: "Cubit dan gabungkan unsur — berapa banyak boleh anda jumpa?",
+    labHow: "CUBIT 👌 satu unsur dari rak dan seret ke atas unsur lain — ia akan bergabung sendiri! Tahan lama di satu unsur untuk lihat namanya. Jumpa semuanya!",
+    labSlotHint: "Seret satu unsur ke atas unsur lain untuk gabung",
+    labShelf: "PERPUSTAKAAN UNSUR",
+    labBook: n => `📖 ${n}`,
+    labBookTitle: "Penemuan",
+    labDiscovered: (n, total) => `${n} / ${total} dijumpai`,
+    labNew: "✨ PENEMUAN BAHARU!",
+    labAlready: "Sudah dijumpai",
+    labFizzle: "Tiada apa-apa berlaku...",
+    labClose: "TUTUP",
+    labReset: "RESET",
   },
 };
 let lang = localStorage.getItem("ha-lang") || "en";
@@ -575,6 +603,10 @@ function menu() {
         <div class="emo">🧱</div>
         <div><h3>${t("blastTitle")} <span style="font-size:14px">🧩</span></h3><p>${t("blastDesc")}</p></div>
       </div>
+      <div class="card lab" id="cLab">
+        <div class="emo">🧪</div>
+        <div><h3>${t("labTitle")} <span style="font-size:14px">🔬</span></h3><p>${t("labDesc")}</p></div>
+      </div>
     </div>
     <div class="made-with">🤖 ${t("madeWith")}</div>
   </div>`);
@@ -583,6 +615,7 @@ function menu() {
   node.querySelector("#cSign").onclick = () => { sfx.click(); intro(SIGN); };
   node.querySelector("#cSnake").onclick = () => { sfx.click(); intro(SNAKE); };
   node.querySelector("#cBlast").onclick = () => { sfx.click(); intro(BLAST); };
+  node.querySelector("#cLab").onclick = () => { sfx.click(); intro(LAB); };
   show(node);
 }
 
@@ -2047,6 +2080,331 @@ const BLAST = {
   },
 };
 
+/* ================================================
+   GAME 6 : HAND LAB (element combining)
+================================================ */
+const LAB_ELEMENTS = {
+  fire: { emoji: "🔥", en: { name: "Fire", fact: "Fire needs fuel, heat and oxygen to burn." }, bm: { name: "Api", fact: "Api perlukan bahan bakar, haba dan oksigen untuk menyala." } },
+  water: { emoji: "💧", en: { name: "Water", fact: "Water covers most of planet Earth." }, bm: { name: "Air", fact: "Air menutupi kebanyakan permukaan Bumi." } },
+  earth: { emoji: "🌍", en: { name: "Earth", fact: "Soil and rock make up the ground beneath us." }, bm: { name: "Bumi", fact: "Tanah dan batu membentuk permukaan di bawah kita." } },
+  air: { emoji: "💨", en: { name: "Air", fact: "Air is an invisible mix of gases we breathe." }, bm: { name: "Udara", fact: "Udara ialah campuran gas halimunan yang kita hirup." } },
+  steam: { emoji: "♨️", en: { name: "Steam", fact: "Water turns to steam at 100°C." }, bm: { name: "Wap", fact: "Air bertukar menjadi wap pada suhu 100°C." } },
+  lava: { emoji: "🌋", en: { name: "Lava", fact: "Lava is molten rock from deep underground." }, bm: { name: "Lava", fact: "Lava ialah batuan cair dari dalam bumi." } },
+  energy: { emoji: "⚡", en: { name: "Energy", fact: "Fire releases energy as heat and light." }, bm: { name: "Tenaga", fact: "Api membebaskan tenaga sebagai haba dan cahaya." } },
+  mud: { emoji: "🟤", en: { name: "Mud", fact: "Wet soil sticks together to form mud." }, bm: { name: "Lumpur", fact: "Tanah basah melekat membentuk lumpur." } },
+  cloud: { emoji: "☁️", en: { name: "Cloud", fact: "Clouds are tiny water droplets floating in the sky." }, bm: { name: "Awan", fact: "Awan ialah titisan air halus terapung di langit." } },
+  dust: { emoji: "🌪️", en: { name: "Dust", fact: "Wind can carry tiny bits of earth as dust." }, bm: { name: "Debu", fact: "Angin boleh membawa serpihan halus tanah sebagai debu." } },
+  sun: { emoji: "☀️", en: { name: "Sun", fact: "The Sun is a giant ball of burning gas." }, bm: { name: "Matahari", fact: "Matahari ialah bola gas raksasa yang membara." } },
+  ocean: { emoji: "🌊", en: { name: "Ocean", fact: "Oceans cover about 70% of Earth's surface." }, bm: { name: "Lautan", fact: "Lautan menutupi kira-kira 70% permukaan Bumi." } },
+  mountain: { emoji: "⛰️", en: { name: "Mountain", fact: "Mountains form from rock layers pushed upward." }, bm: { name: "Gunung", fact: "Gunung terbentuk daripada lapisan batu yang tertolak ke atas." } },
+  wind: { emoji: "🌬️", en: { name: "Wind", fact: "Wind is just air that's on the move." }, bm: { name: "Angin", fact: "Angin ialah udara yang sedang bergerak." } },
+  obsidian: { emoji: "🪨", en: { name: "Obsidian", fact: "Lava cooled instantly by water turns to glassy rock." }, bm: { name: "Obsidian", fact: "Lava yang disejukkan segera oleh air bertukar menjadi batu kaca." } },
+  life: { emoji: "🌱", en: { name: "Life", fact: "Energy plus matter can spark the first living things." }, bm: { name: "Hidupan", fact: "Tenaga dan bahan boleh mencetuskan hidupan pertama." } },
+  rain: { emoji: "🌧️", en: { name: "Rain", fact: "Clouds get heavy with water and fall as rain." }, bm: { name: "Hujan", fact: "Awan menjadi berat dengan air lalu turun sebagai hujan." } },
+  rainbow: { emoji: "🌈", en: { name: "Rainbow", fact: "Sunlight bends through raindrops to make a rainbow." }, bm: { name: "Pelangi", fact: "Cahaya matahari membias melalui titisan hujan membentuk pelangi." } },
+  brick: { emoji: "🧱", en: { name: "Brick", fact: "Sun-dried mud becomes a hard building block." }, bm: { name: "Bata", fact: "Lumpur yang dikeringkan matahari menjadi bata yang keras." } },
+  storm: { emoji: "⛈️", en: { name: "Storm", fact: "Storms bring thunder, lightning and heavy rain." }, bm: { name: "Ribut", fact: "Ribut membawa guruh, kilat dan hujan lebat." } },
+  plant: { emoji: "🌿", en: { name: "Plant", fact: "Living things need water to grow." }, bm: { name: "Tumbuhan", fact: "Hidupan memerlukan air untuk membesar." } },
+  sand: { emoji: "🏖️", en: { name: "Sand", fact: "Wind slowly wears mountains down into sand." }, bm: { name: "Pasir", fact: "Angin perlahan-lahan mengikis gunung menjadi pasir." } },
+  fish: { emoji: "🐟", en: { name: "Fish", fact: "Scientists think life began in the ocean." }, bm: { name: "Ikan", fact: "Saintis percaya hidupan bermula di lautan." } },
+  metal: { emoji: "⛏️", en: { name: "Metal", fact: "Heat can pull metal out of mountain rock." }, bm: { name: "Logam", fact: "Haba boleh mengeluarkan logam daripada batuan gunung." } },
+  glass: { emoji: "🪟", en: { name: "Glass", fact: "Melting sand at high heat makes glass." }, bm: { name: "Kaca", fact: "Melebur pasir pada suhu tinggi menghasilkan kaca." } },
+  animal: { emoji: "🐾", en: { name: "Animal", fact: "Animals get their energy by eating plants." }, bm: { name: "Haiwan", fact: "Haiwan mendapat tenaga dengan memakan tumbuhan." } },
+  human: { emoji: "🧑", en: { name: "Human", fact: "Humans are animals who build tools and ideas." }, bm: { name: "Manusia", fact: "Manusia ialah haiwan yang mencipta alat dan idea." } },
+  idea: { emoji: "💡", en: { name: "Idea", fact: "Every invention starts as a single idea." }, bm: { name: "Idea", fact: "Setiap ciptaan bermula sebagai satu idea." } },
+  robot: { emoji: "🤖", en: { name: "Robot", fact: "A robot is an idea for a machine, built in metal." }, bm: { name: "Robot", fact: "Robot ialah idea untuk mesin, dibina daripada logam." } },
+};
+const LAB_BASE = ["fire", "water", "earth", "air"];
+const LAB_RECIPES = {
+  "fire+water": "steam", "earth+fire": "lava", "air+fire": "energy",
+  "earth+water": "mud", "air+water": "cloud", "air+earth": "dust",
+  "fire+fire": "sun", "water+water": "ocean", "earth+earth": "mountain", "air+air": "wind",
+  "lava+water": "obsidian", "earth+energy": "life", "cloud+water": "rain",
+  "cloud+sun": "rainbow", "mud+sun": "brick", "cloud+cloud": "storm",
+  "life+water": "plant", "mountain+wind": "sand", "life+ocean": "fish",
+  "fire+mountain": "metal", "fire+sand": "glass", "energy+plant": "animal",
+  "animal+energy": "human", "energy+human": "idea", "idea+metal": "robot",
+};
+const LAB_TOTAL = Object.keys(LAB_ELEMENTS).length;
+
+const LAB = {
+  emoji: "🧪", titleKey: "labTitle", howKey: "labHow",
+  found: new Set(), bookOpen: false,
+  cursorPos: null, dragEl: null, dragPos: null, dragFromIndex: -1,
+  pinchLog: [], openSince: 0, handLostSince: 0,
+  dwellIndex: -1, dwellSince: 0,
+  shelfBg: null, shelfBgKey: "",
+  bookBtn: null, bookNode: null, running: false,
+
+  start() {
+    this.cleanup();
+    this.found = new Set(LAB_BASE);
+    this.bookOpen = false;
+    this.cursorPos = null; this.dragEl = null; this.dragPos = null; this.dragFromIndex = -1;
+    this.pinchLog = []; this.openSince = 0; this.handLostSince = 0;
+    this.dwellIndex = -1; this.dwellSince = 0;
+    this.shelfBg = null; this.shelfBgKey = "";
+    this.running = true;
+    this.bookBtn = el(`<button class="reset-btn" id="labBookBtn" type="button">${t("labBook")(`${this.found.size}/${LAB_TOTAL}`)}</button>`);
+    this.bookBtn.onclick = () => { sfx.click(); this.toggleBook(); };
+    document.body.appendChild(this.bookBtn);
+  },
+
+  cleanup() {
+    this.bookBtn?.remove(); this.bookNode?.remove();
+    this.bookBtn = null; this.bookNode = null; this.running = false;
+  },
+
+  /* One persistent shelf holds every discovered element — it never gets
+     replaced by a separate "workspace", so it's always reachable, even
+     mid-combine. Combining happens by dragging one shelf item onto another. */
+  layout() {
+    const topSafe = 100, bottomSafe = 56;
+    const items = [...this.found];
+    const availW = innerWidth - 24;
+    const cols = Math.max(4, Math.min(7, Math.floor(availW / 92)));
+    const rows = Math.max(1, Math.ceil(items.length / cols));
+    // Keep the entire library reachable on a short landscape screen as new
+    // discoveries are added, instead of letting lower shelf rows slip away.
+    const maxH = Math.max(220, innerHeight - topSafe - bottomSafe);
+    const cell = Math.max(42, Math.min(92, Math.floor(availW / cols), Math.floor(maxH / rows)));
+    const gridW = cols * cell, gridH = rows * cell;
+    const gx = Math.round((innerWidth - gridW) / 2), gy = topSafe;
+    return { items, cols, cell, rows, gx, gy, gridW, gridH };
+  },
+  shelfPos(index, layout) {
+    const col = index % layout.cols, row = Math.floor(index / layout.cols);
+    return { x: layout.gx + col * layout.cell + layout.cell / 2, y: layout.gy + row * layout.cell + layout.cell / 2 };
+  },
+  hoveredShelf(layout, cursor) {
+    if (!cursor) return -1;
+    const r = layout.cell * .42;
+    for (let i = 0; i < layout.items.length; i++) {
+      if (dist(cursor, this.shelfPos(i, layout)) < r + 14) return i;
+    }
+    return -1;
+  },
+
+  toggleBook() {
+    this.bookOpen = !this.bookOpen;
+    if (!this.bookOpen) { this.bookNode?.remove(); this.bookNode = null; return; }
+    const cards = Object.keys(LAB_ELEMENTS).map(id => {
+      const known = this.found.has(id);
+      const el2 = LAB_ELEMENTS[id];
+      return `<div class="lab-card ${known ? "known" : ""}">
+        <div class="lab-card-emo">${known ? el2.emoji : "❔"}</div>
+        <div class="lab-card-name">${known ? el2[lang].name : "?"}</div>
+      </div>`;
+    }).join("");
+    this.bookNode = el(`<div class="lab-book">
+      <div class="lab-book-panel">
+        <h2>${t("labBookTitle")}</h2>
+        <div class="desc">${t("labDiscovered")(this.found.size, LAB_TOTAL)}</div>
+        <div class="lab-book-grid">${cards}</div>
+        <button class="btn" id="labBookClose">${t("labClose")}</button>
+      </div>
+    </div>`);
+    this.bookNode.querySelector("#labBookClose").onclick = () => { sfx.click(); this.toggleBook(); };
+    document.body.appendChild(this.bookNode);
+  },
+
+  /* The shelf frame + row dividers never change shape between two frames of
+     the same size, so they're cached offscreen like the other games' boards. */
+  buildShelfBackground(layout) {
+    const key = `${layout.cols}:${layout.rows}:${layout.cell}`;
+    if (this.shelfBgKey === key && this.shelfBg) return;
+    const pad = 16, dpr = Math.min(2, devicePixelRatio || 1);
+    const w = layout.gridW + pad * 2, h = layout.gridH + pad * 2;
+    const c = document.createElement("canvas");
+    c.width = Math.ceil(w * dpr); c.height = Math.ceil(h * dpr);
+    const g = c.getContext("2d");
+    g.scale(dpr, dpr);
+    const grad = g.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, "rgba(68,42,20,.5)"); grad.addColorStop(1, "rgba(32,18,10,.62)");
+    g.fillStyle = grad;
+    g.strokeStyle = "rgba(251,191,36,.42)"; g.lineWidth = 2;
+    g.shadowColor = "#fbbf24"; g.shadowBlur = 14;
+    g.beginPath(); g.roundRect(pad - 8, pad - 8, layout.gridW + 16, layout.gridH + 16, 20);
+    g.fill(); g.stroke();
+    g.shadowBlur = 0;
+    g.strokeStyle = "rgba(251,191,36,.25)"; g.lineWidth = 1.5;
+    for (let r = 1; r < layout.rows; r++) {
+      g.beginPath();
+      g.moveTo(pad, pad + r * layout.cell);
+      g.lineTo(pad + layout.gridW, pad + r * layout.cell);
+      g.stroke();
+    }
+    this.shelfBg = { canvas: c, pad, w, h };
+    this.shelfBgKey = key;
+  },
+
+  drawJar(x, y, size, id, alpha = 1, glow = 0, ring = false) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    const w = size, h = size * 1.06;
+    if (glow) { ctx.shadowColor = ring ? "#22d3ee" : "#fbbf24"; ctx.shadowBlur = glow; }
+    ctx.fillStyle = "rgba(255,255,255,.09)";
+    ctx.strokeStyle = ring ? "rgba(34,211,238,.9)" : "rgba(251,191,36,.5)";
+    ctx.lineWidth = ring ? 3 : 2;
+    ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, w * .22); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = ring ? "rgba(34,211,238,.4)" : "rgba(251,191,36,.35)";
+    ctx.beginPath(); ctx.roundRect(x - w * .32, y - h / 2 - h * .08, w * .64, h * .14, 5); ctx.fill();
+    ctx.shadowBlur = 0;
+    // The circle/lid fills above use a low-alpha color; canvas leaks that
+    // alpha into fillText too unless we reset fillStyle to fully opaque
+    // first — that leak was why the element emoji looked washed out before.
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `${size * .56}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(LAB_ELEMENTS[id].emoji, x, y + size * .03);
+    ctx.restore();
+  },
+  drawNameTag(x, y, id) {
+    const name = LAB_ELEMENTS[id][lang].name;
+    ctx.save();
+    ctx.font = "800 13px system-ui";
+    const w = ctx.measureText(name).width + 22;
+    ctx.fillStyle = "rgba(11,5,24,.9)"; ctx.strokeStyle = "rgba(255,255,255,.32)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(x - w / 2, y - 15, w, 27, 13); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(name, x, y - 1);
+    ctx.restore();
+  },
+
+  resolveCombine(idA, idB) {
+    const key = [idA, idB].sort().join("+");
+    const resultId = LAB_RECIPES[key];
+    if (resultId) {
+      const isNew = !this.found.has(resultId);
+      this.found.add(resultId);
+      this.bookBtn.textContent = t("labBook")(`${this.found.size}/${LAB_TOTAL}`);
+      sfx.win();
+      this.showReveal(resultId, isNew);
+    } else {
+      sfx.bad();
+      this.showReveal(null, false);
+    }
+  },
+  showReveal(resultId, isNew) {
+    const info = resultId ? LAB_ELEMENTS[resultId] : null;
+    const card = el(`<div class="lab-reveal ${resultId ? (isNew ? "new" : "known") : "fizzle"}">
+      ${info ? `
+        <div class="lab-reveal-emo">${info.emoji}</div>
+        <div class="lab-reveal-name">${info[lang].name}</div>
+        ${isNew
+          ? `<div class="lab-reveal-badge">${t("labNew")}</div><div class="lab-reveal-fact">${info[lang].fact}</div>`
+          : `<div class="lab-reveal-badge known">${t("labAlready")}</div>`}
+      ` : `<div class="lab-reveal-fizzle">${t("labFizzle")}</div>`}
+    </div>`);
+    document.body.appendChild(card);
+    setTimeout(() => card.remove(), resultId ? (isNew ? 2400 : 1200) : 900);
+  },
+
+  onFrame(dt) {
+    if (!this.running) return;
+    if (this.bookOpen) return;
+    const layout = this.layout();
+    this.buildShelfBackground(layout);
+    const pinch = pinchState();
+    const raw = pinch?.center || null;
+    const now = performance.now();
+
+    if (raw) {
+      const k = 1 - Math.pow(1e-9, dt);
+      if (!this.cursorPos) this.cursorPos = { x: raw.x, y: raw.y };
+      else { this.cursorPos.x += (raw.x - this.cursorPos.x) * k; this.cursorPos.y += (raw.y - this.cursorPos.y) * k; }
+    } else this.cursorPos = null;
+    const cursor = this.cursorPos;
+
+    // Same fast-pinch-tolerant grab/release used in Hand Blast: a rolling
+    // 160ms buffer of the most-closed reading, and a debounced release so
+    // a single blurry frame during a fast drag can't drop the element.
+    if (pinch) this.pinchLog.push({ t: now, v: pinch.pinch, cursor: { x: pinch.center.x, y: pinch.center.y } });
+    while (this.pinchLog.length && now - this.pinchLog[0].t > 160) this.pinchLog.shift();
+
+    if (this.dragEl === null) {
+      const closest = this.pinchLog.reduce((best, e) => (!best || e.v < best.v ? e : best), null);
+      if (closest && closest.v < .48) {
+        const index = this.hoveredShelf(layout, closest.cursor);
+        if (index >= 0) {
+          this.dragEl = layout.items[index]; this.dragFromIndex = index; sfx.click();
+          this.dragPos = { x: closest.cursor.x, y: closest.cursor.y };
+          this.openSince = 0;
+        }
+      }
+    } else {
+      if (!pinch) {
+        this.handLostSince = this.handLostSince || now;
+        if (now - this.handLostSince > 900) { this.dragEl = null; this.dragPos = null; this.dragFromIndex = -1; }
+      } else {
+        this.handLostSince = 0;
+        if (pinch.pinch >= .62) this.openSince = this.openSince || now;
+        else this.openSince = 0;
+        // Dropping onto ANY shelf item — including the one you picked up —
+        // triggers a combine (dropping back on yourself = self-combining,
+        // e.g. fire+fire, which just falls out of this without special-casing).
+        if (this.openSince && now - this.openSince > 70 && this.dragPos) {
+          // Use the latest pinch centre for the drop, rather than the softly
+          // smoothed ghost position, so a quick direct drop lands on the jar
+          // the player is actually touching.
+          const targetIndex = this.hoveredShelf(layout, pinch.center);
+          if (targetIndex >= 0) this.resolveCombine(this.dragEl, layout.items[targetIndex]);
+          this.dragEl = null; this.dragPos = null; this.dragFromIndex = -1; this.openSince = 0;
+        }
+      }
+    }
+    if (this.dragEl !== null && cursor) {
+      const k = 1 - Math.pow(1e-11, dt);
+      if (!this.dragPos) this.dragPos = { x: cursor.x, y: cursor.y };
+      else { this.dragPos.x += (cursor.x - this.dragPos.x) * k; this.dragPos.y += (cursor.y - this.dragPos.y) * k; }
+    }
+
+    // Hold-to-identify: dwell on the same item (idle hover, or a drag that
+    // hasn't moved far from its own slot yet) reveals its name after a beat.
+    let activeIdx = -1;
+    if (this.dragEl !== null && this.dragPos) {
+      const origin = this.shelfPos(this.dragFromIndex, layout);
+      if (dist(this.dragPos, origin) < layout.cell * .5) activeIdx = this.dragFromIndex;
+    } else {
+      activeIdx = this.hoveredShelf(layout, cursor);
+    }
+    if (activeIdx === this.dwellIndex) { /* still dwelling */ }
+    else { this.dwellIndex = activeIdx; this.dwellSince = activeIdx >= 0 ? now : 0; }
+    const showName = this.dwellSince && now - this.dwellSince > 480;
+
+    ctx.save();
+    ctx.fillStyle = "rgba(5,8,28,.28)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    if (this.shelfBg) ctx.drawImage(this.shelfBg.canvas, layout.gx - this.shelfBg.pad, layout.gy - this.shelfBg.pad, this.shelfBg.w, this.shelfBg.h);
+    ctx.font = "900 12px system-ui"; ctx.textAlign = "center"; ctx.letterSpacing = "1.5px";
+    ctx.fillStyle = "rgba(251,191,36,.92)"; ctx.fillText(`🔬 ${t("labShelf")}`, innerWidth / 2, layout.gy - 26);
+    ctx.letterSpacing = "0px";
+
+    const hover = this.dragEl !== null ? this.hoveredShelf(layout, this.dragPos) : this.hoveredShelf(layout, cursor);
+    layout.items.forEach((id, i) => {
+      const p = this.shelfPos(i, layout);
+      const isDropTarget = this.dragEl !== null && i === hover;
+      this.drawJar(p.x, p.y, layout.cell * .72, id, 1, isDropTarget ? 16 : 0, isDropTarget);
+    });
+
+    if (showName && this.dwellIndex >= 0) {
+      const p = this.dragEl !== null ? this.dragPos : this.shelfPos(this.dwellIndex, layout);
+      this.drawNameTag(p.x, p.y - layout.cell * .62, layout.items[this.dwellIndex]);
+    }
+
+    // carried ghost — drawn last so it always sits above the shelf
+    if (this.dragEl !== null && this.dragPos) {
+      this.drawJar(this.dragPos.x, this.dragPos.y - layout.cell * .3, layout.cell * .8, this.dragEl, .95, 20, false);
+    }
+
+    if (layout.items.length <= LAB_BASE.length) {
+      ctx.font = "700 13px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,255,255,.75)";
+      ctx.fillText(t("labSlotHint"), innerWidth / 2, layout.gy + layout.gridH + 26);
+    }
+    ctx.font = "800 13px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,255,255,.9)";
+    ctx.fillText(t("pinchHint"), innerWidth / 2, innerHeight - 22);
+    ctx.restore();
+  },
+};
+
 /* ---------------- top bar ---------------- */
 document.getElementById("langBtn").onclick = () => {
   lang = lang === "en" ? "bm" : "en";
@@ -2070,6 +2428,6 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 }
 
 /* debug hook (harmless in production) */
-window.__ha = { engine, NINJA, BATTLE, SIGN, SNAKE, BLAST, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60) };
+window.__ha = { engine, NINJA, BATTLE, SIGN, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60) };
 
 menu();
