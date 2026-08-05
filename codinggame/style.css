@@ -135,6 +135,15 @@ h1.glitch {
 .btn:active { transform: scale(.95); }
 .btn.amber { color: var(--amber); border-color: var(--amber); box-shadow: 0 0 18px rgba(255,200,87,.25); text-shadow: 0 0 8px rgba(255,200,87,.8); background: linear-gradient(180deg, rgba(255,200,87,.18), rgba(255,200,87,.05)); }
 .btn.small { padding: 8px 16px; font-size: 14px; margin-top: 8px; }
+.stats-overlay {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  background: rgba(2,4,10,.82); padding: 20px;
+}
+.stats-overlay .stats-card {
+  width: min(90vw, 420px); text-align: center; padding: 26px 22px;
+  background: var(--panel); border: 1px solid var(--green); border-radius: 14px;
+  box-shadow: 0 0 30px rgba(0,255,156,.2);
+}
 .skip-link {
   position: fixed; bottom: calc(10px + env(safe-area-inset-bottom)); right: 12px; z-index: 45;
   background: none; border: none; color: rgba(200,255,232,.35);
@@ -332,5 +341,18 @@ h1.glitch {
 
 .fade-in { animation: fadein .5s; }
 @keyframes fadein { from { opacity: 0; transform: translateY(14px); } }
+
+/* install banner — bottom-center pill so it never collides with the
+   bottom-left reset-scores button or the bottom-right skip link */
+.install-banner {
+  position: fixed; z-index: 50; left: 50%; transform: translateX(-50%);
+  bottom: calc(50px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
+  max-width: min(92vw, 420px); padding: 9px 14px; border-radius: 14px;
+  background: rgba(2,4,10,.92); border: 1px solid var(--green);
+  box-shadow: 0 0 20px rgba(0,255,156,.15);
+  font-size: 12px; line-height: 1.35; color: var(--text);
+}
+.install-banner .chip { padding: 5px 12px; font-size: 12px; flex: none; }
 
 .hidden { display: none !important; }

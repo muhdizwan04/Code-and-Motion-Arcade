@@ -113,7 +113,11 @@ const sfx = {
   bad: () => beep(160, 0.25, "sawtooth", 0.07),
   alarm: () => { beep(880, 0.15, "square", 0.06); setTimeout(() => beep(620, 0.15, "square", 0.06), 160); },
   pixel: () => beep(980, 0.03, "sine", 0.04),
-  win: () => { [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => beep(f, 0.18, "triangle", 0.08), i * 140)); },
+  win: () => {
+    [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => beep(f, 0.18, "triangle", 0.08), i * 140));
+    // Land the mission-complete fanfare on a full chord instead of a lone note.
+    setTimeout(() => [1319, 1568, 2093].forEach(f => beep(f, 0.5, "triangle", 0.05)), 580);
+  },
 };
 
 /* ---------- state ---------- */
@@ -210,6 +214,29 @@ function doorUnlocked(next) {
 /* ================= SCREENS ================= */
 
 /* ---- title ---- */
+/* ---------------- lightweight booth play-count tracking ----------------
+   No server, no external analytics — just a localStorage tally the booth
+   operator can peek at by tapping the title 5 times. */
+const CH_PLAY_COUNT_KEY = "ch-plays";
+function bumpMissionCount() {
+  const n = +(localStorage.getItem(CH_PLAY_COUNT_KEY) || 0) + 1;
+  localStorage.setItem(CH_PLAY_COUNT_KEY, String(n));
+}
+function showPlayStats() {
+  const n = +(localStorage.getItem(CH_PLAY_COUNT_KEY) || 0);
+  const node = el(`<div class="stats-overlay">
+    <div class="stats-card">
+      <div class="stage-title">📊 BOOTH STATS</div>
+      <div class="stage-help">${n} mission${n === 1 ? "" : "s"} started on this device</div>
+      <button class="btn amber small" id="statsResetBtn">RESET</button>
+      <button class="btn small" id="statsCloseBtn">CLOSE</button>
+    </div>
+  </div>`);
+  node.querySelector("#statsResetBtn").onclick = () => { sfx.click(); localStorage.removeItem(CH_PLAY_COUNT_KEY); node.remove(); showPlayStats(); };
+  node.querySelector("#statsCloseBtn").onclick = () => { sfx.click(); node.remove(); };
+  document.body.appendChild(node);
+}
+
 function titleScreen() {
   clearSkip();
   topbar.classList.remove("hidden");
@@ -217,12 +244,21 @@ function titleScreen() {
   currentDoor = 0; renderProgress();
   const node = el(`<div style="margin:auto">
     <div class="big-emoji">🕵️</div>
-    <h1 class="glitch">CYBER HEIST</h1>
+    <h1 class="glitch" id="chTitle">CYBER HEIST</h1>
     <div class="subtitle">${t("subtitle")}</div>
     <button class="btn" id="startBtn">${t("tapStart")}</button>
     ${leaderboardHtml()}
   </div>`);
-  node.querySelector("#startBtn").onclick = () => { sfx.click(); bootScreen(); };
+  node.querySelector("#startBtn").onclick = () => { sfx.click(); bumpMissionCount(); bootScreen(); };
+  // Secret booth-operator gesture: 5 taps on the title within 3s opens the
+  // play-count overlay, out of the way of normal play.
+  let titleTaps = 0, titleTapTimer = null;
+  node.querySelector("#chTitle").onclick = () => {
+    titleTaps++;
+    clearTimeout(titleTapTimer);
+    titleTapTimer = setTimeout(() => { titleTaps = 0; }, 3000);
+    if (titleTaps >= 5) { titleTaps = 0; showPlayStats(); }
+  };
   show(node);
 }
 
@@ -232,7 +268,7 @@ async function bootScreen() {
     <div class="type-line" id="bootText"></div>
     <div id="nameArea" class="hidden" style="margin-top:20px">
       <div class="stage-title">${t("agentPrompt")}</div>
-      <input id="agentName" maxlength="12" autocomplete="off" placeholder="???">
+      <input id="agentName" maxlength="12" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="go" placeholder="???">
       <br><button class="btn" id="nameGo">${t("startMission")}</button>
     </div>
   </div>`);
@@ -680,6 +716,41 @@ document.getElementById("resetScoreBtn").textContent = t("resetScores");
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
+
+/* Install banner: offline-ready only matters once this is on the home
+   screen, and browsers bury that step — especially iOS Safari, which has
+   no install-prompt API at all and needs plain-text instructions instead. */
+(function setupInstallBanner() {
+  const KEY = "ch-install-dismissed";
+  if (localStorage.getItem(KEY)) return;
+  if (window.matchMedia("(display-mode: standalone)").matches || navigator.standalone) return;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  let deferredPrompt = null;
+
+  function showBanner(iosMode) {
+    if (document.getElementById("installBanner")) return;
+    const banner = el(`<div class="install-banner" id="installBanner">
+      <span>${iosMode ? "📲 Tap Share ⬆️ then \"Add to Home Screen\"" : "📲 Install this app for offline play"}</span>
+      ${iosMode ? "" : `<button class="chip" id="installBtn">Install</button>`}
+      <button class="chip" id="installDismiss" aria-label="dismiss">✕</button>
+    </div>`);
+    document.body.appendChild(banner);
+    if (!iosMode) {
+      banner.querySelector("#installBtn").onclick = async () => {
+        banner.remove();
+        if (deferredPrompt) { deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; }
+      };
+    }
+    banner.querySelector("#installDismiss").onclick = () => { localStorage.setItem(KEY, "1"); banner.remove(); };
+  }
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    showBanner(false);
+  });
+  if (isIOS) showBanner(true);
+})();
 
 /* go */
 titleScreen();

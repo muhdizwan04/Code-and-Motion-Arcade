@@ -165,6 +165,19 @@ h1.arcade {
 }
 @keyframes slide { to { transform: translateX(160%); } }
 
+/* hand calibration */
+.calib-ring {
+  width: 96px; height: 96px; margin: 4px auto 14px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 44px; background: rgba(34,211,238,.12); border: 3px solid rgba(34,211,238,.5);
+  animation: calibpulse 1.4s ease-in-out infinite;
+}
+@keyframes calibpulse { 50% { transform: scale(1.08); box-shadow: 0 0 24px rgba(34,211,238,.45); } }
+.calib-panel.calib-ok .calib-ring {
+  border-color: var(--lime); background: rgba(163,230,53,.18);
+  animation: none; box-shadow: 0 0 30px rgba(163,230,53,.6);
+}
+
 /* HUD (in games) */
 .hud {
   position: fixed; z-index: 25; left: 0; right: 0;
@@ -455,17 +468,12 @@ h1.arcade {
   background: rgba(17,10,32,.9); border: 1px solid rgba(255,255,255,.16); border-radius: 24px;
   padding: 22px; text-align: center;
 }
-.lab-book-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
-  gap: 10px; margin: 16px 0;
+.stats-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 14px; border-radius: 12px; background: rgba(255,255,255,.06);
+  margin-bottom: 6px; font-size: 14px;
 }
-.lab-card {
-  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12);
-  border-radius: 14px; padding: 10px 4px; opacity: .5;
-}
-.lab-card.known { opacity: 1; border-color: rgba(163,230,53,.45); background: rgba(163,230,53,.08); }
-.lab-card-emo { font-size: 26px; }
-.lab-card-name { font-size: 10px; opacity: .85; margin-top: 4px; }
+.stats-row b { color: var(--cyan); font-size: 17px; }
 .lab-reveal {
   position: fixed; z-index: 45; left: 50%; top: 40%; transform: translate(-50%,-50%);
   padding: 18px 26px; border-radius: 22px; text-align: center; pointer-events: none;
@@ -480,24 +488,15 @@ h1.arcade {
   font-size: 12px; font-weight: 800; letter-spacing: .5px;
   background: rgba(251,191,36,.15); color: var(--amber); border: 1px solid rgba(251,191,36,.4);
 }
-.lab-reveal-badge.known { background: rgba(34,211,238,.12); color: var(--cyan); border-color: rgba(34,211,238,.4); }
 .lab-reveal-fact { margin-top: 10px; font-size: 13px; line-height: 1.45; opacity: .85; }
-.lab-reveal-fizzle { font-size: clamp(15px, 4vw, 19px); font-weight: 800; color: rgba(255,255,255,.65); }
 .lab-reveal.new {
   border-color: var(--amber); box-shadow: 0 0 40px rgba(251,191,36,.35);
   animation: labrevealnew 2.4s both;
 }
-.lab-reveal.known { border-color: var(--cyan); animation: labrevealknown 1.2s both; }
-.lab-reveal.fizzle { animation: labrevealknown .9s both; }
 @keyframes labrevealnew {
   0% { opacity: 0; transform: translate(-50%,-40%) scale(.6) rotate(-4deg); }
   12%,82% { opacity: 1; transform: translate(-50%,-50%) scale(1) rotate(0); }
   100% { opacity: 0; transform: translate(-50%,-58%) scale(1.08); }
-}
-@keyframes labrevealknown {
-  0% { opacity: 0; transform: translate(-50%,-45%) scale(.75); }
-  18%,78% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
-  100% { opacity: 0; transform: translate(-50%,-58%) scale(1.05); }
 }
 
 @media (max-width: 620px) {
@@ -514,5 +513,19 @@ h1.arcade {
   .phrase-steps { font-size: 11px; padding-left: 19px; }
   .phrase-live-status { font-size: 10px; min-height: 34px; }
 }
+
+/* install banner */
+.install-banner {
+  position: fixed; z-index: 50; left: 50%; transform: translateX(-50%);
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  max-width: min(94vw, 460px); padding: 10px 14px; border-radius: 16px;
+  background: rgba(11,5,24,.92); border: 1px solid rgba(255,255,255,.25);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  font-size: 13px; line-height: 1.35; box-shadow: 0 8px 30px rgba(0,0,0,.4);
+}
+.install-banner .chip { padding: 5px 12px; font-size: 13px; flex: none; }
+/* Stay out of the way while a camera game is actually being played. */
+body.playing .install-banner { display: none; }
 
 .hidden { display: none !important; }

@@ -28,6 +28,10 @@ const STR = {
     start: "START ▶",
     back: "MENU",
     again: "PLAY AGAIN ↺",
+    calibShow: "Show me your hand! ✋",
+    calibHint: "Hold your hand up so the camera can see it clearly",
+    calibReady: "Got it! Ready…",
+    calibSkip: "Can't see your hand? Start anyway →",
     // ninja
     ninjaHow: "Bugs are attacking the system! 🐛 Move your POINTER FINGER in the air to slice them. Avoid the bombs 💣!",
     score: "Score", time: "Time", combo: "Combo", best: "Best",
@@ -122,8 +126,6 @@ const STR = {
     labBookTitle: "Discoveries",
     labDiscovered: (n, total) => `${n} / ${total} discovered`,
     labNew: "✨ NEW DISCOVERY!",
-    labAlready: "Already discovered",
-    labFizzle: "Nothing happens...",
     labClose: "CLOSE",
     labReset: "RESET",
     labRecipes: "RECIPES",
@@ -151,6 +153,10 @@ const STR = {
     start: "MULA ▶",
     back: "MENU",
     again: "MAIN LAGI ↺",
+    calibShow: "Tunjukkan tangan anda! ✋",
+    calibHint: "Angkat tangan anda supaya kamera dapat melihatnya dengan jelas",
+    calibReady: "Dapat! Bersedia…",
+    calibSkip: "Kamera tak nampak tangan? Mula juga →",
     ninjaHow: "Pepijat menyerang sistem! 🐛 Gerakkan JARI TELUNJUK di udara untuk menetaknya. Elakkan bom 💣!",
     score: "Skor", time: "Masa", combo: "Combo", best: "Terbaik",
     debugged: "SISTEM DIBAIKI!",
@@ -242,8 +248,6 @@ const STR = {
     labBookTitle: "Penemuan",
     labDiscovered: (n, total) => `${n} / ${total} dijumpai`,
     labNew: "✨ PENEMUAN BAHARU!",
-    labAlready: "Sudah dijumpai",
-    labFizzle: "Tiada apa-apa berlaku...",
     labClose: "TUTUP",
     labReset: "RESET",
     labRecipes: "RESIPI",
@@ -277,15 +281,22 @@ function beep(freq = 660, dur = 0.08, type = "square", vol = 0.05) {
     o.start(); o.stop(actx.currentTime + dur);
   } catch (e) {}
 }
+function chord(freqs, dur = 0.35, type = "triangle", vol = 0.05) {
+  freqs.forEach(f => beep(f, dur, type, vol));
+}
 const sfx = {
   click: () => beep(520, 0.05),
+  open: () => { beep(660, 0.05, "sine", 0.05); setTimeout(() => beep(880, 0.07, "sine", 0.045), 45); },
   slice: () => beep(880 + Math.random() * 300, 0.06, "sawtooth", 0.05),
-  bomb: () => { beep(120, 0.3, "sawtooth", 0.09); },
+  bomb: () => { beep(120, 0.3, "sawtooth", 0.09); beep(85, 0.22, "square", 0.05); },
   good: () => { beep(660, 0.09); setTimeout(() => beep(880, 0.12), 90); },
   bad: () => beep(160, 0.25, "sawtooth", 0.07),
   count: () => beep(440, 0.1, "sine", 0.07),
   go: () => beep(880, 0.2, "sine", 0.08),
-  win: () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.16, "triangle", 0.08), i * 130)); },
+  win: () => {
+    [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.16, "triangle", 0.08), i * 130));
+    setTimeout(() => chord([1047, 1319, 1568], 0.5, "triangle", 0.05), 520); // land on a full major chord, not just a lone top note
+  },
   tick: () => beep(1200, 0.02, "sine", 0.02),
 };
 
@@ -296,6 +307,7 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const homeBtn = document.getElementById("homeBtn");
 const handStatus = document.getElementById("handStatus");
+const topbar = document.getElementById("topbar");
 
 function resize() {
   canvas.width = innerWidth * devicePixelRatio;
@@ -454,6 +466,14 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 
 /* ---------------- hand maths ---------------- */
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+/* Removes dead entries without allocating a new array — Air Ninja calls this
+   on 3-4 particle/trail arrays every single frame at 60fps, and .filter()
+   there was pure avoidable GC pressure on lower-end tablets. */
+function pruneInPlace(arr, keep) {
+  let w = 0;
+  for (let i = 0; i < arr.length; i++) if (keep(arr[i])) arr[w++] = arr[i];
+  arr.length = w;
+}
 function jointAngle(a, b, c) {
   const abx = a.x - b.x, aby = a.y - b.y;
   const cbx = c.x - b.x, cby = c.y - b.y;
@@ -597,10 +617,39 @@ function stopGame() {
 }
 
 /* ---------------- screens ---------------- */
+/* ---------------- lightweight booth play-count tracking ----------------
+   No server, no external analytics — just a localStorage tally the booth
+   operator can peek at by tapping the title 5 times. */
+const PLAY_COUNT_KEY = "ha-plays";
+function bumpPlayCount(gameKey) {
+  let counts = {};
+  try { counts = JSON.parse(localStorage.getItem(PLAY_COUNT_KEY) || "{}"); } catch {}
+  counts[gameKey] = (counts[gameKey] || 0) + 1;
+  localStorage.setItem(PLAY_COUNT_KEY, JSON.stringify(counts));
+}
+function showPlayStats() {
+  let counts = {};
+  try { counts = JSON.parse(localStorage.getItem(PLAY_COUNT_KEY) || "{}"); } catch {}
+  const labels = { ninja: "🥷 Air Ninja", battle: "✊ Gesture Battle", sign: "🤟 Sign Speller", snake: "🐍 Hand Snake", blast: "🧱 Hand Blast", lab: "🧪 Hand Lab" };
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const rows = Object.keys(labels).map(k => `<div class="stats-row"><span>${labels[k]}</span><b>${counts[k] || 0}</b></div>`).join("");
+  const node = el(`<div class="lab-book" id="statsOverlay">
+    <div class="lab-book-panel" style="color:var(--text);background:rgba(17,10,32,.95)">
+      <h2>📊 Booth Stats</h2>
+      <div class="desc">${total} total plays this device</div>
+      <div style="margin:16px 0;text-align:left">${rows}</div>
+      <button class="btn ghost" id="statsResetBtn" style="font-size:14px;padding:9px 20px">Reset Stats</button>
+      <br><button class="btn" id="statsCloseBtn">Close</button>
+    </div>
+  </div>`);
+  node.querySelector("#statsResetBtn").onclick = () => { sfx.click(); localStorage.removeItem(PLAY_COUNT_KEY); node.remove(); showPlayStats(); };
+  node.querySelector("#statsCloseBtn").onclick = () => { sfx.click(); node.remove(); };
+  document.body.appendChild(node);
+}
 function menu() {
   stopGame();
   const node = el(`<div style="margin:auto;width:100%">
-    <h1 class="arcade">${t("title")}</h1>
+    <h1 class="arcade" id="arcadeTitle">${t("title")}</h1>
     <div class="tagline">${t("tagline")}</div>
     <div class="cards">
       <div class="card ninja" id="cNinja">
@@ -630,12 +679,21 @@ function menu() {
     </div>
     <div class="made-with">🤖 ${t("madeWith")}</div>
   </div>`);
-  node.querySelector("#cNinja").onclick = () => { sfx.click(); intro(NINJA); };
-  node.querySelector("#cBattle").onclick = () => { sfx.click(); intro(BATTLE); };
-  node.querySelector("#cSign").onclick = () => { sfx.click(); intro(SIGN); };
-  node.querySelector("#cSnake").onclick = () => { sfx.click(); intro(SNAKE); };
-  node.querySelector("#cBlast").onclick = () => { sfx.click(); intro(BLAST); };
-  node.querySelector("#cLab").onclick = () => { sfx.click(); intro(LAB); };
+  node.querySelector("#cNinja").onclick = () => { sfx.open(); intro(NINJA); };
+  node.querySelector("#cBattle").onclick = () => { sfx.open(); intro(BATTLE); };
+  node.querySelector("#cSign").onclick = () => { sfx.open(); intro(SIGN); };
+  node.querySelector("#cSnake").onclick = () => { sfx.open(); intro(SNAKE); };
+  node.querySelector("#cBlast").onclick = () => { sfx.open(); intro(BLAST); };
+  node.querySelector("#cLab").onclick = () => { sfx.open(); intro(LAB); };
+  // Secret booth-operator gesture: 5 taps on the title within 3s opens the
+  // play-count overlay, out of the way of normal kid usage.
+  let titleTaps = 0, titleTapTimer = null;
+  node.querySelector("#arcadeTitle").onclick = () => {
+    titleTaps++;
+    clearTimeout(titleTapTimer);
+    titleTapTimer = setTimeout(() => { titleTaps = 0; }, 3000);
+    if (titleTaps >= 5) { titleTaps = 0; showPlayStats(); }
+  };
   show(node);
 }
 
@@ -667,12 +725,57 @@ async function intro(game) {
     document.body.classList.add("playing");
     homeBtn.classList.remove("hidden");
     handStatus.classList.remove("hidden");
+    await calibrate();
     show(null);
     ui.classList.add("passthrough");
     activeGame = game;
+    bumpPlayCount(game.titleKey.replace("Title", ""));
     game.start();
   };
   show(node);
+}
+
+/* A booth gets walk-up strangers with zero warm-up: this beat makes sure a
+   hand is actually visible to the camera BEFORE the timer/round starts,
+   instead of a kid's first few seconds being spent fumbling while a crowd
+   watches. Skippable after a few seconds so no one ever gets stuck. */
+function calibrate() {
+  return new Promise((resolve) => {
+    const node = el(`<div class="panel calib-panel">
+      <div class="calib-ring"><span id="calibIcon">✋</span></div>
+      <h2 id="calibTitle">${t("calibShow")}</h2>
+      <div class="desc" id="calibDesc">${t("calibHint")}</div>
+      <button class="btn ghost hidden" id="calibSkip" style="font-size:15px;padding:10px 24px">${t("calibSkip")}</button>
+    </div>`);
+    show(node);
+    let seenFrames = 0, done = false;
+    const skipBtn = node.querySelector("#calibSkip");
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearInterval(poll);
+      clearTimeout(skipTimer);
+      resolve();
+    };
+    skipBtn.onclick = () => { sfx.click(); finish(); };
+    const poll = setInterval(() => {
+      if (engine.hand) {
+        seenFrames++;
+        if (seenFrames === 1) {
+          node.querySelector("#calibIcon").textContent = "✅";
+          node.querySelector("#calibTitle").textContent = t("calibReady");
+          node.classList.add("calib-ok");
+        }
+        if (seenFrames >= 10) { sfx.good(); finish(); } // ~600ms of steady tracking
+      } else if (seenFrames > 0) {
+        seenFrames = 0;
+        node.querySelector("#calibIcon").textContent = "✋";
+        node.querySelector("#calibTitle").textContent = t("calibShow");
+        node.classList.remove("calib-ok");
+      }
+    }, 60);
+    const skipTimer = setTimeout(() => { skipBtn.classList.remove("hidden"); }, 4000);
+  });
 }
 
 homeBtn.onclick = () => { sfx.click(); ui.classList.remove("passthrough"); menu(); };
@@ -685,12 +788,12 @@ const NINJA = {
   emoji: "🥷", titleKey: "ninjaTitle", howKey: "ninjaHow",
   objs: [], parts: [], trail: [], score: 0, combo: 0, comboT: 0, timeLeft: 60,
   spawnT: 0, running: false, hud: null, floaties: [], shake: 0, comboBanner: null,
-  lastTipAt: 0,
+  lastTipAt: 0, noHandSince: 0,
 
   start() {
     this.objs = []; this.parts = []; this.trail = []; this.floaties = [];
     this.score = 0; this.combo = 0; this.timeLeft = 60; this.spawnT = 0.5; this.shake = 0;
-    this.lastTipAt = 0; this.running = true;
+    this.lastTipAt = 0; this.noHandSince = 0; this.running = true;
     this.hud = el(`<div class="hud">
       <div class="stat"><div class="lbl">${t("score")}</div><div class="num cyan" id="nScore">0</div></div>
       <div class="stat"><div class="lbl">${t("time")}</div><div class="num amber" id="nTime">60</div></div>
@@ -775,7 +878,7 @@ const NINJA = {
       }
     }
     const nowT = performance.now();
-    this.trail = this.trail.filter(p => nowT - p.t < 260);
+    pruneInPlace(this.trail, p => nowT - p.t < 260);
 
     /* physics + draw objects */
     ctx.font = "40px sans-serif";
@@ -791,7 +894,7 @@ const NINJA = {
       ctx.fillText(o.emoji, 0, 0);
       ctx.restore();
     });
-    this.objs = this.objs.filter(o => o.y < innerHeight + 120 && !o.sliced);
+    pruneInPlace(this.objs, o => o.y < innerHeight + 120 && !o.sliced);
 
     /* slicing */
     if (this.trail.length >= 2) {
@@ -836,7 +939,7 @@ const NINJA = {
       }
       ctx.globalAlpha = 1;
     });
-    this.parts = this.parts.filter(p => p.life > 0);
+    pruneInPlace(this.parts, p => p.life > 0);
 
     /* score floaties */
     this.floaties.forEach(f => {
@@ -847,7 +950,7 @@ const NINJA = {
       ctx.fillText(f.text, f.x, f.y);
       ctx.shadowBlur = 0; ctx.globalAlpha = 1;
     });
-    this.floaties = this.floaties.filter(f => f.life > 0);
+    pruneInPlace(this.floaties, f => f.life > 0);
 
     /* draw trail (comet) */
     if (this.trail.length >= 2) {
@@ -864,6 +967,7 @@ const NINJA = {
       ctx.restore();
     }
     if (tip) {
+      this.noHandSince = 0;
       ctx.save();
       ctx.strokeStyle = "rgba(34,211,238,.7)";
       ctx.lineWidth = 3;
@@ -871,6 +975,20 @@ const NINJA = {
       ctx.beginPath(); ctx.arc(tip.x, tip.y, 22 + Math.sin(nowT / 90) * 2, 0, 7); ctx.stroke();
       ctx.beginPath(); ctx.arc(tip.x, tip.y, 10, 0, 7); ctx.fill();
       ctx.restore();
+    } else {
+      // Same "show your hand" grace-period treatment as the other games —
+      // brief drops stay silent, but a real loss gets an explicit hint
+      // instead of the player wondering why nothing is slicing.
+      this.noHandSince = this.noHandSince || nowT;
+      if (nowT - this.noHandSince > 500) {
+        ctx.save();
+        ctx.font = "800 20px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillStyle = "rgba(11,5,24,.7)";
+        ctx.beginPath(); ctx.roundRect(innerWidth / 2 - 140, innerHeight / 2 - 24, 280, 48, 24); ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.fillText(t("handLost"), innerWidth / 2, innerHeight / 2);
+        ctx.restore();
+      }
     }
     ctx.restore();
   },
@@ -2160,6 +2278,38 @@ const LAB_RECIPES = {
   "mountain+water": "lake", "earth+plant": "tree", "plant+plant": "forest",
   "energy+metal": "electricity", "electricity+idea": "computer", "brick+human": "city",
   "metal+water": "boat", "air+animal": "bird", "idea+sun": "space",
+  // The 37 recipes above were the original curated set; everything below
+  // fills in far more of the "obvious things a kid would actually try"
+  // pairings so combining feels like authored chemistry rather than mostly
+  // landing on the arbitrary (if stable) hash fallback further down.
+  "air+steam": "cloud", "earth+steam": "rain", "steam+wind": "cloud", "steam+sun": "cloud",
+  "lava+lava": "volcano", "lava+mountain": "obsidian", "lava+sand": "glass", "lava+ocean": "obsidian", "lava+stone": "volcano",
+  "energy+wind": "electricity", "energy+sun": "electricity", "energy+ocean": "electricity", "energy+life": "animal",
+  "fire+mud": "brick", "mud+plant": "tree", "life+mud": "plant",
+  "cloud+mountain": "storm", "cloud+wind": "storm", "cloud+electricity": "storm",
+  "dust+wind": "sand", "dust+water": "mud", "dust+fire": "smoke",
+  "sun+water": "steam", "earth+sun": "life", "plant+sun": "forest", "ocean+sun": "rain", "glass+sun": "rainbow",
+  "earth+ocean": "mud", "fire+ocean": "steam", "animal+ocean": "fish", "ocean+wind": "storm", "ocean+rain": "storm", "ocean+volcano": "obsidian", "fish+ocean": "fish",
+  "life+mountain": "tree", "mountain+plant": "forest", "mountain+rain": "lake",
+  "rain+wind": "storm", "sand+wind": "dust", "stone+wind": "sand",
+  "fire+obsidian": "lava",
+  "air+life": "bird", "idea+life": "human",
+  "earth+rain": "mud", "fire+rain": "steam",
+  "plant+water": "tree",
+  "sand+water": "mud",
+  "air+fish": "bird", "fish+water": "fish",
+  "human+metal": "robot", "metal+metal": "robot",
+  "animal+idea": "human", "animal+water": "fish",
+  "human+water": "boat", "human+stone": "brick", "human+tree": "boat", "human+human": "city",
+  "idea+robot": "computer",
+  "robot+robot": "city",
+  "air+smoke": "cloud", "smoke+water": "cloud",
+  "volcano+water": "obsidian",
+  "fire+stone": "metal", "fire+lake": "steam", "fire+tree": "smoke", "fire+forest": "smoke",
+  "electricity+robot": "computer", "computer+computer": "robot",
+  "city+city": "space",
+  "boat+fire": "smoke",
+  "brick+brick": "city",
 };
 const LAB_TOTAL = Object.keys(LAB_ELEMENTS).length;
 const LAB_FALLBACK_POOL = Object.keys(LAB_ELEMENTS).filter(id => !LAB_BASE.includes(id));
@@ -2174,286 +2324,6 @@ function labCombinationResult(idA, idB) {
   return { id: LAB_FALLBACK_POOL[(hash >>> 0) % LAB_FALLBACK_POOL.length], exact: false, key };
 }
 
-const LEGACY_LAB = {
-  emoji: "🧪", titleKey: "labTitle", howKey: "labHow",
-  found: new Set(), bookOpen: false,
-  cursorPos: null, dragEl: null, dragPos: null, dragFromIndex: -1,
-  pinchLog: [], openSince: 0, handLostSince: 0,
-  dwellIndex: -1, dwellSince: 0,
-  shelfBg: null, shelfBgKey: "",
-  bookBtn: null, bookNode: null, running: false,
-
-  start() {
-    this.cleanup();
-    this.found = new Set(LAB_BASE);
-    this.bookOpen = false;
-    this.cursorPos = null; this.dragEl = null; this.dragPos = null; this.dragFromIndex = -1;
-    this.pinchLog = []; this.openSince = 0; this.handLostSince = 0;
-    this.dwellIndex = -1; this.dwellSince = 0;
-    this.shelfBg = null; this.shelfBgKey = "";
-    this.running = true;
-    this.bookBtn = el(`<button class="reset-btn" id="labBookBtn" type="button">${t("labBook")(`${this.found.size}/${LAB_TOTAL}`)}</button>`);
-    this.bookBtn.onclick = () => { sfx.click(); this.toggleBook(); };
-    document.body.appendChild(this.bookBtn);
-  },
-
-  cleanup() {
-    this.bookBtn?.remove(); this.bookNode?.remove();
-    this.bookBtn = null; this.bookNode = null; this.running = false;
-  },
-
-  /* One persistent shelf holds every discovered element — it never gets
-     replaced by a separate "workspace", so it's always reachable, even
-     mid-combine. Combining happens by dragging one shelf item onto another. */
-  layout() {
-    const topSafe = 100, bottomSafe = 56;
-    const items = [...this.found];
-    const availW = innerWidth - 24;
-    const cols = Math.max(4, Math.min(7, Math.floor(availW / 92)));
-    const rows = Math.max(1, Math.ceil(items.length / cols));
-    // Keep the entire library reachable on a short landscape screen as new
-    // discoveries are added, instead of letting lower shelf rows slip away.
-    const maxH = Math.max(220, innerHeight - topSafe - bottomSafe);
-    const cell = Math.max(42, Math.min(92, Math.floor(availW / cols), Math.floor(maxH / rows)));
-    const gridW = cols * cell, gridH = rows * cell;
-    const gx = Math.round((innerWidth - gridW) / 2), gy = topSafe;
-    return { items, cols, cell, rows, gx, gy, gridW, gridH };
-  },
-  shelfPos(index, layout) {
-    const col = index % layout.cols, row = Math.floor(index / layout.cols);
-    return { x: layout.gx + col * layout.cell + layout.cell / 2, y: layout.gy + row * layout.cell + layout.cell / 2 };
-  },
-  hoveredShelf(layout, cursor) {
-    if (!cursor) return -1;
-    const r = layout.cell * .42;
-    for (let i = 0; i < layout.items.length; i++) {
-      if (dist(cursor, this.shelfPos(i, layout)) < r + 14) return i;
-    }
-    return -1;
-  },
-
-  toggleBook() {
-    this.bookOpen = !this.bookOpen;
-    if (!this.bookOpen) { this.bookNode?.remove(); this.bookNode = null; return; }
-    const cards = Object.keys(LAB_ELEMENTS).map(id => {
-      const known = this.found.has(id);
-      const el2 = LAB_ELEMENTS[id];
-      return `<div class="lab-card ${known ? "known" : ""}">
-        <div class="lab-card-emo">${known ? el2.emoji : "❔"}</div>
-        <div class="lab-card-name">${known ? el2[lang].name : "?"}</div>
-      </div>`;
-    }).join("");
-    this.bookNode = el(`<div class="lab-book">
-      <div class="lab-book-panel">
-        <h2>${t("labBookTitle")}</h2>
-        <div class="desc">${t("labDiscovered")(this.found.size, LAB_TOTAL)}</div>
-        <div class="lab-book-grid">${cards}</div>
-        <button class="btn" id="labBookClose">${t("labClose")}</button>
-      </div>
-    </div>`);
-    this.bookNode.querySelector("#labBookClose").onclick = () => { sfx.click(); this.toggleBook(); };
-    document.body.appendChild(this.bookNode);
-  },
-
-  /* The shelf frame + row dividers never change shape between two frames of
-     the same size, so they're cached offscreen like the other games' boards. */
-  buildShelfBackground(layout) {
-    const key = `${layout.cols}:${layout.rows}:${layout.cell}`;
-    if (this.shelfBgKey === key && this.shelfBg) return;
-    const pad = 16, dpr = Math.min(2, devicePixelRatio || 1);
-    const w = layout.gridW + pad * 2, h = layout.gridH + pad * 2;
-    const c = document.createElement("canvas");
-    c.width = Math.ceil(w * dpr); c.height = Math.ceil(h * dpr);
-    const g = c.getContext("2d");
-    g.scale(dpr, dpr);
-    const grad = g.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, "rgba(68,42,20,.5)"); grad.addColorStop(1, "rgba(32,18,10,.62)");
-    g.fillStyle = grad;
-    g.strokeStyle = "rgba(251,191,36,.42)"; g.lineWidth = 2;
-    g.shadowColor = "#fbbf24"; g.shadowBlur = 14;
-    g.beginPath(); g.roundRect(pad - 8, pad - 8, layout.gridW + 16, layout.gridH + 16, 20);
-    g.fill(); g.stroke();
-    g.shadowBlur = 0;
-    g.strokeStyle = "rgba(251,191,36,.25)"; g.lineWidth = 1.5;
-    for (let r = 1; r < layout.rows; r++) {
-      g.beginPath();
-      g.moveTo(pad, pad + r * layout.cell);
-      g.lineTo(pad + layout.gridW, pad + r * layout.cell);
-      g.stroke();
-    }
-    this.shelfBg = { canvas: c, pad, w, h };
-    this.shelfBgKey = key;
-  },
-
-  drawJar(x, y, size, id, alpha = 1, glow = 0, ring = false) {
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    const w = size, h = size * 1.06;
-    if (glow) { ctx.shadowColor = ring ? "#22d3ee" : "#fbbf24"; ctx.shadowBlur = glow; }
-    ctx.fillStyle = "rgba(255,255,255,.09)";
-    ctx.strokeStyle = ring ? "rgba(34,211,238,.9)" : "rgba(251,191,36,.5)";
-    ctx.lineWidth = ring ? 3 : 2;
-    ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, w * .22); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = ring ? "rgba(34,211,238,.4)" : "rgba(251,191,36,.35)";
-    ctx.beginPath(); ctx.roundRect(x - w * .32, y - h / 2 - h * .08, w * .64, h * .14, 5); ctx.fill();
-    ctx.shadowBlur = 0;
-    // The circle/lid fills above use a low-alpha color; canvas leaks that
-    // alpha into fillText too unless we reset fillStyle to fully opaque
-    // first — that leak was why the element emoji looked washed out before.
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `${size * .56}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(LAB_ELEMENTS[id].emoji, x, y + size * .03);
-    ctx.restore();
-  },
-  drawNameTag(x, y, id) {
-    const name = LAB_ELEMENTS[id][lang].name;
-    ctx.save();
-    ctx.font = "800 13px system-ui";
-    const w = ctx.measureText(name).width + 22;
-    ctx.fillStyle = "rgba(11,5,24,.9)"; ctx.strokeStyle = "rgba(255,255,255,.32)"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect(x - w / 2, y - 15, w, 27, 13); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(name, x, y - 1);
-    ctx.restore();
-  },
-
-  resolveCombine(idA, idB) {
-    const key = [idA, idB].sort().join("+");
-    const resultId = LAB_RECIPES[key];
-    if (resultId) {
-      const isNew = !this.found.has(resultId);
-      this.found.add(resultId);
-      this.bookBtn.textContent = t("labBook")(`${this.found.size}/${LAB_TOTAL}`);
-      sfx.win();
-      this.showReveal(resultId, isNew);
-    } else {
-      sfx.bad();
-      this.showReveal(null, false);
-    }
-  },
-  showReveal(resultId, isNew) {
-    const info = resultId ? LAB_ELEMENTS[resultId] : null;
-    const card = el(`<div class="lab-reveal ${resultId ? (isNew ? "new" : "known") : "fizzle"}">
-      ${info ? `
-        <div class="lab-reveal-emo">${info.emoji}</div>
-        <div class="lab-reveal-name">${info[lang].name}</div>
-        ${isNew
-          ? `<div class="lab-reveal-badge">${t("labNew")}</div><div class="lab-reveal-fact">${info[lang].fact}</div>`
-          : `<div class="lab-reveal-badge known">${t("labAlready")}</div>`}
-      ` : `<div class="lab-reveal-fizzle">${t("labFizzle")}</div>`}
-    </div>`);
-    document.body.appendChild(card);
-    setTimeout(() => card.remove(), resultId ? (isNew ? 2400 : 1200) : 900);
-  },
-
-  onFrame(dt) {
-    if (!this.running) return;
-    if (this.bookOpen) return;
-    const layout = this.layout();
-    this.buildShelfBackground(layout);
-    const pinch = pinchState();
-    const raw = pinch?.center || null;
-    const now = performance.now();
-
-    if (raw) {
-      const k = 1 - Math.pow(1e-9, dt);
-      if (!this.cursorPos) this.cursorPos = { x: raw.x, y: raw.y };
-      else { this.cursorPos.x += (raw.x - this.cursorPos.x) * k; this.cursorPos.y += (raw.y - this.cursorPos.y) * k; }
-    } else this.cursorPos = null;
-    const cursor = this.cursorPos;
-
-    // Same fast-pinch-tolerant grab/release used in Hand Blast: a rolling
-    // 160ms buffer of the most-closed reading, and a debounced release so
-    // a single blurry frame during a fast drag can't drop the element.
-    if (pinch) this.pinchLog.push({ t: now, v: pinch.pinch, cursor: { x: pinch.center.x, y: pinch.center.y } });
-    while (this.pinchLog.length && now - this.pinchLog[0].t > 160) this.pinchLog.shift();
-
-    if (this.dragEl === null) {
-      const closest = this.pinchLog.reduce((best, e) => (!best || e.v < best.v ? e : best), null);
-      if (closest && closest.v < .48) {
-        const index = this.hoveredShelf(layout, closest.cursor);
-        if (index >= 0) {
-          this.dragEl = layout.items[index]; this.dragFromIndex = index; sfx.click();
-          this.dragPos = { x: closest.cursor.x, y: closest.cursor.y };
-          this.openSince = 0;
-        }
-      }
-    } else {
-      if (!pinch) {
-        this.handLostSince = this.handLostSince || now;
-        if (now - this.handLostSince > 900) { this.dragEl = null; this.dragPos = null; this.dragFromIndex = -1; }
-      } else {
-        this.handLostSince = 0;
-        if (pinch.pinch >= .62) this.openSince = this.openSince || now;
-        else this.openSince = 0;
-        // Dropping onto ANY shelf item — including the one you picked up —
-        // triggers a combine (dropping back on yourself = self-combining,
-        // e.g. fire+fire, which just falls out of this without special-casing).
-        if (this.openSince && now - this.openSince > 70 && this.dragPos) {
-          // Use the latest pinch centre for the drop, rather than the softly
-          // smoothed ghost position, so a quick direct drop lands on the jar
-          // the player is actually touching.
-          const targetIndex = this.hoveredShelf(layout, pinch.center);
-          if (targetIndex >= 0) this.resolveCombine(this.dragEl, layout.items[targetIndex]);
-          this.dragEl = null; this.dragPos = null; this.dragFromIndex = -1; this.openSince = 0;
-        }
-      }
-    }
-    if (this.dragEl !== null && cursor) {
-      const k = 1 - Math.pow(1e-11, dt);
-      if (!this.dragPos) this.dragPos = { x: cursor.x, y: cursor.y };
-      else { this.dragPos.x += (cursor.x - this.dragPos.x) * k; this.dragPos.y += (cursor.y - this.dragPos.y) * k; }
-    }
-
-    // Hold-to-identify: dwell on the same item (idle hover, or a drag that
-    // hasn't moved far from its own slot yet) reveals its name after a beat.
-    let activeIdx = -1;
-    if (this.dragEl !== null && this.dragPos) {
-      const origin = this.shelfPos(this.dragFromIndex, layout);
-      if (dist(this.dragPos, origin) < layout.cell * .5) activeIdx = this.dragFromIndex;
-    } else {
-      activeIdx = this.hoveredShelf(layout, cursor);
-    }
-    if (activeIdx === this.dwellIndex) { /* still dwelling */ }
-    else { this.dwellIndex = activeIdx; this.dwellSince = activeIdx >= 0 ? now : 0; }
-    const showName = this.dwellSince && now - this.dwellSince > 480;
-
-    ctx.save();
-    ctx.fillStyle = "rgba(5,8,28,.28)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
-    if (this.shelfBg) ctx.drawImage(this.shelfBg.canvas, layout.gx - this.shelfBg.pad, layout.gy - this.shelfBg.pad, this.shelfBg.w, this.shelfBg.h);
-    ctx.font = "900 12px system-ui"; ctx.textAlign = "center"; ctx.letterSpacing = "1.5px";
-    ctx.fillStyle = "rgba(251,191,36,.92)"; ctx.fillText(`🔬 ${t("labShelf")}`, innerWidth / 2, layout.gy - 26);
-    ctx.letterSpacing = "0px";
-
-    const hover = this.dragEl !== null ? this.hoveredShelf(layout, this.dragPos) : this.hoveredShelf(layout, cursor);
-    layout.items.forEach((id, i) => {
-      const p = this.shelfPos(i, layout);
-      const isDropTarget = this.dragEl !== null && i === hover;
-      this.drawJar(p.x, p.y, layout.cell * .72, id, 1, isDropTarget ? 16 : 0, isDropTarget);
-    });
-
-    if (showName && this.dwellIndex >= 0) {
-      const p = this.dragEl !== null ? this.dragPos : this.shelfPos(this.dwellIndex, layout);
-      this.drawNameTag(p.x, p.y - layout.cell * .62, layout.items[this.dwellIndex]);
-    }
-
-    // carried ghost — drawn last so it always sits above the shelf
-    if (this.dragEl !== null && this.dragPos) {
-      this.drawJar(this.dragPos.x, this.dragPos.y - layout.cell * .3, layout.cell * .8, this.dragEl, .95, 20, false);
-    }
-
-    if (layout.items.length <= LAB_BASE.length) {
-      ctx.font = "700 13px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,255,255,.75)";
-      ctx.fillText(t("labSlotHint"), innerWidth / 2, layout.gy + layout.gridH + 26);
-    }
-    ctx.font = "800 13px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,255,255,.9)";
-    ctx.fillText(t("pinchHint"), innerWidth / 2, innerHeight - 22);
-    ctx.restore();
-  },
-};
-
-/* The original shelf-only prototype is kept above as a reference while this
-   workbench version owns the active Hand Lab experience below. */
 const LAB = {
   emoji: "🧪", titleKey: "labTitle", howKey: "labHow",
   found: new Set(), workspace: [], drag: null, cursorPos: null, pinchLog: [],
@@ -2483,17 +2353,43 @@ const LAB = {
 
   layout() {
     const items = [...this.found];
+    // Read the real topbar height (it grows with the safe-area inset on a
+    // notched iPad) so the library header and workspace title never sit
+    // underneath the sound/language buttons like they did before.
+    const topSafe = (topbar?.getBoundingClientRect().bottom || 54) + 6;
     const wide = innerWidth >= 760 && innerWidth > innerHeight * 1.15;
     const library = wide
-      ? { x: Math.max(0, innerWidth - Math.min(330, Math.max(230, innerWidth * .24))), y: 0, w: Math.min(330, Math.max(230, innerWidth * .24)), h: innerHeight, wide: true }
-      : { x: 0, y: Math.max(208, innerHeight - Math.min(innerHeight * .42, 360)), w: innerWidth, h: Math.min(innerHeight * .42, 360), wide: false };
+      ? { x: Math.max(0, innerWidth - Math.min(330, Math.max(230, innerWidth * .24))), y: topSafe, w: Math.min(330, Math.max(230, innerWidth * .24)), h: innerHeight - topSafe, wide: true }
+      : { x: 0, y: 0, w: innerWidth, h: 0, wide: false };
+    if (!wide) {
+      // The bottom panel's height now grows with how many elements have been
+      // discovered (up to 41 by the end) instead of a fixed guess, and is
+      // capped so the workspace always keeps real room — this is what stops
+      // a near-complete library from running its rows off the bottom edge
+      // on a shorter or unusually-shaped tablet.
+      const colsGuess = Math.max(3, Math.min(7, Math.floor((innerWidth - 18) / 74)));
+      const roughRows = Math.max(1, Math.ceil(items.length / colsGuess));
+      const needed = 62 + roughRows * 34;
+      library.h = Math.max(140, Math.min(needed, innerHeight * .55));
+      library.y = innerHeight - library.h;
+    }
     const workspace = wide
-      ? { x: 0, y: 0, w: library.x - 1, h: innerHeight }
-      : { x: 0, y: 0, w: innerWidth, h: library.y - 1 };
-    const cols = library.wide ? Math.max(2, Math.min(3, Math.floor((library.w - 24) / 96))) : Math.max(3, Math.min(5, Math.floor((library.w - 18) / 78)));
-    const rows = Math.max(1, Math.ceil(items.length / cols));
+      ? { x: 0, y: topSafe, w: library.x - 1, h: innerHeight - topSafe }
+      : { x: 0, y: topSafe, w: innerWidth, h: library.y - topSafe - 1 };
+    const minCellH = library.wide ? 30 : 26;
+    const maxCols = library.wide ? 5 : 8;
+    let cols = library.wide
+      ? Math.max(2, Math.min(4, Math.floor((library.w - 24) / 96)))
+      : Math.max(3, Math.min(7, Math.floor((library.w - 18) / 74)));
+    let rows = Math.max(1, Math.ceil(items.length / cols));
+    // If even the smallest readable chip size would overflow the panel,
+    // add columns until it fits rather than letting rows run off-screen.
+    while (rows * minCellH > library.h - 62 && cols < maxCols) {
+      cols++;
+      rows = Math.max(1, Math.ceil(items.length / cols));
+    }
     const cellW = (library.w - 20) / cols;
-    const cellH = Math.max(24, Math.min(42, Math.floor((library.h - 62) / rows)));
+    const cellH = Math.max(minCellH, Math.min(42, Math.floor((library.h - 62) / rows)));
     return {
       items, cols, rows, cellW, cellH, library, workspace,
     };
@@ -2587,13 +2483,25 @@ const LAB = {
   combine(sourceId, targetId, targetPoint) {
     const combination = labCombinationResult(sourceId, targetId), resultId = combination.id;
     this.history.set(combination.key, resultId);
-    const isNew = !this.found.has(resultId); this.found.add(resultId);
-    sfx.win(); this.showReveal(resultId, isNew); return resultId;
+    const isNew = !this.found.has(resultId);
+    this.found.add(resultId);
+    // Infinite Craft only interrupts you for a genuinely NEW discovery — a
+    // combo landing on something you already have just merges quietly on
+    // the canvas (the resulting tag already shows its name), no popup.
+    if (isNew) { sfx.win(); this.showReveal(resultId); }
+    else sfx.good();
+    return resultId;
   },
-  showReveal(resultId, isNew) {
-    const info = resultId ? LAB_ELEMENTS[resultId] : null;
-    const card = el(`<div class="lab-reveal ${resultId ? (isNew ? "new" : "known") : "fizzle"}">${info ? `<div class="lab-reveal-emo">${info.emoji}</div><div class="lab-reveal-name">${info[lang].name}</div>${isNew ? `<div class="lab-reveal-badge">${t("labNew")}</div><div class="lab-reveal-fact">${info[lang].fact}</div>` : `<div class="lab-reveal-badge known">${t("labAlready")}</div>`}` : `<div class="lab-reveal-fizzle">${t("labFizzle")}</div>`}</div>`);
-    document.body.appendChild(card); setTimeout(() => card.remove(), resultId ? (isNew ? 2400 : 1200) : 900);
+  showReveal(resultId) {
+    const info = LAB_ELEMENTS[resultId];
+    const card = el(`<div class="lab-reveal new">
+      <div class="lab-reveal-emo">${info.emoji}</div>
+      <div class="lab-reveal-name">${info[lang].name}</div>
+      <div class="lab-reveal-badge">${t("labNew")}</div>
+      <div class="lab-reveal-fact">${info[lang].fact}</div>
+    </div>`);
+    document.body.appendChild(card);
+    setTimeout(() => card.remove(), 2400);
   },
   release(layout, point) {
     if (!this.drag) return;
@@ -2671,11 +2579,11 @@ const LAB = {
     }
     ctx.restore();
     ctx.fillStyle = "#111827"; ctx.font = "900 15px system-ui"; ctx.textAlign = "center";
-    ctx.fillText("HAND LAB", layout.workspace.x + layout.workspace.w / 2, 82);
+    ctx.fillText("HAND LAB", layout.workspace.x + layout.workspace.w / 2, layout.workspace.y + 26);
     ctx.font = "700 11px system-ui"; ctx.fillStyle = "#64748b";
-    ctx.fillText(t("labSlotHint"), layout.workspace.x + layout.workspace.w / 2, 101);
+    ctx.fillText(t("labSlotHint"), layout.workspace.x + layout.workspace.w / 2, layout.workspace.y + 45);
     ctx.font = "800 10px system-ui"; ctx.fillStyle = "rgba(15,118,110,.9)";
-    ctx.fillText(`● ${t("labCamera")}`, layout.workspace.x + layout.workspace.w / 2, 118);
+    ctx.fillText(`● ${t("labCamera")}`, layout.workspace.x + layout.workspace.w / 2, layout.workspace.y + 62);
     const targetIndex = this.drag ? this.hitWorkspace(cursor, this.drag.type === "workspace" ? this.drag.index : -1) : -1;
     this.workspace.forEach((item, index) => { if (this.drag?.type === "workspace" && this.drag.index === index) return; this.drawTag(item.x, item.y, item.id, { target: index === targetIndex }); });
     if (this.drag && cursor) this.drawTag(cursor.x, cursor.y, this.drag.id, { alpha: .96, target: targetIndex >= 0 });
@@ -2685,7 +2593,12 @@ const LAB = {
     ctx.beginPath(); ctx.rect(layout.library.x, layout.library.y, layout.library.w, layout.library.h); ctx.stroke();
     ctx.fillStyle = "rgba(241,245,249,.95)"; ctx.beginPath(); ctx.roundRect(layout.library.x + 11, layout.library.y + 12, layout.library.w - 22, 27, 9); ctx.fill();
     ctx.font = "800 12px system-ui"; ctx.textAlign = "left"; ctx.fillStyle = "#0f172a";
-    ctx.fillText(`${t("labShelf")}  ·  ${t("labDiscovered")(this.found.size, LAB_TOTAL)}`, layout.library.x + 22, layout.library.y + 30);
+    // Title and counter are drawn from opposite edges so a long translated
+    // label can never push the count off the panel.
+    ctx.fillText(t("labShelf"), layout.library.x + 22, layout.library.y + 30);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#7c3aed";
+    ctx.fillText(`${this.found.size}/${LAB_TOTAL}`, layout.library.x + layout.library.w - 22, layout.library.y + 30);
     layout.items.forEach((id, index) => { const p = this.libraryPos(index, layout); this.drawTag(p.x, p.y, id, { compact: true }); });
     if (dwell && now - this.dwellSince > 500) this.drawFact(dwell.item.x, dwell.item.y, dwell.item.id, layout);
     if (pinch) {
@@ -2720,6 +2633,42 @@ document.getElementById("soundBtn").textContent = soundOn ? "🔊" : "🔇";
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
+
+/* Install banner: this app is only genuinely offline-ready once it's added
+   to the home screen, and that's a one-time step the booth operator (or an
+   interested teacher) needs to be told about, since browsers bury it —
+   especially iOS Safari, which has no install-prompt API at all. */
+(function setupInstallBanner() {
+  const KEY = "ha-install-dismissed";
+  if (localStorage.getItem(KEY)) return;
+  if (window.matchMedia("(display-mode: standalone)").matches || navigator.standalone) return;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  let deferredPrompt = null;
+
+  function showBanner(iosMode) {
+    if (document.getElementById("installBanner")) return;
+    const banner = el(`<div class="install-banner" id="installBanner">
+      <span>${iosMode ? "📲 Tap Share ⬆️ then \"Add to Home Screen\" for full-screen offline play" : "📲 Install this app for full-screen offline play"}</span>
+      ${iosMode ? "" : `<button class="chip" id="installBtn">Install</button>`}
+      <button class="chip" id="installDismiss" aria-label="dismiss">✕</button>
+    </div>`);
+    document.body.appendChild(banner);
+    if (!iosMode) {
+      banner.querySelector("#installBtn").onclick = async () => {
+        banner.remove();
+        if (deferredPrompt) { deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; }
+      };
+    }
+    banner.querySelector("#installDismiss").onclick = () => { localStorage.setItem(KEY, "1"); banner.remove(); };
+  }
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    showBanner(false);
+  });
+  if (isIOS) showBanner(true);
+})();
 
 /* debug hook (harmless in production) */
 window.__ha = { engine, NINJA, BATTLE, SIGN, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60) };
