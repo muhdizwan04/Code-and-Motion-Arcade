@@ -1,8 +1,10 @@
 /* ================= AI HAND ARCADE =================
-   3 games powered by one hand-tracking AI (MediaPipe, runs 100% on-device):
-   - Air Ninja: slice bugs with your fingertip
+   5 games powered by one hand-tracking AI (MediaPipe, runs 100% on-device):
+   - Air Ninja: slice fruit with your fingertip (Time Attack or 3-life Survival)
    - Gesture Battle: rock-paper-scissors vs a pattern-learning AI
-   - Sign Speller: learn sign-language letters
+   - Hand Snake: your fingertip is a free-moving snake
+   - Hand Blast: pinch-drag block puzzle
+   - Hand Lab: pinch-craft elements, Infinite-Craft style
 ================================================== */
 import { FilesetResolver, HandLandmarker } from "./vendor/vision_bundle.mjs";
 
@@ -15,11 +17,9 @@ const STR = {
     title: "AI HAND ARCADE",
     tagline: "The camera AI sees your hand. No touching allowed! 🖐️",
     ninjaTitle: "Air Ninja",
-    ninjaDesc: "Slice the bugs with your finger — in the air!",
+    ninjaDesc: "Slice the fruit with your finger — in the air!",
     battleTitle: "Gesture Battle",
     battleDesc: "Rock-paper-scissors vs an AI that learns your mind",
-    signTitle: "Sign Speller",
-    signDesc: "Learn real sign language — the AI checks your hand",
     madeWith: "PWA · AI runs on this device · no internet needed",
     loading: "Waking up the AI brain… 🧠",
     loadingCam: "Turning on the camera… 📷",
@@ -33,11 +33,15 @@ const STR = {
     calibReady: "Got it! Ready…",
     calibSkip: "Can't see your hand? Start anyway →",
     // ninja
-    ninjaHow: "Bugs are attacking the system! 🐛 Move your POINTER FINGER in the air to slice them. Avoid the bombs 💣!",
-    score: "Score", time: "Time", combo: "Combo", best: "Best",
+    ninjaHow: "Fruit is flying through the air! 🍉 Move your POINTER FINGER to slice it. Avoid the bombs 💣!",
+    score: "Score", time: "Time", combo: "Combo", best: "Best", lives: "Lives",
     debugged: "SYSTEM DEBUGGED!",
     newBest: "🎉 NEW HIGH SCORE!",
-    ninjaRanks: ["🥷 BUG NINJA MASTER", "⚔️ CODE WARRIOR", "🐣 BUG CATCHER"],
+    ninjaRanks: ["🥷 FRUIT NINJA MASTER", "⚔️ BLADE WARRIOR", "🍃 ROOKIE SLICER"],
+    ninjaModeTime: "⏱ TIME ATTACK",
+    ninjaModeTimeDesc: "60 seconds on the clock — score as much as you can!",
+    ninjaModeLife: "❤️ SURVIVAL",
+    ninjaModeLifeDesc: "3 lives, no clock — slicing a bomb costs a life!",
     // battle
     battleHow: "First to 5 wins! Show ✊ ✋ or ✌️ to the camera when I say GO. Warning: my AI brain learns your pattern… 🧠",
     you: "You", ai: "AI",
@@ -54,49 +58,7 @@ const STR = {
     battleMsgYou: "Impressive! You stayed unpredictable. That's the only way to beat a pattern-learning AI!",
     battleMsgAi: "Humans always fall into patterns — and AI is built to find patterns. That's exactly how real AI learns!",
     predicted: (p) => `AI predicted your moves ${p}% of the time`,
-    // sign
-    signHow: "Learn supported static ASL handshapes with live AI feedback.",
-    freeMode: "🔍 FREE PRACTICE", spellMode: "🎯 SPELL WORDS", phraseMode: "💬 SIMPLE PHRASES",
-    freeExplain: "What is Free Practice? Show any supported sign and the AI tells you what it sees. No score, no timer — just experiment.",
-    spellExplain: "Follow a real hand photo and hold each letter to spell short words.",
-    phraseExplain: "Perform each phrase for the camera. The AI waits, checks every step, and only passes a correct sign.",
-    aslNotice: "ASL (American Sign Language) practice · static hand AI",
-    freeHint: "AI-supported: A B D F I L O U V W Y · I LOVE YOU · HI",
-    sensorTip: "Palm toward camera · show your wrist · hold steady",
-    confidence: n => `${n}% match`,
-    holdIt: "Hold it…",
-    keepTrying: "Not matched yet — adjust your hand and keep trying.",
     handLost: "Show your full hand inside the camera.",
-    phraseWaiting: "Waiting for the correct sign…",
-    phraseStep: (n, total, text) => `Step ${n}/${total}: ${text}`,
-    phraseSteps: {
-      ILY: ["Show 🤟 and hold it steady"],
-      HI: ["Open your palm", "Wave your hand left and right"],
-      MISS: ["Point to yourself", "Touch near your chin", "Point toward the other person"],
-      NAME: ["Place a flat hand on your chest", "Show two H handshapes", "Tap the two H handshapes together twice"],
-    },
-    signGot: "✔ GOT IT!",
-    spellDone: (w) => `You spelled ${w} in sign language! 🎉`,
-    wordsDone: "🏆 ALL WORDS DONE! You're a sign master!",
-    skipLetter: "skip »",
-    detected: "I see…",
-    tryAi: "TRY WITH AI",
-    guidedPractice: "GUIDED PRACTICE",
-    donePractice: "DONE / BACK TO PHRASES",
-    phraseSuccess: p => `Great! You signed “${p}”`,
-    phraseGuideMiss: "Point to yourself → touch your chin with your index finger → point to the other person.",
-    phraseGuideName: "Place a flat hand on your chest for MY → tap two H-handshapes together twice for NAME → fingerspell your name.",
-    phraseLove: "I LOVE YOU",
-    phraseHi: "HI",
-    phraseMiss: "I MISS YOU",
-    phraseName: "MY NAME IS…",
-    photoCredit: "Photo credits",
-    hints: {
-      A: "Fist ✊", B: "4 fingers up, thumb tucked", D: "Point up ☝️", F: "OK sign 👌",
-      I: "Little finger only", L: "Thumb + pointer, like L", O: "All fingertips touch thumb, round O",
-      U: "2 fingers together", V: "Peace sign ✌️ spread", W: "3 fingers up", Y: "Thumb + pinky 🤙",
-      ILY: "🤟 thumb + pointer + pinky", HI: "Open hand 🖐",
-    },
     // snake
     snakeTitle: "Hand Snake",
     snakeDesc: "Your finger is the snake — eat, grow, survive!",
@@ -132,7 +94,7 @@ const STR = {
     labRecipesTitle: "Recipe Book",
     labNoRecipes: "Combine elements to record recipes here.",
     labCheatTitle: "All Combination Possibilities",
-    labCamera: "LIVE CAMERA · pinch to craft",
+    labCamera: "ROBOT HAND · pinch to craft",
     labPossibilities: n => `${n} possible recipes`,
   },
   bm: {
@@ -140,11 +102,9 @@ const STR = {
     title: "ARKED TANGAN AI",
     tagline: "AI kamera nampak tangan anda. Tak boleh sentuh skrin! 🖐️",
     ninjaTitle: "Air Ninja",
-    ninjaDesc: "Tetak pepijat dengan jari — di udara!",
+    ninjaDesc: "Tetak buah dengan jari — di udara!",
     battleTitle: "Gesture Battle",
     battleDesc: "Batu-kertas-gunting lawan AI yang belajar corak anda",
-    signTitle: "Sign Speller",
-    signDesc: "Belajar bahasa isyarat sebenar — AI semak tangan anda",
     madeWith: "PWA · AI berjalan pada peranti ini · tiada internet diperlukan",
     loading: "Mengejutkan otak AI… 🧠",
     loadingCam: "Menghidupkan kamera… 📷",
@@ -157,11 +117,15 @@ const STR = {
     calibHint: "Angkat tangan anda supaya kamera dapat melihatnya dengan jelas",
     calibReady: "Dapat! Bersedia…",
     calibSkip: "Kamera tak nampak tangan? Mula juga →",
-    ninjaHow: "Pepijat menyerang sistem! 🐛 Gerakkan JARI TELUNJUK di udara untuk menetaknya. Elakkan bom 💣!",
-    score: "Skor", time: "Masa", combo: "Combo", best: "Terbaik",
+    ninjaHow: "Buah-buahan terbang di udara! 🍉 Gerakkan JARI TELUNJUK untuk menetaknya. Elakkan bom 💣!",
+    score: "Skor", time: "Masa", combo: "Combo", best: "Terbaik", lives: "Nyawa",
     debugged: "SISTEM DIBAIKI!",
     newBest: "🎉 REKOD BARU!",
-    ninjaRanks: ["🥷 NINJA PEPIJAT", "⚔️ PAHLAWAN KOD", "🐣 PENANGKAP PEPIJAT"],
+    ninjaRanks: ["🥷 NINJA BUAH", "⚔️ PAHLAWAN PEDANG", "🍃 PEMULA"],
+    ninjaModeTime: "⏱ SERANGAN MASA",
+    ninjaModeTimeDesc: "60 saat di jam — kumpul skor sebanyak mungkin!",
+    ninjaModeLife: "❤️ BERTAHAN",
+    ninjaModeLifeDesc: "3 nyawa, tiada jam — tetak bom hilang satu nyawa!",
     battleHow: "Siapa dapat 5 dulu menang! Tunjuk ✊ ✋ atau ✌️ pada kamera bila saya kata GO. Amaran: otak AI saya belajar corak anda… 🧠",
     you: "Anda", ai: "AI",
     show: "TUNJUK!",
@@ -177,48 +141,7 @@ const STR = {
     battleMsgYou: "Hebat! Anda kekal tidak menentu. Itu saja cara nak kalahkan AI yang belajar corak!",
     battleMsgAi: "Manusia selalu ada corak — dan AI dibina untuk mencari corak. Beginilah cara AI sebenar belajar!",
     predicted: (p) => `AI meramal pergerakan anda ${p}% daripada masa`,
-    signHow: "Belajar bentuk tangan ASL statik yang disokong dengan maklum balas AI.",
-    freeMode: "🔍 LATIHAN BEBAS", spellMode: "🎯 EJA PERKATAAN", phraseMode: "💬 FRASA MUDAH",
-    freeExplain: "Apa itu Latihan Bebas? Tunjuk mana-mana isyarat yang disokong dan AI beritahu apa yang dilihat. Tiada skor atau masa.",
-    spellExplain: "Ikut foto tangan sebenar dan tahan setiap huruf untuk mengeja perkataan pendek.",
-    phraseExplain: "Lakukan setiap frasa di depan kamera. AI menunggu, menyemak setiap langkah dan hanya menerima isyarat yang betul.",
-    aslNotice: "Latihan ASL (Bahasa Isyarat Amerika) · AI tangan statik",
-    freeHint: "Disokong AI: A B D F I L O U V W Y · SAYA SAYANG AWAK · HAI",
-    sensorTip: "Tapak tangan ke kamera · tunjuk pergelangan · tahan stabil",
-    confidence: n => `${n}% padan`,
-    holdIt: "Tahan…",
-    keepTrying: "Belum tepat — laraskan tangan dan terus cuba.",
     handLost: "Tunjukkan seluruh tangan di dalam kamera.",
-    phraseWaiting: "Menunggu isyarat yang betul…",
-    phraseStep: (n, total, text) => `Langkah ${n}/${total}: ${text}`,
-    phraseSteps: {
-      ILY: ["Tunjukkan 🤟 dan tahan dengan stabil"],
-      HI: ["Buka tapak tangan", "Lambai tangan ke kiri dan kanan"],
-      MISS: ["Tuding diri sendiri", "Sentuh berhampiran dagu", "Tuding ke arah orang lain"],
-      NAME: ["Letak tapak tangan rata di dada", "Tunjukkan dua bentuk tangan H", "Ketuk dua bentuk tangan H bersama dua kali"],
-    },
-    signGot: "✔ BETUL!",
-    spellDone: (w) => `Anda mengeja ${w} dalam bahasa isyarat! 🎉`,
-    wordsDone: "🏆 SEMUA PERKATAAN SIAP! Anda mahir isyarat!",
-    skipLetter: "langkau »",
-    detected: "Saya nampak…",
-    tryAi: "CUBA DENGAN AI",
-    guidedPractice: "LATIHAN BERPANDU",
-    donePractice: "SIAP / KEMBALI KE FRASA",
-    phraseSuccess: p => `Hebat! Anda tunjuk “${p}”`,
-    phraseGuideMiss: "Tuding diri sendiri → sentuh dagu dengan jari telunjuk → tuding orang di hadapan.",
-    phraseGuideName: "Letak tapak tangan rata di dada untuk SAYA → ketuk dua bentuk tangan H dua kali untuk NAMA → eja nama anda.",
-    phraseLove: "SAYA SAYANG AWAK",
-    phraseHi: "HAI",
-    phraseMiss: "SAYA RINDU AWAK",
-    phraseName: "NAMA SAYA…",
-    photoCredit: "Kredit foto",
-    hints: {
-      A: "Genggam ✊", B: "4 jari tegak, ibu jari lipat", D: "Tuding ke atas ☝️", F: "Isyarat OK 👌",
-      I: "Jari kelingking sahaja", L: "Ibu jari + telunjuk, macam L", O: "Semua hujung jari sentuh ibu jari, bentuk O",
-      U: "2 jari rapat", V: "Isyarat peace ✌️ jarak", W: "3 jari tegak", Y: "Ibu jari + kelingking 🤙",
-      ILY: "🤟 ibu jari + telunjuk + kelingking", HI: "Tangan terbuka 🖐",
-    },
     // snake
     snakeTitle: "Ular Tangan",
     snakeDesc: "Jari anda ialah ular — makan, membesar, bertahan!",
@@ -254,17 +177,19 @@ const STR = {
     labRecipesTitle: "Buku Resipi",
     labNoRecipes: "Gabungkan unsur untuk merekod resipi di sini.",
     labCheatTitle: "Semua Kemungkinan Gabungan",
-    labCamera: "KAMERA LANGSUNG · cubit untuk mencipta",
+    labCamera: "TANGAN ROBOT · cubit untuk mencipta",
     labPossibilities: n => `${n} resipi yang mungkin`,
   },
 };
 let lang = localStorage.getItem("ha-lang") || "en";
 const t = (k) => STR[lang][k];
-const aslCreditsHtml = () => `<div class="asl-credits">${t("photoCredit")}:
-  <a href="https://www.lifeprint.com/asl101/fingerspelling/" target="_blank" rel="noreferrer">ASL alphabet © William Vicars / Lifeprint</a> ·
-  <a href="https://commons.wikimedia.org/wiki/File:Ily.jpg" target="_blank" rel="noreferrer">ILY: Rico38, public domain</a> ·
-  <a href="https://commons.wikimedia.org/wiki/File:ChocHello.jpg" target="_blank" rel="noreferrer">Hello: Loran Davis, CC BY 3.0</a>
-</div>`;
+
+/* ---------------- camera background toggle ----------------
+   Some games can hide the live camera feed entirely and render a
+   procedural robot hand from the landmarks instead (same idea as Hand
+   Lab). Whether that's on is a per-device preference; whether the CURRENT
+   game supports it at all is a per-game flag checked at start time. */
+let camBgOn = localStorage.getItem("ha-cambg") !== "off";
 
 /* ---------------- sound ---------------- */
 let soundOn = localStorage.getItem("ha-sound") !== "off";
@@ -306,6 +231,7 @@ const cam = document.getElementById("cam");
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const homeBtn = document.getElementById("homeBtn");
+const camBtn = document.getElementById("camBtn");
 const handStatus = document.getElementById("handStatus");
 const topbar = document.getElementById("topbar");
 
@@ -510,62 +436,6 @@ function pinchState() {
     center: { x: (thumb.x + index.x) / 2, y: (thumb.y + index.y) / 2 },
   };
 }
-const clamp01 = value => Math.max(0, Math.min(1, value));
-function fingerFeatures(lms) {
-  const hs = dist(lms[0], lms[9]) || 1e-6;
-  const openness = (mcp, pip, tip) => {
-    const straight = clamp01((jointAngle(lms[mcp], lms[pip], lms[tip]) - 100) / 62);
-    const reachRatio = dist(lms[tip], lms[0]) / (dist(lms[pip], lms[0]) || 1e-6);
-    return straight * 0.62 + clamp01((reachRatio - 0.88) / 0.30) * 0.38;
-  };
-  const thumbStraight = clamp01((jointAngle(lms[2], lms[3], lms[4]) - 105) / 55);
-  const thumbReach = clamp01((dist(lms[4], lms[5]) / hs - 0.42) / 0.62);
-  return {
-    i: openness(5, 6, 8),
-    m: openness(9, 10, 12),
-    r: openness(13, 14, 16),
-    p: openness(17, 18, 20),
-    thumb: thumbStraight * 0.55 + thumbReach * 0.45,
-    pinchClose: 1 - clamp01((dist(lms[4], lms[8]) / hs - 0.18) / 0.52),
-    midClose: 1 - clamp01((dist(lms[4], lms[12]) / hs - 0.22) / 0.58),
-    spreadClose: 1 - clamp01((dist(lms[8], lms[12]) / hs - 0.12) / 0.36),
-    spreadWide: clamp01((dist(lms[8], lms[12]) / hs - 0.22) / 0.40),
-  };
-}
-function patternScore(features, wanted) {
-  const keys = ["i", "m", "r", "p"];
-  return keys.reduce((total, key, index) =>
-    total + (wanted[index] ? features[key] : 1 - features[key]), 0) / keys.length;
-}
-function signScores(lms) {
-  const f = fingerFeatures(lms);
-  const down = patternScore(f, [0, 0, 0, 0]);
-  const one = patternScore(f, [1, 0, 0, 0]);
-  const pinky = patternScore(f, [0, 0, 0, 1]);
-  const two = patternScore(f, [1, 1, 0, 0]);
-  const open = patternScore(f, [1, 1, 1, 1]);
-  return {
-    A: down * 0.82 + (1 - f.pinchClose) * 0.18,
-    B: open * 0.76 + (1 - f.thumb) * 0.24,
-    D: one * 0.80 + (1 - f.thumb) * 0.20,
-    F: patternScore(f, [0, 1, 1, 1]) * 0.66 + f.pinchClose * 0.34,
-    I: pinky * 0.82 + (1 - f.thumb) * 0.18,
-    L: one * 0.74 + f.thumb * 0.26,
-    O: down * 0.45 + f.pinchClose * 0.32 + f.midClose * 0.23,
-    U: two * 0.76 + f.spreadClose * 0.24,
-    V: two * 0.72 + f.spreadWide * 0.28,
-    W: patternScore(f, [1, 1, 1, 0]) * 0.88 + (1 - f.p) * 0.12,
-    Y: pinky * 0.72 + f.thumb * 0.28,
-    ILY: patternScore(f, [1, 0, 0, 1]) * 0.72 + f.thumb * 0.28,
-    HI: open * 0.74 + f.thumb * 0.26,
-  };
-}
-function signReading(lms) {
-  const scores = signScores(lms);
-  const ranked = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-  const [sign, confidence] = ranked[0];
-  return { sign: confidence >= 0.64 ? sign : null, confidence, scores };
-}
 function classifyRPS(lms) {
   const f = fingerStates(lms);
   const n = [f.index, f.middle, f.ring, f.pinky].filter(Boolean).length;
@@ -586,6 +456,47 @@ function drawSkeleton(lms, color = "rgba(34,211,238,.9)") {
   ctx.fillStyle = "#fff";
   lms.forEach((p, i) => {
     ctx.beginPath(); ctx.arc(p.x, p.y, [4, 8, 12, 16, 20].includes(i) ? 5 : 3, 0, 7); ctx.fill();
+  });
+  ctx.restore();
+}
+// A stand-in for the raw camera feed: a stylized mechanical hand rendered
+// entirely from the live landmark positions, so it mirrors real hand motion
+// without ever showing the actual video.
+function drawRobotHand(lms) {
+  if (!lms) return;
+  const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20]];
+  const PALM = [0, 5, 9, 13, 17];
+  ctx.save();
+  const cx = PALM.reduce((s, i) => s + lms[i].x, 0) / PALM.length;
+  const cy = PALM.reduce((s, i) => s + lms[i].y, 0) / PALM.length;
+  ctx.beginPath();
+  PALM.forEach((i, idx) => { const p = lms[i]; if (idx === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+  ctx.closePath();
+  const plate = ctx.createRadialGradient(cx, cy, 4, cx, cy, 70);
+  plate.addColorStop(0, "#94a3b8"); plate.addColorStop(1, "#334155");
+  ctx.fillStyle = plate; ctx.strokeStyle = "#0f172a"; ctx.lineWidth = 2;
+  ctx.shadowColor = "rgba(34,211,238,.55)"; ctx.shadowBlur = 16;
+  ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+  BONES.forEach(([a, b]) => {
+    const p1 = lms[a], p2 = lms[b];
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#64748b"; ctx.lineWidth = 9;
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    ctx.strokeStyle = "#cbd5e1"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+  });
+  lms.forEach((p, i) => {
+    const tip = [4, 8, 12, 16, 20].includes(i);
+    const r = i === 0 ? 11 : tip ? 6.5 : 8;
+    const jg = ctx.createRadialGradient(p.x - 2, p.y - 2, 1, p.x, p.y, r);
+    jg.addColorStop(0, tip ? "#67e8f9" : "#e2e8f0"); jg.addColorStop(1, tip ? "#0891b2" : "#475569");
+    ctx.fillStyle = jg; ctx.strokeStyle = "#0f172a"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill(); ctx.stroke();
+    if (tip) {
+      ctx.shadowColor = "#22d3ee"; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, 7); ctx.fillStyle = "#ecfeff"; ctx.fill();
+      ctx.shadowBlur = 0;
+    }
   });
   ctx.restore();
 }
@@ -613,6 +524,7 @@ function stopGame() {
   engine.stopCamera();
   document.body.classList.remove("playing");
   homeBtn.classList.add("hidden");
+  camBtn.classList.add("hidden");
   handStatus.classList.add("hidden");
 }
 
@@ -630,7 +542,7 @@ function bumpPlayCount(gameKey) {
 function showPlayStats() {
   let counts = {};
   try { counts = JSON.parse(localStorage.getItem(PLAY_COUNT_KEY) || "{}"); } catch {}
-  const labels = { ninja: "🥷 Air Ninja", battle: "✊ Gesture Battle", sign: "🤟 Sign Speller", snake: "🐍 Hand Snake", blast: "🧱 Hand Blast", lab: "🧪 Hand Lab" };
+  const labels = { ninja: "🥷 Air Ninja", battle: "✊ Gesture Battle", snake: "🐍 Hand Snake", blast: "🧱 Hand Blast", lab: "🧪 Hand Lab" };
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const rows = Object.keys(labels).map(k => `<div class="stats-row"><span>${labels[k]}</span><b>${counts[k] || 0}</b></div>`).join("");
   const node = el(`<div class="lab-book" id="statsOverlay">
@@ -654,15 +566,11 @@ function menu() {
     <div class="cards">
       <div class="card ninja" id="cNinja">
         <div class="emo">🥷</div>
-        <div><h3>${t("ninjaTitle")} <span style="font-size:14px">🐛</span></h3><p>${t("ninjaDesc")}</p></div>
+        <div><h3>${t("ninjaTitle")} <span style="font-size:14px">🍉</span></h3><p>${t("ninjaDesc")}</p></div>
       </div>
       <div class="card battle" id="cBattle">
         <div class="emo">✊</div>
         <div><h3>${t("battleTitle")} <span style="font-size:14px">🧠</span></h3><p>${t("battleDesc")}</p></div>
-      </div>
-      <div class="card sign" id="cSign">
-        <div class="emo">🤟</div>
-        <div><h3>${t("signTitle")} <span style="font-size:14px">📖</span></h3><p>${t("signDesc")}</p></div>
       </div>
       <div class="card snake" id="cSnake">
         <div class="emo">🐍</div>
@@ -681,7 +589,6 @@ function menu() {
   </div>`);
   node.querySelector("#cNinja").onclick = () => { sfx.open(); intro(NINJA); };
   node.querySelector("#cBattle").onclick = () => { sfx.open(); intro(BATTLE); };
-  node.querySelector("#cSign").onclick = () => { sfx.open(); intro(SIGN); };
   node.querySelector("#cSnake").onclick = () => { sfx.open(); intro(SNAKE); };
   node.querySelector("#cBlast").onclick = () => { sfx.open(); intro(BLAST); };
   node.querySelector("#cLab").onclick = () => { sfx.open(); intro(LAB); };
@@ -698,14 +605,33 @@ function menu() {
 }
 
 async function intro(game) {
+  // Some games (currently just Air Ninja) offer more than one way to play;
+  // they expose a modes() method returning the choices so this stays generic.
+  const modes = typeof game.modes === "function" ? game.modes() : null;
+  const modeHtml = modes ? `<div class="mode-select" id="modeSelect">${modes.map((m, i) => `
+    <button class="mode-btn${i === 0 ? " active" : ""}" data-mode="${m.id}" type="button">
+      <span class="mode-label">${m.label}</span><span class="mode-desc">${m.desc}</span>
+    </button>`).join("")}</div>` : "";
   const node = el(`<div class="panel">
     <div class="big-emoji">${game.emoji}</div>
     <h2>${t(game.titleKey)}</h2>
     <div class="desc">${t(game.howKey)}</div>
+    ${modeHtml}
     <div id="loadArea"></div>
     <button class="btn" id="startBtn">${t("start")}</button>
     <br><button class="btn ghost" id="backBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button>
   </div>`);
+  if (modes) {
+    game.selectedMode = modes[0].id;
+    node.querySelectorAll(".mode-btn").forEach(btn => {
+      btn.onclick = () => {
+        sfx.click();
+        node.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        game.selectedMode = btn.dataset.mode;
+      };
+    });
+  }
   node.querySelector("#backBtn").onclick = () => { sfx.click(); menu(); };
   node.querySelector("#startBtn").onclick = async () => {
     sfx.click();
@@ -725,6 +651,7 @@ async function intro(game) {
     document.body.classList.add("playing");
     homeBtn.classList.remove("hidden");
     handStatus.classList.remove("hidden");
+    if (game.bgToggle) { camBtn.classList.remove("hidden"); applyCamBg(); } else { camBtn.classList.add("hidden"); }
     await calibrate();
     show(null);
     ui.classList.add("passthrough");
@@ -780,23 +707,50 @@ function calibrate() {
 
 homeBtn.onclick = () => { sfx.click(); ui.classList.remove("passthrough"); menu(); };
 
+// Applies the current on/off preference to the live <video> feed and the
+// toggle button's icon. Only called for games that opt in via bgToggle —
+// Hand Lab manages cam visibility itself and never shows this button.
+function applyCamBg() {
+  cam.style.display = camBgOn ? "" : "none";
+  camBtn.textContent = camBgOn ? "📷" : "🤖";
+}
+camBtn.onclick = () => {
+  sfx.click();
+  camBgOn = !camBgOn;
+  localStorage.setItem("ha-cambg", camBgOn ? "on" : "off");
+  applyCamBg();
+};
+
 /* ================================================
    GAME 1 : AIR NINJA
 ================================================ */
-const BUGS = ["🐛", "🐞", "🦠", "👾", "🕷️"];
+const FRUITS = ["🍎", "🍊", "🍋", "🍉", "🍇", "🍓", "🍑", "🥝", "🍍", "🍌"];
 const NINJA = {
-  emoji: "🥷", titleKey: "ninjaTitle", howKey: "ninjaHow",
+  emoji: "🥷", titleKey: "ninjaTitle", howKey: "ninjaHow", bgToggle: true,
   objs: [], parts: [], trail: [], score: 0, combo: 0, comboT: 0, timeLeft: 60,
   spawnT: 0, running: false, hud: null, floaties: [], shake: 0, comboBanner: null,
-  lastTipAt: 0, noHandSince: 0,
+  lastTipAt: 0, noHandSince: 0, mode: "time", selectedMode: "time", lives: 3,
+
+  // Offered on the intro screen: Time Attack (the original 60s clock) or
+  // Survival (no clock, 3 lives, a bomb costs one instead of just points).
+  modes() {
+    return [
+      { id: "time", label: t("ninjaModeTime"), desc: t("ninjaModeTimeDesc") },
+      { id: "life", label: t("ninjaModeLife"), desc: t("ninjaModeLifeDesc") },
+    ];
+  },
 
   start() {
     this.objs = []; this.parts = []; this.trail = []; this.floaties = [];
-    this.score = 0; this.combo = 0; this.timeLeft = 60; this.spawnT = 0.5; this.shake = 0;
+    this.mode = this.selectedMode === "life" ? "life" : "time";
+    this.score = 0; this.combo = 0; this.timeLeft = 60; this.lives = 3; this.spawnT = 0.5; this.shake = 0;
     this.lastTipAt = 0; this.noHandSince = 0; this.running = true;
+    const secondStat = this.mode === "life"
+      ? `<div class="stat"><div class="lbl">${t("lives")}</div><div class="num pink" id="nLives">❤️❤️❤️</div></div>`
+      : `<div class="stat"><div class="lbl">${t("time")}</div><div class="num amber" id="nTime">60</div></div>`;
     this.hud = el(`<div class="hud">
       <div class="stat"><div class="lbl">${t("score")}</div><div class="num cyan" id="nScore">0</div></div>
-      <div class="stat"><div class="lbl">${t("time")}</div><div class="num amber" id="nTime">60</div></div>
+      ${secondStat}
       <div class="stat"><div class="lbl">${t("combo")}</div><div class="num pink" id="nCombo">x1</div></div>
     </div>`);
     document.body.appendChild(this.hud);
@@ -811,11 +765,17 @@ const NINJA = {
     this.running = false;
   },
 
+  // How far into the round we are, 0..1, used to ramp difficulty and visual
+  // intensity the same way regardless of which mode is driving the round.
+  progress() {
+    return this.mode === "time" ? (60 - this.timeLeft) / 60 : Math.min(1, this.score / 500);
+  },
+
   spawn() {
     const isBomb = Math.random() < 0.16;
     const x = 60 + Math.random() * (innerWidth - 120);
     this.objs.push({
-      emoji: isBomb ? "💣" : BUGS[Math.floor(Math.random() * BUGS.length)],
+      emoji: isBomb ? "💣" : FRUITS[Math.floor(Math.random() * FRUITS.length)],
       bomb: isBomb,
       x, y: innerHeight + 60,
       vx: (innerWidth / 2 - x) * (0.3 + Math.random() * 0.5) / 100 * 60,
@@ -828,17 +788,21 @@ const NINJA = {
 
   onFrame(dt) {
     if (!this.running) return;
-    /* timer */
-    this.timeLeft -= dt;
-    if (this.timeLeft <= 0) return this.end();
-    this.hud.querySelector("#nTime").textContent = Math.ceil(this.timeLeft);
+    /* timer — Survival mode has no clock, it ends when lives run out */
+    if (this.mode === "time") {
+      this.timeLeft -= dt;
+      if (this.timeLeft <= 0) return this.end();
+      this.hud.querySelector("#nTime").textContent = Math.ceil(this.timeLeft);
+    }
     this.shake = Math.max(0, this.shake - dt * 34);
     ctx.save();
     if (this.shake > 0) ctx.translate((Math.random() - .5) * this.shake, (Math.random() - .5) * this.shake);
 
+    if (!camBgOn) { ctx.fillStyle = "#0b0518"; ctx.fillRect(0, 0, innerWidth, innerHeight); }
+
     /* animated speed lines make the camera view feel like an arcade arena */
     ctx.save();
-    ctx.globalAlpha = .12 + (60 - this.timeLeft) / 600;
+    ctx.globalAlpha = .12 + this.progress() * .1;
     ctx.strokeStyle = "#22d3ee";
     ctx.lineWidth = 2;
     for (let i = 0; i < 7; i++) {
@@ -854,12 +818,14 @@ const NINJA = {
     }
     ctx.restore();
 
-    /* spawn — speeds up over time */
+    if (!camBgOn && engine.hand) drawRobotHand(engine.hand);
+
+    /* spawn — speeds up as the round progresses */
     this.spawnT -= dt;
     if (this.spawnT <= 0) {
-      const wave = 1 + Math.floor(Math.random() * (this.timeLeft < 30 ? 3 : 2));
+      const wave = 1 + Math.floor(Math.random() * (this.progress() > .5 ? 3 : 2));
       for (let i = 0; i < wave; i++) setTimeout(() => this.running && this.spawn(), i * 140);
-      this.spawnT = this.timeLeft < 20 ? 0.75 : this.timeLeft < 40 ? 0.95 : 1.2;
+      this.spawnT = this.progress() > .67 ? 0.75 : this.progress() > .33 ? 0.95 : 1.2;
     }
 
     /* finger trail */
@@ -1027,6 +993,15 @@ const NINJA = {
         x: o.x, y: o.y, vx: -350 + Math.random() * 700, vy: -420 + Math.random() * 500,
         size: 3 + Math.random() * 6, color: ["#f43f5e", "#fbbf24", "#ffffff"][i % 3], life: 0.5 + Math.random() * 0.4,
       });
+      if (this.mode === "life") {
+        this.lives = Math.max(0, this.lives - 1);
+        const livesEl = this.hud.querySelector("#nLives");
+        if (livesEl) livesEl.textContent = "❤️".repeat(this.lives) + "🖤".repeat(3 - this.lives);
+        if (this.lives <= 0) {
+          this.hud.querySelector("#nScore").textContent = this.score;
+          return this.end();
+        }
+      }
     } else {
       sfx.slice();
       this.combo++; this.comboT = 1.1;
@@ -1088,7 +1063,7 @@ const NINJA = {
 const RPS_EMO = { rock: "✊", paper: "✋", scissors: "✌️" };
 const BEATS = { rock: "paper", paper: "scissors", scissors: "rock" };
 const BATTLE = {
-  emoji: "🧠", titleKey: "battleTitle", howKey: "battleHow",
+  emoji: "🧠", titleKey: "battleTitle", howKey: "battleHow", bgToggle: true,
   you: 0, ai: 0, history: [], trans: {}, predHits: 0, predTotal: 0,
   state: "idle", samples: [], arena: null, pop: null, timers: [],
 
@@ -1198,7 +1173,12 @@ const BATTLE = {
   },
 
   onFrame() {
-    drawSkeleton(engine.hand);
+    if (!camBgOn) {
+      ctx.fillStyle = "#0b0518"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+      drawRobotHand(engine.hand);
+    } else {
+      drawSkeleton(engine.hand);
+    }
     if (this.state === "capture" && engine.norm) {
       const g = classifyRPS(engine.norm);
       if (g) this.samples.push(g);
@@ -1281,437 +1261,14 @@ const BATTLE = {
 };
 
 /* ================================================
-   GAME 3 : SIGN SPELLER
-================================================ */
-const SIGN_WORDS = ["AI", "LAB", "WAU", "DUA", "UBI", "BOLA", "WIFI", "YOYO", "ABU", "VIVA", "LAWA", "BUDI"];
-const SIGN_EMO = { ILY: "🤟", HI: "🖐" };
-const SIGN_PHOTO_POS = {
-  A: "-14px -7px", B: "-191px -7px", D: "-543px -7px", F: "-100px -107px",
-  I: "-614px -79px", L: "-343px -229px", O: "-93px -343px", U: "-343px -429px",
-  V: "-507px -426px", W: "-700px -414px", Y: "-264px -550px",
-};
-const SIGN = {
-  emoji: "🤟", titleKey: "signTitle", howKey: "signHow",
-  mode: null, wordIdx: 0, letterIdx: 0, holdT: 0, current: null, lockUntil: 0,
-  dom: [], phraseTarget: null, phraseTitle: "", phrasePhoto: "", phrase: null,
-  signSamples: [], phraseStep: 0, phraseState: null,
-  latestScores: {}, targetSince: 0, targetFrames: 0,
-
-  start() {
-    this.clearDom();
-    ui.classList.remove("passthrough");
-    const node = el(`<div class="panel">
-      <div class="big-emoji">🤟</div>
-      <h2>${t("signTitle")}</h2>
-      <div class="desc">${t("signHow")}</div>
-      <div class="sign-mode-list">
-        <button class="sign-mode" id="freeBtn"><b>${t("freeMode")}</b><span>${t("freeExplain")}</span></button>
-        <button class="sign-mode" id="spellBtn"><b>${t("spellMode")}</b><span>${t("spellExplain")}</span></button>
-        <button class="sign-mode phrase" id="phraseBtn"><b>${t("phraseMode")}</b><span>${t("phraseExplain")}</span></button>
-      </div>
-      <div class="asl-notice">${t("aslNotice")}</div>
-      ${aslCreditsHtml()}
-      <br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button>
-    </div>`);
-    node.querySelector("#freeBtn").onclick = () => { sfx.click(); this.begin("free"); };
-    node.querySelector("#spellBtn").onclick = () => { sfx.click(); this.wordIdx = 0; this.begin("spell"); };
-    node.querySelector("#phraseBtn").onclick = () => { sfx.click(); this.phraseMenu(); };
-    node.querySelector("#menuBtn").onclick = () => { sfx.click(); menu(); };
-    show(node);
-  },
-  phraseMenu() {
-    this.clearDom();
-    this.mode = null;
-    ui.classList.remove("passthrough");
-    const phrases = [
-      { key: "ILY", kind: "static", title: t("phraseLove"), target: "ILY", photo: "assets/asl-i-love-you.jpg", action: t("tryAi") },
-      { key: "HI", kind: "wave", title: t("phraseHi"), target: "HI", photo: "assets/asl-hello.jpg", action: t("tryAi") },
-      { key: "MISS", kind: "miss", title: t("phraseMiss"), guide: t("phraseGuideMiss"), icon: "☝️", action: t("tryAi") },
-      { key: "NAME", kind: "name", title: t("phraseName"), guide: t("phraseGuideName"), icon: "🤲", action: t("tryAi") },
-    ];
-    const node = el(`<div class="panel phrase-panel">
-      <h2>${t("phraseMode")}</h2>
-      <div class="desc">${t("phraseExplain")}</div>
-      <div class="phrase-grid" id="phraseGrid"></div>
-      <div class="asl-notice">${t("aslNotice")}</div>
-      ${aslCreditsHtml()}
-      <button class="btn ghost" id="backSign" style="font-size:15px;padding:10px 24px">← ${t("back")}</button>
-    </div>`);
-    const grid = node.querySelector("#phraseGrid");
-    phrases.forEach((phrase) => {
-      const card = el(`<button class="phrase-card">
-        ${phrase.photo ? `<img src="${phrase.photo}" alt="${phrase.title} ASL reference">` : `<span class="phrase-icon">${phrase.icon}</span>`}
-        <b>${phrase.title}</b>
-        <small>${phrase.action}</small>
-      </button>`);
-      card.onclick = () => {
-        sfx.click();
-        this.beginPhrase(phrase);
-      };
-      grid.appendChild(card);
-    });
-    node.querySelector("#backSign").onclick = () => { sfx.click(); this.start(); };
-    show(node);
-  },
-  beginPhrase(phrase) {
-    this.mode = "phrase";
-    this.phrase = phrase;
-    this.phraseTarget = phrase.target;
-    this.phraseTitle = phrase.title;
-    this.phrasePhoto = phrase.photo;
-    this.holdT = 0;
-    this.current = null;
-    this.signSamples = [];
-    this.resetTargetConfirmation();
-    this.phraseStep = 0;
-    this.phraseState = {
-      startedAt: performance.now(), lastX: null, minX: 1, maxX: 0,
-      waveTravel: 0, touchCount: 0, touching: false,
-    };
-    show(null);
-    ui.classList.add("passthrough");
-    this.buildDom();
-  },
-  begin(mode) {
-    this.mode = mode; this.letterIdx = 0; this.holdT = 0; this.current = null; this.signSamples = [];
-    this.resetTargetConfirmation();
-    show(null); ui.classList.add("passthrough");
-    this.buildDom();
-  },
-  buildDom() {
-    this.clearDom();
-    const detect = el(`<div class="sign-detect">
-      <div class="bubble"><span id="sLetter">…</span>
-        <svg viewBox="0 0 120 120" width="100%" height="100%">
-          <circle cx="60" cy="60" r="56" fill="none" stroke="rgba(163,230,53,.95)" stroke-width="6"
-            stroke-dasharray="352" stroke-dashoffset="352" id="sRing" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <div class="hint" id="sHint">${this.mode === "free" ? t("freeHint") : ""}</div>
-      <div class="sign-confidence" id="sConfidence">${t("sensorTip")}</div>
-    </div>`);
-    document.body.appendChild(detect);
-    this.dom.push(detect);
-    if (this.mode === "free") {
-      const freeRef = el(`<div class="free-reference">
-        <div class="free-title">${t("freeMode")}</div>
-        <img src="assets/asl-alphabet.jpg" alt="ASL alphabet hand reference">
-        <div class="supported-signs">${t("freeHint")}</div>
-        <div>${t("sensorTip")}</div>
-      </div>`);
-      document.body.appendChild(freeRef);
-      this.dom.push(freeRef);
-      const back = el(`<button class="chip sign-back">← ${t("back")}</button>`);
-      back.onclick = () => { sfx.click(); this.start(); };
-      document.body.appendChild(back);
-      this.dom.push(back);
-    } else if (this.mode === "spell") {
-      const word = SIGN_WORDS[this.wordIdx];
-      const bar = el(`<div class="spell-bar" id="spellBar"></div>`);
-      [...word].forEach((ch, i) => bar.appendChild(el(`<div class="slot ${i === 0 ? "now" : ""}">${ch}</div>`)));
-      document.body.appendChild(bar);
-      this.dom.push(bar);
-      const ref = el(`<div class="ref-hand">
-        <div class="asl-photo" id="refPic" role="img"></div>
-        <div class="cap" id="refCap"></div>
-      </div>`);
-      document.body.appendChild(ref);
-      this.dom.push(ref);
-      const skip = el(`<button class="chip" style="position:fixed;bottom:calc(20px + env(safe-area-inset-bottom));right:14px;z-index:26">${t("skipLetter")}</button>`);
-      skip.onclick = () => { sfx.click(); this.advance(); };
-      document.body.appendChild(skip);
-      this.dom.push(skip);
-      this.updateHint();
-    } else if (this.mode === "phrase") {
-      const steps = STR[lang].phraseSteps[this.phrase.key];
-      const ref = el(`<div class="phrase-check-card">
-        ${this.phrasePhoto
-          ? `<img src="${this.phrasePhoto}" alt="${this.phraseTitle} ASL reference">`
-          : `<div class="phrase-live-icon">${this.phrase.icon}</div>`}
-        <strong>${this.phraseTitle}</strong>
-        ${this.phrase.guide ? `<span>${this.phrase.guide}</span>` : ""}
-        <ol class="phrase-steps" id="phraseSteps">
-          ${steps.map((step, i) => `<li class="${i === 0 ? "active" : ""}">${step}</li>`).join("")}
-        </ol>
-        <div class="phrase-live-status" id="phraseStatus">${t("phraseWaiting")}</div>
-        <div class="phrase-progress"><i id="phraseProgress"></i></div>
-      </div>`);
-      document.body.appendChild(ref);
-      this.dom.push(ref);
-      const back = el(`<button class="chip sign-back">← ${t("phraseMode")}</button>`);
-      back.onclick = () => { sfx.click(); this.phraseMenu(); };
-      document.body.appendChild(back);
-      this.dom.push(back);
-    }
-  },
-  clearDom() { this.dom.forEach(d => d.remove()); this.dom = []; },
-  cleanup() { this.clearDom(); },
-
-  targetLetter() { return this.mode === "phrase" ? this.phraseTarget : SIGN_WORDS[this.wordIdx][this.letterIdx]; },
-  stableSign(raw) {
-    if (engine.frameUpdated) {
-      this.signSamples.push(raw);
-      if (this.signSamples.length > 9) this.signSamples.shift();
-    }
-    const counts = {};
-    this.signSamples.forEach(sign => { if (sign) counts[sign] = (counts[sign] || 0) + 1; });
-    const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    return ranked.length && ranked[0][1] >= 4 ? ranked[0][0] : null;
-  },
-  resetTargetConfirmation() {
-    this.targetSince = 0;
-    this.targetFrames = 0;
-  },
-  targetProgress(matches, now) {
-    if (engine.frameUpdated) {
-      if (matches) {
-        if (!this.targetSince) this.targetSince = engine.frameAt || now;
-        this.targetFrames++;
-      } else {
-        this.resetTargetConfirmation();
-      }
-    }
-    if (!this.targetSince) return 0;
-    return Math.min(1, (now - this.targetSince) / 1100);
-  },
-  setPhraseFeedback(progress, status) {
-    const bar = document.getElementById("phraseProgress");
-    const statusEl = document.getElementById("phraseStatus");
-    const stepsEl = document.getElementById("phraseSteps");
-    if (bar) bar.style.width = `${Math.max(0, Math.min(1, progress)) * 100}%`;
-    if (statusEl) statusEl.textContent = status;
-    if (stepsEl) [...stepsEl.children].forEach((li, i) => {
-      li.classList.toggle("done", i < this.phraseStep);
-      li.classList.toggle("active", i === this.phraseStep);
-    });
-  },
-  nextPhraseStep() {
-    this.phraseStep++;
-    this.holdT = 0;
-    this.signSamples = [];
-    sfx.good();
-  },
-  phraseFrame(dt, sign) {
-    const phrase = this.phrase;
-    const steps = STR[lang].phraseSteps[phrase.key];
-    const hand = engine.norm;
-    if (!hand) {
-      this.setPhraseFeedback(0, t("handLost"));
-      return;
-    }
-    const f = fingerStates(hand);
-    const stepText = () => t("phraseStep")(Math.min(this.phraseStep + 1, steps.length), steps.length, steps[Math.min(this.phraseStep, steps.length - 1)]);
-    const holdMatch = (matched, seconds = 0.9) => {
-      if (engine.frameUpdated) {
-        if (matched) this.holdT += engine.frameDelta || 0.03;
-        else this.holdT = Math.max(0, this.holdT - (engine.frameDelta || 0.03) * 1.2);
-      }
-      this.setPhraseFeedback(this.holdT / seconds, matched ? t("holdIt") : `${stepText()} · ${t("keepTrying")}`);
-      return this.holdT >= seconds;
-    };
-
-    if (phrase.kind === "static") {
-      const score = this.latestScores[phrase.target] || 0;
-      if (holdMatch(score >= 0.80 && sign === phrase.target, 1.1) && this.mode === "phrase") this.phraseComplete();
-      return;
-    }
-
-    if (phrase.kind === "wave") {
-      const open = sign === "HI" || sign === "B" || (f.index && f.middle && f.ring && f.pinky);
-      if (this.phraseStep === 0) {
-        if (holdMatch(open, 0.35)) {
-          this.nextPhraseStep();
-          this.phraseState.lastX = f.palmX;
-          this.phraseState.minX = f.palmX;
-          this.phraseState.maxX = f.palmX;
-        }
-      } else {
-        if (open && engine.frameUpdated) {
-          const x = f.palmX;
-          if (this.phraseState.lastX != null) this.phraseState.waveTravel += Math.abs(x - this.phraseState.lastX);
-          this.phraseState.lastX = x;
-          this.phraseState.minX = Math.min(this.phraseState.minX, x);
-          this.phraseState.maxX = Math.max(this.phraseState.maxX, x);
-        }
-        const travel = this.phraseState.waveTravel;
-        const range = this.phraseState.maxX - this.phraseState.minX;
-        const progress = Math.min(1, Math.max(travel / 0.34, range / 0.18));
-        this.setPhraseFeedback(progress, open ? stepText() : t("keepTrying"));
-        if (open && travel >= 0.28 && range >= 0.13) this.phraseComplete();
-      }
-      return;
-    }
-
-    const pointing = f.index && !f.middle && !f.ring && !f.pinky;
-    if (phrase.kind === "miss") {
-      const tip = hand[8];
-      let matched = false;
-      if (this.phraseStep === 0) matched = pointing && tip.y > 0.58 && Math.abs(tip.x - 0.5) < 0.34;
-      else if (this.phraseStep === 1) matched = pointing && tip.y > 0.27 && tip.y < 0.57 && Math.abs(tip.x - 0.5) < 0.30;
-      else matched = pointing && (tip.x < 0.30 || tip.x > 0.70);
-      if (holdMatch(matched, 0.38)) {
-        if (this.phraseStep >= steps.length - 1) this.phraseComplete();
-        else this.nextPhraseStep();
-      }
-      return;
-    }
-
-    if (phrase.kind === "name") {
-      if (this.phraseStep === 0) {
-        const open = sign === "HI" || sign === "B" || (f.index && f.middle && f.ring && f.pinky);
-        if (holdMatch(open && f.palmY > 0.54, 0.4)) this.nextPhraseStep();
-        return;
-      }
-      const twoHands = engine.handsNorm.length >= 2;
-      const h1 = twoHands ? fingerStates(engine.handsNorm[0]) : null;
-      const h2 = twoHands ? fingerStates(engine.handsNorm[1]) : null;
-      const hShape = state => state && state.index && state.middle && !state.ring && !state.pinky;
-      const bothH = hShape(h1) && hShape(h2);
-      if (this.phraseStep === 1) {
-        if (holdMatch(bothH, 0.4)) {
-          this.nextPhraseStep();
-          this.phraseState.touchCount = 0;
-          this.phraseState.touching = false;
-        }
-        return;
-      }
-      if (!bothH) {
-        this.setPhraseFeedback(this.phraseState.touchCount / 2, `${stepText()} · ${t("keepTrying")}`);
-        return;
-      }
-      const gap = dist(engine.handsNorm[0][8], engine.handsNorm[1][8]);
-      const touching = gap < 0.19;
-      if (touching && !this.phraseState.touching) {
-        this.phraseState.touchCount++;
-        sfx.tick();
-      }
-      this.phraseState.touching = touching;
-      this.setPhraseFeedback(this.phraseState.touchCount / 2, stepText());
-      if (this.phraseState.touchCount >= 2) this.phraseComplete();
-    }
-  },
-  updateHint() {
-    if (this.mode !== "spell") return;
-    const L = this.targetLetter();
-    const hint = STR[lang].hints[L] || "";
-    const cap = document.getElementById("refCap");
-    const pic = document.getElementById("refPic");
-    if (cap) cap.textContent = `${L}: ${hint}`;
-    if (pic) {
-      pic.style.backgroundPosition = SIGN_PHOTO_POS[L] || "center";
-      pic.setAttribute("aria-label", `${L}: ${hint}`);
-    }
-    const hintEl = document.getElementById("sHint");
-    if (hintEl) hintEl.textContent = `${L} → ${hint}`;
-  },
-
-  onFrame(dt) {
-    drawSkeleton(engine.hand, "rgba(236,72,153,.9)");
-    if (this.mode === "phrase" && engine.hands.length > 1) {
-      drawSkeleton(engine.hands[1], "rgba(34,211,238,.9)");
-    }
-    const letterEl = document.getElementById("sLetter");
-    const ring = document.getElementById("sRing");
-    const confidenceEl = document.getElementById("sConfidence");
-    if (!letterEl) return;
-    const now = performance.now();
-    const reading = engine.norm ? signReading(engine.norm) : null;
-    this.latestScores = reading ? reading.scores : {};
-    const rawSign = reading ? reading.sign : null;
-    let sign = this.stableSign(rawSign);
-    if (now < this.lockUntil) sign = null;
-
-    const display = sign ? (SIGN_EMO[sign] || sign) : "…";
-    letterEl.textContent = display;
-    if (confidenceEl) {
-      confidenceEl.textContent = reading
-        ? `${t("confidence")(Math.round(reading.confidence * 100))} · ${t("sensorTip")}`
-        : t("handLost");
-    }
-
-    if (this.mode === "free") {
-      if (sign && sign !== this.current) { sfx.tick(); this.current = sign; }
-      if (!sign) this.current = null;
-      if (ring) ring.style.strokeDashoffset = 352;
-      return;
-    }
-    if (this.mode === "phrase") {
-      this.phraseFrame(dt, sign);
-      return;
-    }
-    /* spell mode: hold the target handshape */
-    const target = this.targetLetter();
-    const targetScore = this.latestScores[target] || 0;
-    const targetMatches = sign === target && targetScore >= 0.80;
-    const frac = this.targetProgress(targetMatches, now);
-    if (ring) ring.style.strokeDashoffset = 352 * (1 - frac);
-    if (targetMatches && frac >= 1 && this.targetFrames >= 18) {
-        sfx.good();
-        this.resetTargetConfirmation();
-        this.lockUntil = now + 700;
-        this.advance();
-    }
-  },
-
-  phraseComplete() {
-    const title = this.phraseTitle;
-    this.clearDom();
-    const pop = el(`<div class="center-pop phrase-success">
-      <div class="huge">🎉</div>
-      <div class="word">${t("phraseSuccess")(title)}</div>
-    </div>`);
-    document.body.appendChild(pop);
-    this.dom.push(pop);
-    setTimeout(() => this.phraseMenu(), 2200);
-  },
-
-  advance() {
-    const bar = document.getElementById("spellBar");
-    if (!bar) return;
-    bar.children[this.letterIdx].classList.remove("now");
-    bar.children[this.letterIdx].classList.add("done");
-    this.letterIdx++;
-    if (this.letterIdx >= SIGN_WORDS[this.wordIdx].length) {
-      const word = SIGN_WORDS[this.wordIdx];
-      sfx.win();
-      const pop = el(`<div class="center-pop"><div class="huge">🎉</div><div class="word">${t("spellDone")(word)}</div></div>`);
-      document.body.appendChild(pop);
-      setTimeout(() => {
-        pop.remove();
-        this.wordIdx++;
-        if (this.wordIdx >= SIGN_WORDS.length) {
-          ui.classList.remove("passthrough");
-          this.clearDom();
-          const node = el(`<div class="panel">
-            <div class="big-emoji">🏆</div>
-            <h2>${t("wordsDone")}</h2>
-            <button class="btn" id="againBtn">${t("again")}</button>
-            <br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button>
-          </div>`);
-          node.querySelector("#againBtn").onclick = () => { sfx.click(); this.wordIdx = 0; this.begin("spell"); };
-          node.querySelector("#menuBtn").onclick = () => { sfx.click(); menu(); };
-          show(node);
-          return;
-        }
-        this.letterIdx = 0;
-        this.buildDom();
-      }, 1800);
-    } else {
-      bar.children[this.letterIdx].classList.add("now");
-      this.updateHint();
-    }
-  },
-};
-
-/* ================================================
-   GAME 4 : HAND SNAKE
+   GAME 3 : HAND SNAKE
 ================================================ */
 /* Free-movement snake: the head IS the smoothed fingertip position every
    frame — there is no grid tick to fall behind on, so it can never "outrun"
    detection the way a fixed-speed grid step could. The body is a rope of
    recent head positions, trimmed to a length budget that grows on each food. */
 const SNAKE = {
-  emoji: "🐍", titleKey: "snakeTitle", howKey: "snakeHow",
+  emoji: "🐍", titleKey: "snakeTitle", howKey: "snakeHow", bgToggle: true,
   head: null, dir: { x: 1, y: 0 }, path: [], budget: 0, thickness: 22,
   score: 0, food: null, tracking: false, field: null, bg: null,
   hud: null, resetBtn: null, running: false,
@@ -1842,7 +1399,12 @@ const SNAKE = {
 
     const now = performance.now();
     ctx.save();
-    ctx.fillStyle = "rgba(5,8,28,.22)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    if (camBgOn) {
+      ctx.fillStyle = "rgba(5,8,28,.22)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    } else {
+      ctx.fillStyle = "#0b0518"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+      drawRobotHand(engine.hand);
+    }
     if (this.bg) ctx.drawImage(this.bg.canvas, field.x - this.bg.pad, field.y - this.bg.pad, this.bg.w, this.bg.h);
 
     /* food */
@@ -1887,7 +1449,7 @@ const SNAKE = {
 };
 
 /* ================================================
-   GAME 5 : BLOCK BLAST
+   GAME 4 : HAND BLAST
 ================================================ */
 /* Weighted shape bag — small pieces stay common so the board keeps breathing,
    while the rarer 5–9 cell shapes give older students something to plan around. */
@@ -1923,7 +1485,7 @@ const BLAST_SHAPES = [
 const BLAST_BAG_TOTAL = BLAST_SHAPES.reduce((sum, entry) => sum + entry.w, 0);
 const BLAST_COLORS = ["#22d3ee", "#a855f7", "#ec4899", "#a3e635", "#fbbf24"];
 const BLAST = {
-  emoji: "🧱", titleKey: "blastTitle", howKey: "blastHow",
+  emoji: "🧱", titleKey: "blastTitle", howKey: "blastHow", bgToggle: true,
   board: [], pieces: [], score: 0, lines: 0, dragging: null,
   flashCells: [], flashT: 0, hud: null, resetBtn: null, running: false,
 
@@ -2140,7 +1702,12 @@ const BLAST = {
     }
 
     ctx.save();
-    ctx.fillStyle = "rgba(5,8,28,.34)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    if (camBgOn) {
+      ctx.fillStyle = "rgba(5,8,28,.34)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    } else {
+      ctx.fillStyle = "#0b0518"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+      drawRobotHand(engine.hand);
+    }
     if (this.bg) ctx.drawImage(this.bg.canvas, layout.gx - this.bg.pad, layout.gy - this.bg.pad, this.bg.size, this.bg.size);
 
     /* filled cells */
@@ -2219,7 +1786,7 @@ const BLAST = {
 };
 
 /* ================================================
-   GAME 6 : HAND LAB (element combining)
+   GAME 5 : HAND LAB (element combining)
 ================================================ */
 const LAB_ELEMENTS = {
   fire: { emoji: "🔥", en: { name: "Fire", fact: "Fire needs fuel, heat and oxygen to burn." }, bm: { name: "Api", fact: "Api perlukan bahan bakar, haba dan oksigen untuk menyala." } },
@@ -2310,18 +1877,59 @@ const LAB_RECIPES = {
   "city+city": "space",
   "boat+fire": "smoke",
   "brick+brick": "city",
+  // Every element combined with itself needs its own explicit answer.
+  // Infinite Craft always escalates a self-combo into a bigger, more
+  // intense version of the same idea (Water+Water=Lake, Fire+Fire=Volcano,
+  // Dust+Dust=Sand, Smoke+Smoke=Cloud — verified against the live game).
+  // Without an entry here the old hash fallback could match on nothing more
+  // than a shared "hot" tag, which is how Energy+Energy ended up at Lava.
+  "steam+steam": "cloud", "energy+energy": "electricity", "mud+mud": "brick", "dust+dust": "sand",
+  "sun+sun": "energy", "ocean+ocean": "storm", "mountain+mountain": "volcano", "wind+wind": "storm",
+  "obsidian+obsidian": "stone", "life+life": "animal", "rain+rain": "storm", "rainbow+rainbow": "idea",
+  "storm+storm": "electricity", "sand+sand": "stone", "fish+fish": "animal", "glass+glass": "computer",
+  "animal+animal": "human", "idea+idea": "robot", "smoke+smoke": "cloud", "volcano+volcano": "mountain",
+  "stone+stone": "mountain", "lake+lake": "ocean", "tree+tree": "forest", "forest+forest": "life",
+  "electricity+electricity": "computer", "boat+boat": "city", "bird+bird": "forest", "space+space": "idea",
 };
 const LAB_TOTAL = Object.keys(LAB_ELEMENTS).length;
 const LAB_FALLBACK_POOL = Object.keys(LAB_ELEMENTS).filter(id => !LAB_BASE.includes(id));
+// Every element gets a handful of category tags so an *unlisted* combo can
+// still land on something in the same neighbourhood (idea+idea should drift
+// toward other abstract/tech things, never toward "lava"). This is what the
+// old fallback lacked: it picked from ALL 36 elements with no notion of
+// "related", so any two inputs could land on anything.
+const LAB_TAGS = {
+  fire: ["hot", "elemental"], water: ["liquid", "elemental"], earth: ["solid", "elemental"], air: ["gas", "elemental"],
+  steam: ["gas", "hot", "elemental"], lava: ["hot", "liquid", "solid", "elemental"], energy: ["abstract", "tech", "power"],
+  mud: ["liquid", "solid", "elemental"], cloud: ["gas", "weather", "sky"], dust: ["solid", "gas", "weather"],
+  sun: ["hot", "sky", "elemental"], ocean: ["liquid", "life", "elemental"], mountain: ["solid", "sky", "elemental"],
+  wind: ["gas", "weather", "elemental"], obsidian: ["solid", "hot", "structure"], life: ["life", "abstract"],
+  rain: ["liquid", "weather", "sky"], rainbow: ["sky", "weather", "abstract"], brick: ["structure", "solid"],
+  storm: ["weather", "sky", "hot"], plant: ["life", "solid"], sand: ["solid", "elemental"], fish: ["life", "liquid"],
+  metal: ["structure", "solid", "hot"], glass: ["structure", "solid", "hot"], animal: ["life"], human: ["life", "tech"],
+  idea: ["abstract", "tech"], robot: ["tech", "structure"], smoke: ["gas", "hot", "weather"],
+  volcano: ["hot", "solid", "sky", "elemental"], stone: ["solid", "elemental"], lake: ["liquid", "elemental"],
+  tree: ["life", "solid"], forest: ["life", "solid"], electricity: ["tech", "abstract", "power"],
+  computer: ["tech", "structure", "abstract"], city: ["structure", "tech", "life"], boat: ["structure", "tech", "liquid"],
+  bird: ["life", "sky"], space: ["sky", "abstract", "tech"],
+};
+function stableHash(key) {
+  let hash = 2166136261;
+  for (const char of key) { hash ^= char.charCodeAt(0); hash = Math.imul(hash, 16777619); }
+  return hash >>> 0;
+}
 function labCombinationResult(idA, idB) {
   const key = [idA, idB].sort().join("+");
   if (LAB_RECIPES[key]) return { id: LAB_RECIPES[key], exact: true, key };
   // Infinite Craft nearly always rewards experimentation. The booth version
-  // stays offline, so unknown pairs use a stable playful fallback: the same
-  // two inputs always produce the same result on every device and session.
-  let hash = 2166136261;
-  for (const char of key) { hash ^= char.charCodeAt(0); hash = Math.imul(hash, 16777619); }
-  return { id: LAB_FALLBACK_POOL[(hash >>> 0) % LAB_FALLBACK_POOL.length], exact: false, key };
+  // stays offline, so unknown pairs use a stable fallback: the same two
+  // inputs always produce the same result on every device and session — and
+  // that result is picked only from elements sharing a tag with either
+  // input, so it stays thematically plausible instead of fully arbitrary.
+  const wantTags = new Set([...(LAB_TAGS[idA] || []), ...(LAB_TAGS[idB] || [])]);
+  const related = LAB_FALLBACK_POOL.filter(id => id !== idA && id !== idB && (LAB_TAGS[id] || []).some(tag => wantTags.has(tag)));
+  const pool = related.length ? related : LAB_FALLBACK_POOL;
+  return { id: pool[stableHash(key) % pool.length], exact: false, key };
 }
 
 const LAB = {
@@ -2344,11 +1952,15 @@ const LAB = {
     this.recipeBtn.onclick = () => { sfx.click(); this.openRecipes(false); };
     this.cheatBtn.onclick = () => { sfx.click(); this.openRecipes(true); };
     document.body.append(this.recipeBtn, this.cheatBtn);
+    // Hand Lab draws a robot hand from the landmarks instead of the raw
+    // feed, so the camera video itself stays hidden the whole time.
+    cam.style.display = "none";
   },
 
   cleanup() {
     this.recipeBtn?.remove(); this.cheatBtn?.remove(); this.bookNode?.remove();
     this.recipeBtn = null; this.cheatBtn = null; this.bookNode = null; this.running = false;
+    cam.style.display = "";
   },
 
   layout() {
@@ -2562,9 +2174,11 @@ const LAB = {
     if (dwell?.key !== this.dwellKey) { this.dwellKey = dwell?.key || ""; this.dwellSince = dwell ? now : 0; }
 
     ctx.save();
-    // Keep the camera unmistakably visible so players understand that their
-    // real hand is the controller; the light tint only protects text contrast.
-    ctx.fillStyle = "rgba(248,250,252,.46)"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    // No camera feed in Hand Lab — a flat workbench backdrop instead, with the
+    // player's own hand rendered as a robot hand further down.
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, innerHeight);
+    bgGrad.addColorStop(0, "#f8fafc"); bgGrad.addColorStop(1, "#e2e8f0");
+    ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, innerWidth, innerHeight);
     // A quiet constellation field gives the free canvas the same open, calm
     // feeling as Infinite Craft without competing with the hand-controlled tags.
     ctx.save(); ctx.beginPath(); ctx.rect(layout.workspace.x, layout.workspace.y, layout.workspace.w, layout.workspace.h); ctx.clip();
@@ -2584,6 +2198,8 @@ const LAB = {
     ctx.fillText(t("labSlotHint"), layout.workspace.x + layout.workspace.w / 2, layout.workspace.y + 45);
     ctx.font = "800 10px system-ui"; ctx.fillStyle = "rgba(15,118,110,.9)";
     ctx.fillText(`● ${t("labCamera")}`, layout.workspace.x + layout.workspace.w / 2, layout.workspace.y + 62);
+    if (engine.hand) drawRobotHand(engine.hand);
+    else { ctx.font = "700 13px system-ui"; ctx.fillStyle = "#94a3b8"; ctx.fillText(t("handLost"), layout.workspace.x + layout.workspace.w / 2, layout.workspace.y + layout.workspace.h / 2); }
     const targetIndex = this.drag ? this.hitWorkspace(cursor, this.drag.type === "workspace" ? this.drag.index : -1) : -1;
     this.workspace.forEach((item, index) => { if (this.drag?.type === "workspace" && this.drag.index === index) return; this.drawTag(item.x, item.y, item.id, { target: index === targetIndex }); });
     if (this.drag && cursor) this.drawTag(cursor.x, cursor.y, this.drag.id, { alpha: .96, target: targetIndex >= 0 });
@@ -2671,6 +2287,6 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 })();
 
 /* debug hook (harmless in production) */
-window.__ha = { engine, NINJA, BATTLE, SIGN, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60) };
+window.__ha = { engine, NINJA, BATTLE, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60) };
 
 menu();

@@ -1,4 +1,4 @@
-const CACHE = "hand-arcade-v15";
+const CACHE = "hand-arcade-v18";
 const FILES = [
   ".",
   "index.html",
@@ -9,9 +9,6 @@ const FILES = [
   "icon-192.png",
   "icon-512.png",
   "icon-180.png",
-  "assets/asl-alphabet.jpg",
-  "assets/asl-i-love-you.jpg",
-  "assets/asl-hello.jpg",
   "vendor/vision_bundle.mjs",
   "vendor/hand_landmarker.task",
   "vendor/wasm/vision_wasm_internal.js",
