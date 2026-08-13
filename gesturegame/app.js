@@ -32,9 +32,20 @@ const STR = {
     calibHint: "Hold your hand up so the camera can see it clearly",
     calibReady: "Got it! Ready…",
     calibSkip: "Can't see your hand? Start anyway →",
+    // camera recovery
+    camTroubleTitle: "Camera trouble",
+    camTroubleDesc: "The camera feed froze. Trying to reconnect…",
+    camReconnecting: "Reconnecting camera…",
+    camRetryBtn: "🔄 TRY AGAIN",
+    // attract loop (idle screen)
+    attractMsg1: "🖐️ Wave to play!",
+    attractMsg2: "🎮 Tap a game to start!",
+    attractMsg3: "🤖 No internet needed — AI runs right here!",
+    attractMsg4: "🏆 Can you beat today's top score?",
     // ninja
     ninjaHow: "Fruit is flying through the air! 🍉 Move your POINTER FINGER to slice it. Avoid the bombs 💣!",
     score: "Score", time: "Time", combo: "Combo", best: "Best", lives: "Lives",
+    todaysBest: "Today's Best", newDailyBest: "🔥 NEW TODAY'S BEST!", todayBadge: n => `🏆 ${n} today`,
     debugged: "SYSTEM DEBUGGED!",
     newBest: "🎉 NEW HIGH SCORE!",
     ninjaRanks: ["🥷 FRUIT NINJA MASTER", "⚔️ BLADE WARRIOR", "🍃 ROOKIE SLICER"],
@@ -117,8 +128,19 @@ const STR = {
     calibHint: "Angkat tangan anda supaya kamera dapat melihatnya dengan jelas",
     calibReady: "Dapat! Bersedia…",
     calibSkip: "Kamera tak nampak tangan? Mula juga →",
+    // camera recovery
+    camTroubleTitle: "Masalah kamera",
+    camTroubleDesc: "Suapan kamera terhenti. Cuba sambung semula…",
+    camReconnecting: "Menyambung semula kamera…",
+    camRetryBtn: "🔄 CUBA LAGI",
+    // attract loop (idle screen)
+    attractMsg1: "🖐️ Lambai untuk main!",
+    attractMsg2: "🎮 Ketik permainan untuk mula!",
+    attractMsg3: "🤖 Tak perlu internet — AI berjalan di sini!",
+    attractMsg4: "🏆 Boleh kalahkan skor terbaik hari ini?",
     ninjaHow: "Buah-buahan terbang di udara! 🍉 Gerakkan JARI TELUNJUK untuk menetaknya. Elakkan bom 💣!",
     score: "Skor", time: "Masa", combo: "Combo", best: "Terbaik", lives: "Nyawa",
+    todaysBest: "Skor Terbaik Hari Ini", newDailyBest: "🔥 REKOD TERBAIK HARI INI!", todayBadge: n => `🏆 ${n} hari ini`,
     debugged: "SISTEM DIBAIKI!",
     newBest: "🎉 REKOD BARU!",
     ninjaRanks: ["🥷 NINJA BUAH", "⚔️ PAHLAWAN PEDANG", "🍃 PEMULA"],
@@ -191,6 +213,27 @@ const t = (k) => STR[lang][k];
    game supports it at all is a per-game flag checked at start time. */
 let camBgOn = localStorage.getItem("ha-cambg") !== "off";
 
+/* ---------------- today's best score (Malaysia time, resets daily) ----------------
+   A booth-day leaderboard: separate from the permanent all-time best, this
+   tracks the top score set today only, so it means something fresh for
+   whoever's visiting the booth right now. Malaysia (Asia/Kuala_Lumpur) is a
+   fixed UTC+8 with no DST, so the offset math below is exact year-round. */
+function malaysiaDateStr() {
+  const utcMs = Date.now() + new Date().getTimezoneOffset() * 60000;
+  return new Date(utcMs + 8 * 3600000).toISOString().slice(0, 10);
+}
+function getDailyBest(gameKey) {
+  let rec = {};
+  try { rec = JSON.parse(localStorage.getItem(`ha-daily-${gameKey}`) || "{}"); } catch {}
+  return rec.date === malaysiaDateStr() ? (rec.score || 0) : 0;
+}
+function setDailyBest(gameKey, score) {
+  const current = getDailyBest(gameKey);
+  if (score <= current) return { isNew: false, best: current };
+  localStorage.setItem(`ha-daily-${gameKey}`, JSON.stringify({ date: malaysiaDateStr(), score }));
+  return { isNew: true, best: score };
+}
+
 /* ---------------- sound ---------------- */
 let soundOn = localStorage.getItem("ha-sound") !== "off";
 let actx = null;
@@ -248,15 +291,33 @@ function show(node) {
   ui.innerHTML = "";
   ui.scrollTop = 0; // a new screen always starts at the top, never mid-scroll
   if (node) { ui.appendChild(node); node.classList.add("fade-in"); }
+  // Every screen transition counts as "fresh attention" for the idle-return
+  // watchdog below — hand-tracked gameplay never fires pointer/key events, so
+  // resetting only on real screen changes (not on generic input) is what
+  // keeps a just-finished game's score screen from instantly bouncing to menu.
+  lastInteraction = Date.now();
 }
 
 /* ---------------- hand engine ---------------- */
+const CAM_CONSTRAINTS = {
+  video: {
+    facingMode: "user",
+    width: { ideal: 1280, min: 640 },
+    height: { ideal: 720, min: 480 },
+    frameRate: { ideal: 30, min: 20 },
+    resizeMode: "crop-and-scale",
+  },
+  audio: false,
+};
 const engine = {
   landmarker: null, ready: false, camReady: false,
   hand: null,        // mirrored screen-space landmarks [{x,y}] or null
   norm: null,        // mirrored normalized landmarks
   hands: [], handsNorm: [],
   lastVideoTime: -1, frameUpdated: false, lastSeenAt: 0, frameAt: 0, frameDelta: 0,
+  lastFrameOkAt: 0,  // last time a genuinely new video frame was processed —
+                      // the camera-stall watchdog below watches this, separately
+                      // from "hand visible", to catch a frozen/dead camera feed.
   async init(onStatus) {
     if (!this.ready) {
       onStatus(t("loading"));
@@ -281,21 +342,22 @@ const engine = {
     }
     if (!this.camReady) {
       onStatus(t("loadingCam"));
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 1280, min: 640 },
-          height: { ideal: 720, min: 480 },
-          frameRate: { ideal: 30, min: 20 },
-          resizeMode: "crop-and-scale",
-        },
-        audio: false,
-      });
-      cam.srcObject = stream;
-      await new Promise((res) => { cam.onloadedmetadata = res; });
-      await cam.play();
-      this.camReady = true;
+      await this.startVideoStream();
     }
+  },
+  async startVideoStream() {
+    const stream = await navigator.mediaDevices.getUserMedia(CAM_CONSTRAINTS);
+    cam.srcObject = stream;
+    await new Promise((res) => { cam.onloadedmetadata = res; });
+    await cam.play();
+    this.camReady = true;
+    this.lastFrameOkAt = performance.now(); // grace period before the watchdog can fire
+  },
+  // Used by the camera-stall watchdog to recover without reloading the AI
+  // model (which stays loaded) — just tears down and re-requests the stream.
+  async reconnectCamera() {
+    this.stopCamera();
+    await this.startVideoStream();
   },
   stopCamera() {
     const stream = cam.srcObject;
@@ -319,6 +381,7 @@ const engine = {
     if (cam.currentTime === this.lastVideoTime) return false; // same frame, keep previous
     this.lastVideoTime = cam.currentTime;
     this.frameUpdated = true;
+    this.lastFrameOkAt = performance.now();
     const frameNow = performance.now();
     this.frameDelta = this.frameAt ? Math.min(0.1, Math.max(0.01, (frameNow - this.frameAt) / 1000)) : 0;
     this.frameAt = frameNow;
@@ -526,7 +589,96 @@ function stopGame() {
   homeBtn.classList.add("hidden");
   camBtn.classList.add("hidden");
   handStatus.classList.add("hidden");
+  camTroubleNode?.remove(); camTroubleNode = null; camRecovering = false;
 }
+
+/* ---------------- camera stall recovery ----------------
+   A frozen/disconnected camera doesn't throw — it just stops delivering new
+   video frames, so engine.hand quietly freezes at its last position and the
+   booth looks "stuck" with nobody able to tell why. This watches for that
+   specific failure (no new frame for several seconds while a camera game is
+   active) and self-heals by re-requesting the stream, with a visible retry
+   button as the fallback if auto-recovery can't get it back. */
+let camTroubleNode = null, camRecovering = false;
+const CAM_STALL_MS = 6000;
+setInterval(() => {
+  if (camRecovering || !document.body.classList.contains("playing") || !engine.camReady) return;
+  if (performance.now() - engine.lastFrameOkAt > CAM_STALL_MS) startCameraRecovery();
+}, 1000);
+async function startCameraRecovery(attempt = 1) {
+  camRecovering = true;
+  if (!camTroubleNode) {
+    camTroubleNode = el(`<div class="cam-trouble">
+      <div class="panel">
+        <div class="big-emoji">📷💤</div>
+        <h2>${t("camTroubleTitle")}</h2>
+        <div class="desc" id="camTroubleDesc">${t("camTroubleDesc")}</div>
+        <button class="btn" id="camRetryBtn">${t("camRetryBtn")}</button>
+      </div>
+    </div>`);
+    camTroubleNode.querySelector("#camRetryBtn").onclick = () => { sfx.click(); startCameraRecovery(1); };
+    document.body.appendChild(camTroubleNode);
+  }
+  const desc = camTroubleNode.querySelector("#camTroubleDesc");
+  desc.textContent = t("camReconnecting");
+  try {
+    await engine.reconnectCamera();
+    await new Promise((res) => setTimeout(res, 700));
+    if (performance.now() - engine.lastFrameOkAt > 1500) throw new Error("no frame after reconnect");
+    camTroubleNode.remove(); camTroubleNode = null;
+    camRecovering = false;
+  } catch {
+    if (attempt < 3) { setTimeout(() => startCameraRecovery(attempt + 1), 1500); }
+    else { desc.textContent = t("camTroubleDesc"); camRecovering = false; }
+  }
+}
+
+/* ---------------- attract loop (booth idle screen) ----------------
+   Nobody babysits a booth all day. If the menu sits idle, spotlight the game
+   cards in turn and cycle a friendly, kid-aimed call-to-action so it reads as
+   "come play" rather than "abandoned kiosk". If a non-gameplay screen (mode
+   picker, calibrate, a finished game's score screen) sits idle even longer,
+   assume whoever was there walked off and quietly return to the menu so the
+   next visitor doesn't inherit somebody else's half-finished setup screen. */
+const ATTRACT_AFTER_S = 25, IDLE_RETURN_AFTER_S = 45;
+let atMenu = false, lastInteraction = Date.now();
+let attractActive = false, attractCardTimer = null, attractMsgTimer = null, attractNode = null;
+const ATTRACT_MSG_KEYS = ["attractMsg1", "attractMsg2", "attractMsg3", "attractMsg4"];
+addEventListener("pointerdown", () => { lastInteraction = Date.now(); if (attractActive) stopAttract(); }, { capture: true });
+function startAttract() {
+  if (attractActive || !atMenu) return;
+  const cards = [...document.querySelectorAll(".card")];
+  if (!cards.length) return;
+  attractActive = true;
+  let i = 0;
+  cards[i].classList.add("spotlight");
+  attractCardTimer = setInterval(() => {
+    cards[i].classList.remove("spotlight");
+    i = (i + 1) % cards.length;
+    cards[i].classList.add("spotlight");
+  }, 1400);
+  attractNode = el(`<div class="attract-banner"><span id="attractMsg"></span></div>`);
+  document.body.appendChild(attractNode);
+  let mi = 0;
+  const cycleMsg = () => { attractNode.querySelector("#attractMsg").textContent = t(ATTRACT_MSG_KEYS[mi % ATTRACT_MSG_KEYS.length]); mi++; };
+  cycleMsg();
+  attractMsgTimer = setInterval(cycleMsg, 3200);
+}
+function stopAttract() {
+  if (!attractActive) return;
+  attractActive = false;
+  clearInterval(attractCardTimer); clearInterval(attractMsgTimer);
+  document.querySelectorAll(".card.spotlight").forEach((c) => c.classList.remove("spotlight"));
+  attractNode?.remove(); attractNode = null;
+}
+setInterval(() => {
+  const idleFor = (Date.now() - lastInteraction) / 1000;
+  if (atMenu) {
+    if (idleFor > ATTRACT_AFTER_S && !attractActive) startAttract();
+  } else if (!ui.classList.contains("passthrough") && ui.querySelector(".panel") && idleFor > IDLE_RETURN_AFTER_S) {
+    menu();
+  }
+}, 1000);
 
 /* ---------------- screens ---------------- */
 /* ---------------- lightweight booth play-count tracking ----------------
@@ -560,13 +712,15 @@ function showPlayStats() {
 }
 function menu() {
   stopGame();
+  atMenu = true;
+  const dailyBadge = (key) => { const b = getDailyBest(key); return b > 0 ? `<span class="card-badge">${t("todayBadge")(b)}</span>` : ""; };
   const node = el(`<div style="margin:auto;width:100%">
     <h1 class="arcade" id="arcadeTitle">${t("title")}</h1>
     <div class="tagline">${t("tagline")}</div>
     <div class="cards">
       <div class="card ninja" id="cNinja">
         <div class="emo">🥷</div>
-        <div><h3>${t("ninjaTitle")} <span style="font-size:14px">🍉</span></h3><p>${t("ninjaDesc")}</p></div>
+        <div><h3>${t("ninjaTitle")} <span style="font-size:14px">🍉</span></h3><p>${t("ninjaDesc")}</p>${dailyBadge("ninja")}</div>
       </div>
       <div class="card battle" id="cBattle">
         <div class="emo">✊</div>
@@ -574,11 +728,11 @@ function menu() {
       </div>
       <div class="card snake" id="cSnake">
         <div class="emo">🐍</div>
-        <div><h3>${t("snakeTitle")} <span style="font-size:14px">🎮</span></h3><p>${t("snakeDesc")}</p></div>
+        <div><h3>${t("snakeTitle")} <span style="font-size:14px">🎮</span></h3><p>${t("snakeDesc")}</p>${dailyBadge("snake")}</div>
       </div>
       <div class="card blast" id="cBlast">
         <div class="emo">🧱</div>
-        <div><h3>${t("blastTitle")} <span style="font-size:14px">🧩</span></h3><p>${t("blastDesc")}</p></div>
+        <div><h3>${t("blastTitle")} <span style="font-size:14px">🧩</span></h3><p>${t("blastDesc")}</p>${dailyBadge("blast")}</div>
       </div>
       <div class="card lab" id="cLab">
         <div class="emo">🧪</div>
@@ -605,6 +759,8 @@ function menu() {
 }
 
 async function intro(game) {
+  atMenu = false;
+  stopAttract();
   // Some games (currently just Air Ninja) offer more than one way to play;
   // they expose a modes() method returning the choices so this stays generic.
   const modes = typeof game.modes === "function" ? game.modes() : null;
@@ -996,7 +1152,7 @@ const NINJA = {
       if (this.mode === "life") {
         this.lives = Math.max(0, this.lives - 1);
         const livesEl = this.hud.querySelector("#nLives");
-        if (livesEl) livesEl.textContent = "❤️".repeat(this.lives) + "🖤".repeat(3 - this.lives);
+        if (livesEl) livesEl.textContent = "❤️".repeat(this.lives) + "🤍".repeat(3 - this.lives);
         if (this.lives <= 0) {
           this.hud.querySelector("#nScore").textContent = this.score;
           return this.end();
@@ -1038,6 +1194,7 @@ const NINJA = {
     const best = Math.max(this.score, +(localStorage.getItem("ha-ninja-best") || 0));
     const isNew = this.score >= best && this.score > 0;
     localStorage.setItem("ha-ninja-best", best);
+    const daily = setDailyBest("ninja", this.score);
     const rank = this.score >= 400 ? 0 : this.score >= 200 ? 1 : 2;
     if (this.hud) this.hud.remove();
     ui.classList.remove("passthrough");
@@ -1046,8 +1203,8 @@ const NINJA = {
       <h2>${t("debugged")}</h2>
       <div class="score-line">${this.score}</div>
       <div class="result-rank">${t("ninjaRanks")[rank]}</div>
-      ${isNew ? `<div class="desc" style="color:var(--amber)">${t("newBest")}</div>` : ""}
-      <div class="best-line">${t("best")}: ${best}</div>
+      ${isNew ? `<div class="desc" style="color:var(--amber)">${t("newBest")}</div>` : daily.isNew ? `<div class="desc" style="color:var(--cyan)">${t("newDailyBest")}</div>` : ""}
+      <div class="best-line">${t("best")}: ${best} · ${t("todaysBest")}: ${daily.best}</div>
       <button class="btn" id="againBtn">${t("again")}</button>
       <br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button>
     </div>`);
@@ -1440,8 +1597,9 @@ const SNAKE = {
   end() {
     if (!this.running) return;
     const score = this.score, rank = score >= 180 ? 0 : score >= 80 ? 1 : 2;
+    const daily = setDailyBest("snake", score);
     this.cleanup(); sfx.bad(); ui.classList.remove("passthrough");
-    const node = el(`<div class="panel"><div class="big-emoji">🐍</div><h2>${t("gameOver")}</h2><div class="score-line">${score}</div><div class="result-rank">${t("snakeRanks")[rank]}</div><button class="btn" id="againBtn">${t("again")}</button><br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button></div>`);
+    const node = el(`<div class="panel"><div class="big-emoji">🐍</div><h2>${t("gameOver")}</h2><div class="score-line">${score}</div><div class="result-rank">${t("snakeRanks")[rank]}</div>${daily.isNew ? `<div class="desc" style="color:var(--cyan)">${t("newDailyBest")}</div>` : ""}<div class="best-line">${t("todaysBest")}: ${daily.best}</div><button class="btn" id="againBtn">${t("again")}</button><br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button></div>`);
     node.querySelector("#againBtn").onclick = () => { sfx.click(); show(null); ui.classList.add("passthrough"); this.start(); };
     node.querySelector("#menuBtn").onclick = () => { sfx.click(); menu(); };
     show(node);
@@ -1777,8 +1935,9 @@ const BLAST = {
   end() {
     if (!this.running) return;
     const score = this.score, rank = score >= 500 ? 0 : score >= 200 ? 1 : 2;
+    const daily = setDailyBest("blast", score);
     this.cleanup(); sfx.bad(); ui.classList.remove("passthrough");
-    const node = el(`<div class="panel"><div class="big-emoji">🧱</div><h2>${t("noMoves")}</h2><div class="score-line">${score}</div><div class="result-rank">${t("blastRanks")[rank]}</div><button class="btn" id="againBtn">${t("again")}</button><br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button></div>`);
+    const node = el(`<div class="panel"><div class="big-emoji">🧱</div><h2>${t("noMoves")}</h2><div class="score-line">${score}</div><div class="result-rank">${t("blastRanks")[rank]}</div>${daily.isNew ? `<div class="desc" style="color:var(--cyan)">${t("newDailyBest")}</div>` : ""}<div class="best-line">${t("todaysBest")}: ${daily.best}</div><button class="btn" id="againBtn">${t("again")}</button><br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button></div>`);
     node.querySelector("#againBtn").onclick = () => { sfx.click(); show(null); ui.classList.add("passthrough"); this.start(); };
     node.querySelector("#menuBtn").onclick = () => { sfx.click(); menu(); };
     show(node);

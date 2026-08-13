@@ -104,6 +104,22 @@ h1.arcade {
   position: relative; overflow: hidden;
 }
 .card:active { transform: scale(.97); }
+.card.spotlight {
+  transform: scale(1.035);
+  border-color: rgba(34,211,238,.65);
+  box-shadow: 0 0 0 3px rgba(34,211,238,.35), 0 20px 50px rgba(34,211,238,.25);
+  transition: transform .5s ease, box-shadow .5s ease, border-color .5s ease;
+}
+.attract-banner {
+  position: fixed; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom));
+  transform: translateX(-50%); z-index: 20; pointer-events: none;
+  background: rgba(11,5,24,.75); border: 1px solid rgba(255,255,255,.22);
+  border-radius: 999px; padding: 10px 22px; font-weight: 800;
+  font-size: clamp(13px, 3.6vw, 16px); white-space: nowrap;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  animation: attractpulse 1.6s ease-in-out infinite;
+}
+@keyframes attractpulse { 50% { transform: translateX(-50%) scale(1.04); } }
 .card::after {
   content: ""; position: absolute; inset: 0;
   background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.14) 48%, transparent 60%);
@@ -124,6 +140,11 @@ h1.arcade {
 .card.lab .emo { background: linear-gradient(135deg, #a3e63644, #22d3ee44); }
 .card h3 { font-size: clamp(18px, 5vw, 23px); font-weight: 800; }
 .card p { font-size: clamp(12px, 3.3vw, 14px); opacity: .75; margin-top: 3px; line-height: 1.4; }
+.card-badge {
+  display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 999px;
+  background: rgba(251,191,36,.16); border: 1px solid rgba(251,191,36,.4);
+  color: var(--amber); font-size: 11px; font-weight: 800; letter-spacing: .3px;
+}
 .made-with { opacity: .45; font-size: 12px; margin-top: 14px; }
 
 /* generic big button */
@@ -333,6 +354,11 @@ h1.arcade {
 .lab-book {
   position: fixed; inset: 0; z-index: 40;
   background: rgba(5,3,12,.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.cam-trouble {
+  position: fixed; inset: 0; z-index: 45;
+  background: rgba(5,3,12,.92); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   display: flex; align-items: center; justify-content: center; padding: 20px;
 }
 .lab-book-panel.recipe-panel { color: #0f172a; background: rgba(248,250,252,.97); border-color: rgba(15,23,42,.18); }
