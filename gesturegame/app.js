@@ -307,9 +307,12 @@ function show(node) {
 const CAM_CONSTRAINTS = {
   video: {
     facingMode: "user",
-    width: { ideal: 1280, min: 640 },
+    // A 960×720 stream is detailed enough for fingertips but much easier for
+    // a phone/tablet to analyse in real time than a full-HD stream. Keeping
+    // inference fast is more important to control quality than raw pixels.
+    width: { ideal: 960, min: 640 },
     height: { ideal: 720, min: 480 },
-    frameRate: { ideal: 30, min: 20 },
+    frameRate: { ideal: 60, min: 24 },
     resizeMode: "crop-and-scale",
   },
   audio: false,
@@ -318,6 +321,8 @@ const engine = {
   landmarker: null, ready: false, camReady: false,
   hand: null,        // mirrored screen-space landmarks [{x,y}] or null
   norm: null,        // mirrored normalized landmarks
+  renderNorm: null,  // tiny velocity prediction: makes 30fps camera input feel continuous at 60fps
+  velocity: [],
   hands: [], handsNorm: [],
   lastVideoTime: -1, frameUpdated: false, lastSeenAt: 0, frameAt: 0, frameDelta: 0,
   lastFrameOkAt: 0,  // last time a genuinely new video frame was processed —
@@ -330,12 +335,14 @@ const engine = {
       const options = (delegate) => ({
         baseOptions: { modelAssetPath: "vendor/hand_landmarker.task", delegate },
         runningMode: "VIDEO",
-        numHands: 2,
-        // A slightly more forgiving entrance threshold helps on phone cameras,
-        // while the temporal filter below keeps the cursor calm once tracked.
-        minHandDetectionConfidence: 0.50,
-        minHandPresenceConfidence: 0.50,
-        minTrackingConfidence: 0.48,
+        // Every game uses one controlling hand. Tracking one hand keeps the
+        // inference loop light and stops a background hand from stealing focus.
+        numHands: 1,
+        // Let a hand enter in normal indoor light, then rely on the temporal
+        // filter below instead of rapidly dropping/reacquiring it.
+        minHandDetectionConfidence: 0.42,
+        minHandPresenceConfidence: 0.45,
+        minTrackingConfidence: 0.42,
       });
       try {
         this.landmarker = await HandLandmarker.createFromOptions(fileset, options("GPU"));
@@ -372,6 +379,8 @@ const engine = {
     this.lastVideoTime = -1;
     this.hand = null;
     this.norm = null;
+    this.renderNorm = null;
+    this.velocity = [];
     this.hands = [];
     this.handsNorm = [];
     this.frameUpdated = false;
@@ -382,7 +391,7 @@ const engine = {
   },
   detect() {
     this.frameUpdated = false;
-    if (!this.ready || !this.camReady || cam.readyState < 2) { this.hand = null; return false; }
+    if (!this.ready || !this.camReady || cam.readyState < 2) { this.hand = null; this.renderNorm = null; return false; }
     if (cam.currentTime === this.lastVideoTime) return false; // same frame, keep previous
     this.lastVideoTime = cam.currentTime;
     this.frameUpdated = true;
@@ -398,47 +407,73 @@ const engine = {
       const dw = vw * scale, dh = vh * scale;
       const ox = (innerWidth - dw) / 2, oy = (innerHeight - dh) / 2;
       const rawHands = res.landmarks.map(hand => hand.map(p => ({ x: 1 - p.x, y: p.y, z: p.z })));
-      // Keep the same primary hand when two hands cross the camera.
-      if (this.norm && rawHands.length > 1) {
-        rawHands.sort((a, b) => dist(a[0], this.norm[0]) - dist(b[0], this.norm[0]));
-      }
       const raw = rawHands[0];
       if (!this.norm) {
-        this.norm = raw;
+        this.norm = raw.map(p => ({ ...p }));
+        this.renderNorm = raw.map(p => ({ ...p }));
+        this.velocity = raw.map(() => ({ x: 0, y: 0, z: 0 }));
       } else {
-        // Adaptive smoothing: steady hands are filtered strongly, but a quick
-        // fingertip movement still feels immediate. This is much less jumpy on
-        // lower-light phone cameras than smoothing from wrist motion alone.
-        const motion = raw.reduce((sum, p, i) => sum + dist(p, this.norm[i]), 0) / raw.length;
-        this.norm = raw.map((p, i) => ({
-          // Per-landmark filtering lets thumb/index tips react quickly while
-          // the palm remains steady—a better fit for pinch-and-drag games.
-          ...(() => {
-            const localMotion = dist(p, this.norm[i]);
-            const isControlTip = i === 4 || i === 8;
-            const alpha = Math.max(isControlTip ? 0.28 : 0.17, Math.min(0.88, (isControlTip ? 0.28 : 0.17) + localMotion * 10 + motion * 2));
-            return {
-              x: this.norm[i].x + (p.x - this.norm[i].x) * alpha,
-              y: this.norm[i].y + (p.y - this.norm[i].y) * alpha,
-              z: this.norm[i].z + (p.z - this.norm[i].z) * alpha,
-            };
-          })(),
-        }));
+        // Adaptive low-pass filter: steady hands get a calm cursor, while a
+        // deliberate fast movement receives a high alpha so games stay direct.
+        // Thumb and index receive a little more responsiveness for pinch games.
+        const dt = this.frameDelta || 1 / 30;
+        this.norm = raw.map((p, i) => {
+          const prev = this.norm[i];
+          const d = dist(p, prev);
+          const controlTip = i === 4 || i === 8;
+          const alpha = Math.min(controlTip ? 0.88 : 0.74,
+            (controlTip ? 0.24 : 0.18) + Math.min(0.56, d * (controlTip ? 9.5 : 7.2)));
+          const next = {
+            x: prev.x + (p.x - prev.x) * alpha,
+            y: prev.y + (p.y - prev.y) * alpha,
+            z: prev.z + (p.z - prev.z) * alpha,
+          };
+          const v = {
+            x: Math.max(-1.5, Math.min(1.5, (next.x - prev.x) / dt)),
+            y: Math.max(-1.5, Math.min(1.5, (next.y - prev.y) / dt)),
+            z: Math.max(-1.5, Math.min(1.5, (next.z - prev.z) / dt)),
+          };
+          this.velocity[i] = v;
+          return next;
+        });
       }
       const toScreen = hand => hand.map(p => ({ x: p.x * dw + ox, y: p.y * dh + oy, z: p.z }));
       this.handsNorm = rawHands;
       this.hands = rawHands.map(toScreen);
-      this.hand = toScreen(this.norm);
+      this.updateRenderedHand(toScreen);
       this.lastSeenAt = performance.now();
     } else if (performance.now() - this.lastSeenAt > 300) {
       // Ignore a few dropped inference frames so the cursor/sign does not flicker.
       this.hand = null;
       this.norm = null;
+      this.renderNorm = null;
+      this.velocity = [];
       this.hands = [];
       this.handsNorm = [];
     }
     handStatus.classList.toggle("seen", !!this.hand);
     return true;
+  },
+  // Run on every animation frame, not just every camera frame. A capped
+  // 24ms prediction bridges the gap between camera frames without making the
+  // cursor drift when a hand stops. Gesture decisions still use `norm`, not
+  // this presentation-only position, so a predicted frame cannot fake a pinch.
+  advanceRender(now = performance.now()) {
+    if (!this.norm || !this.camReady || !cam.videoWidth || !cam.videoHeight) return;
+    const ahead = Math.min(0.024, Math.max(0, (now - this.frameAt) / 1000));
+    const vw = cam.videoWidth, vh = cam.videoHeight;
+    const scale = Math.max(innerWidth / vw, innerHeight / vh);
+    const dw = vw * scale, dh = vh * scale;
+    const ox = (innerWidth - dw) / 2, oy = (innerHeight - dh) / 2;
+    const toScreen = hand => hand.map(p => ({ x: p.x * dw + ox, y: p.y * dh + oy, z: p.z }));
+    this.updateRenderedHand(toScreen, ahead);
+  },
+  updateRenderedHand(toScreen, ahead = 0) {
+    this.renderNorm = this.norm.map((p, i) => {
+      const v = this.velocity[i] || { x: 0, y: 0, z: 0 };
+      return { x: p.x + v.x * ahead, y: p.y + v.y * ahead, z: p.z + v.z * ahead };
+    });
+    this.hand = toScreen(this.renderNorm);
   },
 };
 
@@ -578,6 +613,10 @@ function loop(now) {
   if (document.body.classList.contains("playing")) {
     try {
       engine.detect();
+      // Camera frames usually arrive at 24–30fps while the display refreshes
+      // at 60fps. Advance only the rendered hand between detections so cursor
+      // movement and game feedback stay fluid on phones and iPads.
+      engine.advanceRender(now);
       ctx.clearRect(0, 0, innerWidth, innerHeight);
       if (activeGame && activeGame.onFrame) activeGame.onFrame(dt);
     } catch (e) { console.error("frame error:", e); }
