@@ -10,6 +10,11 @@ import { FilesetResolver, HandLandmarker } from "./vendor/vision_bundle.mjs";
 
 "use strict";
 
+function shakeScreen() {
+  document.body.classList.add("screen-shake");
+  setTimeout(() => document.body.classList.remove("screen-shake"), 350);
+}
+
 /* ---------------- i18n ---------------- */
 const STR = {
   en: {
@@ -1139,6 +1144,7 @@ const NINJA = {
     o.sliced = true;
     if (o.bomb) {
       sfx.bomb();
+      shakeScreen();
       this.score = Math.max(0, this.score - 20);
       this.combo = 0;
       this.shake = 22;
@@ -1180,9 +1186,9 @@ const NINJA = {
         x: o.x, y: o.y, vx: dir * (120 + Math.random() * 160), vy: -180 + Math.random() * 120,
         size: o.r, emoji: o.emoji, rot: 0, vrot: dir * 6, life: 0.55,
       });
-      for (let i = 0; i < 10; i++) this.parts.push({
-        x: o.x, y: o.y, vx: -260 + Math.random() * 520, vy: -350 + Math.random() * 400,
-        size: 2 + Math.random() * 5, color: ["#a3e635", "#22d3ee", "#ffffff"][i % 3], life: 0.4 + Math.random() * 0.35,
+      for (let i = 0; i < 18; i++) this.parts.push({
+        x: o.x, y: o.y, vx: -320 + Math.random() * 640, vy: -400 + Math.random() * 450,
+        size: 3 + Math.random() * 6, color: ["#ff007f", "#00f0ff", "#39ff14"][i % 3], life: 0.45 + Math.random() * 0.4,
       });
     }
     this.hud.querySelector("#nScore").textContent = this.score;
@@ -1377,7 +1383,9 @@ const BATTLE = {
     else if (BEATS[player] === this.aiMove) {
       this.ai++; msg = t("lose"); detail = t("roundRetry"); resultClass = "ai-result";
       this.pop.querySelector("#popBig").textContent = "AI +1";
-      sfx.bad(); this.arena.querySelector("#fAi").classList.add("winner");
+      sfx.bad();
+      shakeScreen();
+      this.arena.querySelector("#fAi").classList.add("winner");
     }
     else {
       this.you++; msg = t("win"); detail = t("roundPraise"); resultClass = "player-result";
@@ -1547,7 +1555,11 @@ const SNAKE = {
           if (acc > skipArc) { cut = i; break; }
         }
         for (let j = 0; j < cut; j++) {
-          if (dist(this.head, this.path[j]) < hitR) { this.end(); return; }
+          if (dist(this.head, this.path[j]) < hitR) {
+            shakeScreen();
+            this.end();
+            return;
+          }
         }
       }
     } else {
@@ -1737,7 +1749,11 @@ const BLAST = {
   },
   place(index, layout, cursor) {
     const piece = this.pieces[index], { col, row } = this.dragCell(layout, cursor, piece);
-    if (!this.valid(piece.shape, col, row)) { sfx.bad(); return; }
+    if (!this.valid(piece.shape, col, row)) {
+      sfx.bad();
+      shakeScreen();
+      return;
+    }
     piece.shape.forEach(([x, y]) => { this.board[row + y][col + x] = piece.color; });
     this.pieces[index] = null; this.score += piece.shape.length * 10;
     const clear = [];

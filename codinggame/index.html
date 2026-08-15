@@ -7,6 +7,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Cyber Heist</title>
+  
+  <!-- Modern Gaming & Technical Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.png">
@@ -20,6 +26,10 @@
   <header id="topbar" class="hidden">
     <div id="progress"></div>
     <div id="timer">00:00</div>
+    <div id="diagnostics" class="hidden" style="display: flex; gap: 10px; margin-left: 12px; font-family: var(--font-display); font-size: 11px; font-weight: 700; color: var(--green); align-items: center;">
+      <span id="kpmVal" style="text-shadow: 0 0 8px var(--green); letter-spacing: 0.08em;">APM: 0</span>
+      <span id="accVal" style="text-shadow: 0 0 8px var(--green); letter-spacing: 0.08em;">ACC: 100%</span>
+    </div>
     <div class="topbtns">
       <button id="soundBtn" class="chip" aria-label="sound">🔊</button>
       <button id="langBtn" class="chip">BM</button>

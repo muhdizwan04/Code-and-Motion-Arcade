@@ -115,7 +115,6 @@ const sfx = {
   pixel: () => beep(980, 0.03, "sine", 0.04),
   win: () => {
     [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => beep(f, 0.18, "triangle", 0.08), i * 140));
-    // Land the mission-complete fanfare on a full chord instead of a lone note.
     setTimeout(() => [1319, 1568, 2093].forEach(f => beep(f, 0.5, "triangle", 0.05)), 580);
   },
 };
@@ -129,6 +128,25 @@ let agent = "";
 let startTime = 0, timerInt = null;
 let currentDoor = 0; // 1..4
 const SCORE_KEY = "ch-session-scores";
+
+/* ---------- Arcade Academy Extensions ---------- */
+let totalActions = 0, wrongActions = 0;
+
+function shakeScreen() {
+  document.body.classList.add("screen-shake");
+  setTimeout(() => document.body.classList.remove("screen-shake"), 350);
+}
+
+function updateDiagnostics() {
+  const kpmVal = document.getElementById("kpmVal");
+  const accVal = document.getElementById("accVal");
+  if (!kpmVal || !accVal) return;
+  const elapsedMin = (Date.now() - startTime) / 60000 || 0.01;
+  const apm = Math.round(totalActions / elapsedMin);
+  const acc = totalActions ? Math.round(((totalActions - wrongActions) / totalActions) * 100) : 100;
+  kpmVal.textContent = `APM: ${apm}`;
+  accVal.textContent = `ACC: ${acc}%`;
+}
 
 /* ---------- helpers ---------- */
 const el = (html) => { const d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstChild; };
@@ -164,7 +182,11 @@ function scoreToast(message) {
 }
 function startTimer() {
   startTime = Date.now();
-  timerInt = setInterval(() => { timerEl.textContent = fmtTime(Date.now() - startTime); }, 500);
+  totalActions = 0; wrongActions = 0;
+  timerInt = setInterval(() => {
+    timerEl.textContent = fmtTime(Date.now() - startTime);
+    updateDiagnostics();
+  }, 500);
 }
 function renderProgress() {
   progressEl.innerHTML = "";
@@ -214,9 +236,6 @@ function doorUnlocked(next) {
 /* ================= SCREENS ================= */
 
 /* ---- title ---- */
-/* ---------------- lightweight booth play-count tracking ----------------
-   No server, no external analytics — just a localStorage tally the booth
-   operator can peek at by tapping the title 5 times. */
 const CH_PLAY_COUNT_KEY = "ch-plays";
 function bumpMissionCount() {
   const n = +(localStorage.getItem(CH_PLAY_COUNT_KEY) || 0) + 1;
@@ -240,6 +259,8 @@ function showPlayStats() {
 function titleScreen() {
   clearSkip();
   topbar.classList.remove("hidden");
+  const diag = document.getElementById("diagnostics");
+  if (diag) diag.classList.add("hidden");
   timerEl.textContent = "00:00";
   currentDoor = 0; renderProgress();
   const node = el(`<div style="margin:auto">
@@ -250,8 +271,7 @@ function titleScreen() {
     ${leaderboardHtml()}
   </div>`);
   node.querySelector("#startBtn").onclick = () => { sfx.click(); bumpMissionCount(); bootScreen(); };
-  // Secret booth-operator gesture: 5 taps on the title within 3s opens the
-  // play-count overlay, out of the way of normal play.
+  
   let titleTaps = 0, titleTapTimer = null;
   node.querySelector("#chTitle").onclick = () => {
     titleTaps++;
@@ -301,7 +321,13 @@ async function briefScreen() {
   await typeText(node.querySelector("#briefText"), t("brief")(agent), 16);
   const b = node.querySelector("#goBtn");
   b.classList.remove("hidden");
-  b.onclick = () => { sfx.click(); startTimer(); stage1(); };
+  b.onclick = () => {
+    sfx.click();
+    const diag = document.getElementById("diagnostics");
+    if (diag) diag.classList.remove("hidden");
+    startTimer();
+    stage1();
+  };
 }
 
 /* ================= STAGE 1 : binary lock ================= */
@@ -343,6 +369,7 @@ function stage1() {
       b.querySelector(".bitval").textContent = bits[idx];
       b.classList.toggle("on", !!bits[idx]);
       sfx.toggle();
+      totalActions++;
       update();
     };
     bitsEl.appendChild(b);
@@ -353,6 +380,7 @@ function stage1() {
     const v = value();
     curEl.textContent = v;
     disp.classList.toggle("match", v === target);
+    updateDiagnostics();
     if (v === target) {
       sfx.good();
       bitsEl.style.pointerEvents = "none";
@@ -407,6 +435,7 @@ function stage2() {
     const ch = String.fromCharCode(65 + i);
     const k = el(`<button class="key">${ch}</button>`);
     k.onclick = () => {
+      totalActions++;
       if (ch === word[pos]) {
         sfx.good();
         const cb = node.querySelector(`#cb${pos}`);
@@ -417,8 +446,11 @@ function stage2() {
         node.querySelector(`#cb${pos}`).classList.add("active");
       } else {
         sfx.bad();
+        wrongActions++;
+        shakeScreen();
         k.classList.remove("wrong"); void k.offsetWidth; k.classList.add("wrong");
       }
+      updateDiagnostics();
     };
     kb.appendChild(k);
   }
@@ -490,9 +522,17 @@ function stage3() {
     k.onclick = () => {
       if (running || queue.length >= 16) return;
       queue.push(k.dataset.d); sfx.click(); renderQueue();
+      totalActions++;
+      updateDiagnostics();
     };
   });
-  node.querySelector("#clrBtn").onclick = () => { if (!running) { queue = []; sfx.toggle(); renderQueue(); } };
+  node.querySelector("#clrBtn").onclick = () => {
+    if (!running) {
+      queue = []; sfx.toggle(); renderQueue();
+      totalActions++;
+      updateDiagnostics();
+    }
+  };
   node.querySelector("#runBtn").onclick = async () => {
     if (running || !queue.length) return;
     running = true;
@@ -513,6 +553,8 @@ function stage3() {
       await new Promise(res => setTimeout(res, 380));
       if (out || wall) {
         sfx.alarm();
+        wrongActions++;
+        shakeScreen();
         robotEl.classList.add("crash");
         document.body.classList.add("alarm-flash");
         node.querySelector("#msg").textContent = t("crash");
@@ -520,6 +562,7 @@ function stage3() {
         placeRobot(maze.start[0], maze.start[1], size);
         renderQueue();
         running = false;
+        updateDiagnostics();
         return;
       }
       if (r === maze.gem[0] && c === maze.gem[1]) {
@@ -569,14 +612,18 @@ function stage4() {
       const pixel = el(`<button type="button" class="px" aria-label="Row ${r + 1}, bit ${c + 1}"></button>`);
       pixel.onclick = () => {
         if (finished || pixel.classList.contains("on")) return;
+        totalActions++;
         if (bit === "0") {
           sfx.bad();
+          wrongActions++;
+          shakeScreen();
           pixel.classList.remove("wrong");
           void pixel.offsetWidth;
           pixel.classList.add("wrong");
           const message = node.querySelector("#doneMsg");
           message.style.color = "var(--red)";
           message.textContent = t("wrongPixel");
+          updateDiagnostics();
           return;
         }
         pixel.classList.add("on");
@@ -587,6 +634,7 @@ function stage4() {
         row.classList.toggle("done", rowDone);
         node.querySelector("#pixelStatus").textContent = t("pixelsLeft")(total - correct);
         node.querySelector("#doneMsg").textContent = "";
+        updateDiagnostics();
         if (correct === total) {
           finished = true;
           grid.classList.add("revealed");
@@ -608,6 +656,8 @@ function stage4() {
 function completeScreen() {
   clearSkip();
   clearInterval(timerInt);
+  const diag = document.getElementById("diagnostics");
+  if (diag) diag.classList.add("hidden");
   const ms = Date.now() - startTime;
   const previousBest = getScores()[0]?.ms ?? Infinity;
   const scores = addScore(agent, ms);
@@ -717,9 +767,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 
-/* Install banner: offline-ready only matters once this is on the home
-   screen, and browsers bury that step — especially iOS Safari, which has
-   no install-prompt API at all and needs plain-text instructions instead. */
+/* Install banner wrapper */
 (function setupInstallBanner() {
   const KEY = "ch-install-dismissed";
   if (localStorage.getItem(KEY)) return;
@@ -730,9 +778,9 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   function showBanner(iosMode) {
     if (document.getElementById("installBanner")) return;
     const banner = el(`<div class="install-banner" id="installBanner">
-      <span>${iosMode ? "📲 Tap Share ⬆️ then \"Add to Home Screen\"" : "📲 Install this app for offline play"}</span>
+      <span>${iosMode ? "📱 Tap Share ➔ \"Add to Home Screen\" for full-screen offline play" : "⚡ Install this app for full-screen offline play"}</span>
       ${iosMode ? "" : `<button class="chip" id="installBtn">Install</button>`}
-      <button class="chip" id="installDismiss" aria-label="dismiss">✕</button>
+      <button class="chip" id="installDismiss" aria-label="dismiss">✖</button>
     </div>`);
     document.body.appendChild(banner);
     if (!iosMode) {
@@ -752,5 +800,4 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   if (isIOS) showBanner(true);
 })();
 
-/* go */
 titleScreen();
