@@ -1,0 +1,15 @@
+{
+  "name": "AI Civilization",
+  "short_name": "Civilization",
+  "description": "Set three tribes' traits, pick an era, and watch civilizations rise and conquer",
+  "start_url": ".",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0b0518",
+  "theme_color": "#0b0518",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

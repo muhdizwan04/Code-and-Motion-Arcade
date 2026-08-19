@@ -180,7 +180,7 @@
     .grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 32px;
+      gap: 26px;
     }
     .game {
       position: relative;
@@ -268,12 +268,16 @@
       transform: scale(1.3);
     }
     
-    .gesture { 
-      --accent: var(--cyan); 
+    .civsim {
+      --accent: #4ade80;
+      --accent-gradient: linear-gradient(135deg, #4ade80, var(--cyan));
+    }
+    .gesture {
+      --accent: var(--cyan);
       --accent-gradient: linear-gradient(135deg, var(--cyan), var(--purple));
     }
-    .coding { 
-      --accent: var(--green); 
+    .coding {
+      --accent: var(--green);
       --accent-gradient: linear-gradient(135deg, var(--green), var(--cyan));
     }
 
@@ -468,6 +472,7 @@
     #ssB1 { --border-color: var(--cyan); filter: drop-shadow(0 0 14px rgba(0, 240, 255, 0.5)); }
     #ssB2 { --border-color: var(--green); filter: drop-shadow(0 0 14px rgba(57, 255, 20, 0.5)); }
     #ssB3 { --border-color: var(--yellow); filter: drop-shadow(0 0 14px rgba(255, 215, 0, 0.5)); }
+    #ssB5 { --border-color: #4ade80; filter: drop-shadow(0 0 14px rgba(74, 222, 128, 0.5)); }
 
     .ss-center { 
       position: relative; 
@@ -547,9 +552,20 @@
   <main>
     <div class="eyebrow">&gt; partnership_exhibition.exe</div>
     <h1>Choose your mission.</h1>
-    <p class="intro">Pilih permainan anda. Kedua-dua aplikasi boleh dipasang sebagai PWA dan berfungsi di luar talian selepas lawatan pertama.</p>
+    <p class="intro">Pilih permainan anda. Semua aplikasi boleh dipasang sebagai PWA dan berfungsi di luar talian selepas lawatan pertama.</p>
 
     <section class="grid" aria-label="Available games">
+      <a class="game civsim" href="civsim/">
+        <div class="game-glow-orb"></div>
+        <div class="game-tag">AI SIMULATION</div>
+        <div class="icon-wrapper">
+          <div class="icon" aria-hidden="true">🏰</div>
+        </div>
+        <h2>AI Civilization</h2>
+        <p>Pilih ciri tiga puak dan era, kemudian saksikan tamadun mereka membesar dan berperang.</p>
+        <span class="launch">PLAY / MAIN ➔</span>
+      </a>
+
       <a class="game gesture" href="gesturegame/">
         <div class="game-glow-orb"></div>
         <div class="game-tag">CAMERA-BASED AI</div>
@@ -580,6 +596,7 @@
     <div class="ss-bounce" id="ssB1">👋</div>
     <div class="ss-bounce" id="ssB2">💻</div>
     <div class="ss-bounce" id="ssB3">✨</div>
+    <div class="ss-bounce" id="ssB5">🏰</div>
     <div class="ss-center">
       <div class="ss-eyebrow" id="ssEyebrow">&gt; ai_hand_arcade.exe</div>
       <div class="ss-title">MOTION AND CODING ARCADE</div>
@@ -612,7 +629,7 @@
       }, 1000);
 
       // Terminal-style line cycles while the screensaver is up.
-      var lines = ["&gt; ai_hand_arcade.exe", "&gt; cyber_heist.exe", "&gt; no_internet_needed.sys", "&gt; on_device_ai.sys"];
+      var lines = ["&gt; ai_civilization.exe", "&gt; ai_hand_arcade.exe", "&gt; cyber_heist.exe", "&gt; no_internet_needed.sys", "&gt; on_device_ai.sys"];
       var li = 0, eyebrow = document.getElementById("ssEyebrow");
       setInterval(function () {
         if (!isShowing()) return;
@@ -625,6 +642,7 @@
         { el: document.getElementById("ssB1"), x: 80, y: 120, vx: 2.1, vy: 1.7 },
         { el: document.getElementById("ssB2"), x: 400, y: 300, vx: -1.6, vy: 2.3 },
         { el: document.getElementById("ssB3"), x: 220, y: 480, vx: 1.3, vy: -1.9 },
+        { el: document.getElementById("ssB5"), x: 300, y: 240, vx: 1.9, vy: -1.4 },
       ];
       function tick() {
         if (isShowing() && !reduceMotion) {
