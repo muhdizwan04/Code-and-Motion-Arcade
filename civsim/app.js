@@ -45,7 +45,7 @@ const STR = {
     speed: "Speed", tribe: n => `TRIBE ${n}`,
     traitInt: "Intelligence", traitWork: "Work", traitHealth: "Health", traitAggro: "Aggression",
     lvl: ["", "Low", "Fair", "High", "Genius"],
-    lvlWork: ["", "Lazy", "Steady", "Hard", "Tireless"],
+    lvlWork: ["", "Getting Started", "Steady", "Hardworking", "Tireless"],
     lvlHealth: ["", "Frail", "Okay", "Tough", "Hardy"],
     lvlAggro: ["", "Peaceful", "Wary", "Bold", "Ruthless"],
     winner: n => `${n} RULES THE LAND!`,
@@ -57,27 +57,29 @@ const STR = {
     evStart: "The tribe settles here.",
     evFoundTree: "Found strange tall plants…",
     evFoundRock: "Found hard grey lumps…",
-    evFoundWater: "Reached the water's edge.",
+    evFoundWater: "Reached the water's edge.", evFoundGem: "Found a sparkling hidden gem!", evFoundAnimal: "Found wild animals roaming here!", evFoundIron: "Found iron ore in the ground!",
     evIgnore: thing => `Walks past the ${thing}, not knowing what they are for.`,
     evDiscover: (emoji, name) => `${emoji} DISCOVERED: ${name}!`,
     evBuildHut: "🏠 Built a hut.",
     evBuildWall: "🧱 Raised a wall.",
     evStarve: "😰 Food is running out!",
     evGrow: n => `👥 Population reaches ${n}.`,
-    evAttack: n => `⚔️ Attacking ${n}!`,
+    evAttack: n => `⚔️ Attacking ${n}!`, evAttackWhy: reason => `⚔️ Attack reason: ${reason}.`,
     evCapture: n => `🚩 Took land from ${n}.`,
-    evLost: "💀 The tribe has fallen.",
+    evLost: "💀 This tribe could not continue.",
+    evLostStarve: "💀 This tribe could not continue because food ran out.", evLostIllness: "💀 This tribe could not continue because of illness.", evLostConquest: "💀 Their capital was captured.",
+    evCollapse: "⚠️ Population is collapsing — help is needed!",
     evExpand: "🚶 Claimed new land.",
     thingTree: "trees", thingRock: "stones", thingWater: "water",
     evChop: "🪓 Started chopping wood.",
     evMine: "⛏️ Started mining stone.",
-    evIdle: "😴 Most people are idle.",
+    evIdle: "😴 The team is taking a short rest.",
     evNoWood: "🪵 Out of wood — can't build.",
     whyInt: lv => `Intelligence ${lv}/4 — ${lv >= 3 ? "clever enough to work new things out" : "struggles to understand new things"}`,
-    whyWork: lv => `Work ${lv}/4 — ${lv >= 3 ? "they keep busy and produce a lot" : "they idle often and produce little"}`,
+    whyWork: lv => `Work ${lv}/4 — ${lv >= 3 ? "they work together and produce a lot" : "they need more time to get things done"}`,
     whyHealth: lv => `Health ${lv}/4 — ${lv >= 3 ? "they resist hunger and grow fast" : "they tire and starve easily"}`,
     whyAggro: lv => `Aggression ${lv}/4 — ${lv >= 3 ? "they attack often and hit hard" : "they rarely pick a fight"}`,
-    jobChop: "chopping", jobMine: "mining", jobFarm: "farming", jobBuild: "building", jobFight: "fighting", jobIdle: "idle",
+    jobChop: "chopping", jobMine: "mining", jobFarm: "farming", jobBuild: "building", jobFight: "fighting", jobIdle: "resting",
     evThirst: "💧 No water nearby — people are thirsty!",
     evWaterFound: "💧 Found drinking water!",
     evNoRoom: "🏕️ No huts — the camp cannot hold more people.",
@@ -89,6 +91,24 @@ const STR = {
     confirmTitle: "READY?", confirmStart: "▶ START",
     redo: "↩ REDO", holdRedo: "Hold over a row again to change it",
     bestToday: n => `🏆 Best score today: ${n}`,
+    pickPolicy: n => `CHOOSE TRIBE ${n} POLICY`,
+    policyHint: "A policy changes what this civilization values most",
+    policyResearch: "Research First", policyResearchSub: "Find inventions and cures sooner",
+    policyFood: "Food First", policyFoodSub: "Grow food and population faster",
+    policyDefend: "Defence First", policyDefendSub: "Build walls and survive outbreaks",
+    policyConquest: "Conquest First", policyConquestSub: "Fight harder, but take bigger risks",
+    policyCooperate: "Cooperate", policyCooperateSub: "Trade resources and share cures",
+    evPolicy: n => `📜 Policy: ${n}`,
+    evIllness: "🦠 Illness is spreading!", evCured: "💊 The outbreak is under control!",
+    evClinic: "🏥 Built a clinic.", evNoCure: "🦠 No cure yet — more people are falling ill.",
+    evTrade: n => `🤝 Shared supplies with ${n}.`, evOffer: n => `🤝 Sent a cooperation offer to ${n}.`, evAccept: n => `✅ ${n} accepted cooperation.`, evReject: n => `❌ ${n} declined cooperation.`, evEvolve: (n, title) => `⬆️ EVOLVED: ${n} → ${title}!`,
+    evEvent: n => `🌍 World event: ${n}`, evDrought: "Drought", evFlood: "Flood", evMigration: "Migration", evPlague: "Plague", evHarvest: "Rich harvest",
+    stageNoob: "New Settlers", stageGatherer: "Gatherers", stageBuilder: "Builders", stageScholar: "Scholars", stageInventor: "Inventors",
+    reportTitle: "AI INTELLIGENCE REPORT", reportSmart: "Smart choices", reportLuck: "Risk & luck", reportStage: "Evolution", reportIll: "Illness losses", reportTech: "Technology", reportPolicy: "Policy",
+    choiceGood: "WHAT WORKED WELL", choiceTry: "TRY THIS NEXT TIME",
+    goodResearch: "Research First helped this tribe discover new ideas sooner.", goodFood: "Food First helped the tribe grow and keep food ready.", goodDefend: "Defence First helped the tribe prepare for danger.", goodConquest: "Conquest First helped the tribe claim more land.", goodCooperate: "Cooperate helped the tribe share food and cures.",
+    tryWork: "Choose more Work next time so the team can gather food and build sooner.", tryInt: "Choose more Intelligence next time to discover useful inventions.", tryHealth: "Choose more Health next time to better handle illness and hunger.", tryMedicine: "Find Medicine and build a Clinic to protect the community from illness.",
+    riverName: "NORTH RIVER", floodFromRiver: "Flood water is flowing from the river!", newDiscovery: "NEW", wheelTravel: "🛞 Wheel explorers found new land.", gemName: "Crystal Craft", objective: "NEXT GOAL", legend: "MAP KEY", relation: "Relations", timeline: "TIMELINE",
   },
   bm: {
     langBtn: "EN",
@@ -127,27 +147,29 @@ const STR = {
     evStart: "Puak menetap di sini.",
     evFoundTree: "Jumpa tumbuhan tinggi pelik…",
     evFoundRock: "Jumpa ketulan kelabu keras…",
-    evFoundWater: "Sampai ke tepi air.",
+    evFoundWater: "Sampai ke tepi air.", evFoundGem: "Menemui permata tersembunyi yang berkilau!", evFoundAnimal: "Menemui haiwan liar di kawasan ini!", evFoundIron: "Menemui bijih besi dalam tanah!",
     evIgnore: thing => `Lalu di sebelah ${thing}, tidak tahu apa gunanya.`,
     evDiscover: (emoji, name) => `${emoji} DITEMUI: ${name}!`,
     evBuildHut: "🏠 Bina pondok.",
     evBuildWall: "🧱 Dirikan tembok.",
     evStarve: "😰 Makanan semakin habis!",
     evGrow: n => `👥 Penduduk mencapai ${n}.`,
-    evAttack: n => `⚔️ Menyerang ${n}!`,
+    evAttack: n => `⚔️ Menyerang ${n}!`, evAttackWhy: reason => `⚔️ Sebab serangan: ${reason}.`,
     evCapture: n => `🚩 Rampas tanah ${n}.`,
-    evLost: "💀 Puak telah tumbang.",
+    evLost: "💀 Puak ini tidak dapat meneruskan.",
+    evLostStarve: "💀 Puak ini tidak dapat meneruskan kerana makanan habis.", evLostIllness: "💀 Puak ini tidak dapat meneruskan kerana penyakit.", evLostConquest: "💀 Ibu kota mereka telah dirampas.",
+    evCollapse: "⚠️ Penduduk semakin pupus — bantuan diperlukan!",
     evExpand: "🚶 Menuntut tanah baru.",
     thingTree: "pokok", thingRock: "batu", thingWater: "air",
     evChop: "🪓 Mula menebang kayu.",
     evMine: "⛏️ Mula melombong batu.",
-    evIdle: "😴 Kebanyakan rakyat menganggur.",
+    evIdle: "😴 Pasukan sedang berehat seketika.",
     evNoWood: "🪵 Kehabisan kayu — tak boleh bina.",
     whyInt: lv => `Kecerdasan ${lv}/4 — ${lv >= 3 ? "cukup pandai untuk memikirkan perkara baru" : "sukar memahami perkara baru"}`,
-    whyWork: lv => `Kerajinan ${lv}/4 — ${lv >= 3 ? "mereka sentiasa sibuk dan hasilkan banyak" : "mereka kerap menganggur, hasil sedikit"}`,
+    whyWork: lv => `Kerajinan ${lv}/4 — ${lv >= 3 ? "mereka bekerjasama dan hasilkan banyak" : "mereka perlukan lebih masa untuk menyiapkan kerja"}`,
     whyHealth: lv => `Kesihatan ${lv}/4 — ${lv >= 3 ? "tahan lapar dan membesar cepat" : "mudah letih dan kebuluran"}`,
     whyAggro: lv => `Agresif ${lv}/4 — ${lv >= 3 ? "kerap menyerang dan kuat" : "jarang mencari gaduh"}`,
-    jobChop: "menebang", jobMine: "melombong", jobFarm: "bertani", jobBuild: "membina", jobFight: "berperang", jobIdle: "menganggur",
+    jobChop: "menebang", jobMine: "melombong", jobFarm: "bertani", jobBuild: "membina", jobFight: "berperang", jobIdle: "berehat",
     evThirst: "💧 Tiada air berdekatan — rakyat kehausan!",
     evWaterFound: "💧 Jumpa air minuman!",
     evNoRoom: "🏕️ Tiada pondok — perkampungan tidak muat lagi.",
@@ -159,6 +181,24 @@ const STR = {
     confirmTitle: "SEDIA?", confirmStart: "▶ MULA",
     redo: "↩ ULANG", holdRedo: "Tahan semula pada baris untuk menukar",
     bestToday: n => `🏆 Skor terbaik hari ini: ${n}`,
+    pickPolicy: n => `PILIH DASAR PUAK ${n}`,
+    policyHint: "Dasar mengubah keutamaan tamadun ini",
+    policyResearch: "Utamakan Kajian", policyResearchSub: "Temui ciptaan dan penawar lebih awal",
+    policyFood: "Utamakan Makanan", policyFoodSub: "Hasil makanan dan rakyat lebih cepat",
+    policyDefend: "Utamakan Pertahanan", policyDefendSub: "Bina tembok dan tahan wabak",
+    policyConquest: "Utamakan Penaklukan", policyConquestSub: "Menyerang lebih kuat, tetapi berisiko",
+    policyCooperate: "Bekerjasama", policyCooperateSub: "Berdagang sumber dan berkongsi penawar",
+    evPolicy: n => `📜 Dasar: ${n}`,
+    evIllness: "🦠 Penyakit sedang merebak!", evCured: "💊 Wabak sudah terkawal!",
+    evClinic: "🏥 Bina klinik.", evNoCure: "🦠 Belum ada penawar — lebih ramai jatuh sakit.",
+    evTrade: n => `🤝 Berkongsi bekalan dengan ${n}.`, evOffer: n => `🤝 Menghantar tawaran kerjasama kepada ${n}.`, evAccept: n => `✅ ${n} menerima kerjasama.`, evReject: n => `❌ ${n} menolak kerjasama.`, evEvolve: (n, title) => `⬆️ BEREVOLUSI: ${n} → ${title}!`,
+    evEvent: n => `🌍 Peristiwa dunia: ${n}`, evDrought: "Kemarau", evFlood: "Banjir", evMigration: "Migrasi", evPlague: "Wabak", evHarvest: "Tuai lumayan",
+    stageNoob: "Peneroka Baharu", stageGatherer: "Pengumpul", stageBuilder: "Pembina", stageScholar: "Cendekiawan", stageInventor: "Pencipta",
+    reportTitle: "LAPORAN KECERDASAN AI", reportSmart: "Pilihan bijak", reportLuck: "Risiko & nasib", reportStage: "Evolusi", reportIll: "Kehilangan penyakit", reportTech: "Teknologi", reportPolicy: "Dasar",
+    choiceGood: "APA YANG MENJADI", choiceTry: "CUBA INI PADA PUSINGAN SETERUSNYA",
+    goodResearch: "Utamakan Kajian membantu puak menemui idea baharu lebih awal.", goodFood: "Utamakan Makanan membantu puak membesar dan menyimpan makanan.", goodDefend: "Utamakan Pertahanan membantu puak bersedia menghadapi bahaya.", goodConquest: "Utamakan Penaklukan membantu puak menuntut lebih banyak tanah.", goodCooperate: "Bekerjasama membantu puak berkongsi makanan dan penawar.",
+    tryWork: "Pilih Kerajinan lebih tinggi supaya pasukan dapat mengumpul makanan dan membina lebih awal.", tryInt: "Pilih Kecerdasan lebih tinggi untuk menemui ciptaan yang berguna.", tryHealth: "Pilih Kesihatan lebih tinggi untuk menghadapi penyakit dan kelaparan dengan lebih baik.", tryMedicine: "Cari Ubat dan bina Klinik untuk melindungi komuniti daripada penyakit.",
+    riverName: "SUNGAI UTARA", floodFromRiver: "Air banjir sedang mengalir dari sungai!", newDiscovery: "BAHARU", wheelTravel: "🛞 Peneroka beroda menemui tanah baharu.", gemName: "Seni Kristal", objective: "MATLAMAT SETERUSNYA", legend: "PETUNJUK PETA", relation: "Hubungan", timeline: "GARIS MASA",
   },
 };
 let lang = localStorage.getItem("ha-lang") || "en";
@@ -341,6 +381,14 @@ const TRAITS = [
 ];
 const TRIBE_COLORS = ["#ff3860", "#00c8ff", "#ffd700"];
 const TRIBE_GLOW = ["rgba(255,56,96,", "rgba(0,200,255,", "rgba(255,215,0,"];
+const POLICIES = [
+  { id: "research", emoji: "🧪", key: "policyResearch", subKey: "policyResearchSub" },
+  { id: "food", emoji: "🌾", key: "policyFood", subKey: "policyFoodSub" },
+  { id: "defend", emoji: "🛡️", key: "policyDefend", subKey: "policyDefendSub" },
+  { id: "conquest", emoji: "⚔️", key: "policyConquest", subKey: "policyConquestSub" },
+  { id: "cooperate", emoji: "🤝", key: "policyCooperate", subKey: "policyCooperateSub" },
+];
+const policyOf = (id) => POLICIES.find(p => p.id === id) || POLICIES[0];
 
 /* Trait curves, indexed by level 1-4. These are deliberately steep so that
    a level 1 tribe and a level 4 tribe look like completely different
@@ -377,7 +425,7 @@ function reason(tr, traitId) {
 const WORKER_CAP = 18;   // drawn workers per tribe — they represent the population
 const JOB_TREE = "chop", JOB_ROCK = "mine", JOB_FARM = "farm", JOB_BUILD = "build", JOB_FIGHT = "fight";
 
-/* ---------------- discoveries (12) ----------------
+/* ---------------- discoveries ----------------
    Each needs a minimum intelligence, sometimes a prior discovery, and
    sometimes that the tribe actually owns land containing that resource —
    which is what makes conquering more land reveal more unknowns. */
@@ -391,9 +439,22 @@ const DISCOVERIES = [
   { id: "wheel",   emoji: "🛞", en: "The Wheel", bm: "Roda",      int: 3, needs: ["wood"] },
   { id: "walls",   emoji: "🧱", en: "Walls",     bm: "Tembok",    int: 3, needs: ["stone"] },
   { id: "boats",   emoji: "⛵", en: "Boats",     bm: "Bot",       int: 3, needs: ["wood"], res: "water" },
+  { id: "bridge",  emoji: "🌉", en: "Bridges",   bm: "Jambatan",  int: 3, needs: ["wood", "stone"] },
   { id: "metal",   emoji: "⚒️", en: "Metal",     bm: "Logam",     int: 4, needs: ["stone", "fire"] },
+  { id: "iron",    emoji: "⛓️", en: "Ironworking", bm: "Kerja Besi", int: 3, needs: ["tools"], res: "iron" },
+  { id: "animals", emoji: "🐑", en: "Animal Farming", bm: "Ternakan Haiwan", int: 2, needs: ["farming"], res: "animal" },
+  { id: "transport", emoji: "🐎", en: "Animal Transport", bm: "Pengangkutan Haiwan", int: 3, needs: ["animals", "wheel"] },
   { id: "writing", emoji: "📜", en: "Writing",   bm: "Tulisan",   int: 4, needs: ["tools"] },
-  { id: "army",    emoji: "🛡️", en: "Army",      bm: "Tentera",   int: 4, needs: ["metal"] },
+  { id: "communication", emoji: "📡", en: "Communication", bm: "Komunikasi", int: 3, needs: ["writing"] },
+  { id: "fishing", emoji: "🎣", en: "Fishing", bm: "Memancing", int: 2, needs: ["tools"], res: "water" },
+  { id: "weapons", emoji: "⚔️", en: "Weapons",    bm: "Senjata",   int: 4, needs: ["metal", "iron"] },
+  { id: "army",    emoji: "🛡️", en: "Army",      bm: "Tentera",   int: 4, needs: ["weapons"] },
+  { id: "medicine", emoji: "💊", en: "Medicine", bm: "Ubat", int: 3, needs: ["fire", "tools"] },
+  { id: "sanitation", emoji: "🧼", en: "Sanitation", bm: "Kebersihan", int: 3, needs: ["medicine"], res: "water" },
+  { id: "electricity", emoji: "⚡", en: "Electricity", bm: "Elektrik", int: 4, needs: ["metal", "writing"] },
+  { id: "crystal", emoji: "💎", en: "Crystal Craft", bm: "Seni Kristal", int: 2, res: "gem" },
+  { id: "engineering", emoji: "⚙️", en: "Engineering", bm: "Kejuruteraan", int: 3, needs: ["crystal", "stone"] },
+  { id: "computing", emoji: "💻", en: "Computing", bm: "Komputer", int: 4, needs: ["electricity", "writing"] },
 ];
 const discName = (d) => d[lang];
 
@@ -595,17 +656,22 @@ const DWELL_MS = 1000;
 
 /* Simple one-row chooser (used for the era). */
 const CHOOSER = {
-  open(title, options, onPick) {
-    Object.assign(this, { title, options, onPick, hoverIndex: -1, hoverSince: 0, locked: false });
+  open(title, options, onPick, context = null) {
+    Object.assign(this, { title, options, onPick, context, hoverIndex: -1, hoverSince: 0, locked: false });
     activeScreen = this;
   },
   layout() {
     const n = this.options.length;
-    const maxW = Math.min(innerWidth - 60, 1000), gap = 16;
-    const cellW = Math.min(220, (maxW - gap * (n - 1)) / n);
-    const totalW = cellW * n + gap * (n - 1);
-    const h = Math.min(230, innerHeight * 0.4);
-    return this.options.map((o, i) => ({ ...o, w: cellW, h, x: innerWidth / 2 - totalW / 2 + i * (cellW + gap) + cellW / 2, y: innerHeight / 2 + 20 }));
+    const cols = n > 4 ? 3 : n, rows = Math.ceil(n / cols), gap = 16;
+    const maxW = Math.min(innerWidth - 48, 1000);
+    const cellW = Math.min(220, (maxW - gap * (cols - 1)) / cols);
+    const h = n > 4 ? Math.min(150, innerHeight * .23) : Math.min(230, innerHeight * .4);
+    const totalW = cellW * cols + gap * (cols - 1), baseY = n > 4 ? innerHeight * .60 : innerHeight / 2 + 20;
+    return this.options.map((o, i) => {
+      const row = Math.floor(i / cols), col = i % cols;
+      return { ...o, w: cellW, h, x: innerWidth / 2 - totalW / 2 + col * (cellW + gap) + cellW / 2,
+        y: baseY + (row - (rows - 1) / 2) * (h + gap) };
+    });
   },
   onFrame() {
     drawBackdrop();
@@ -613,9 +679,16 @@ const CHOOSER = {
     ctx.textAlign = "center";
     ctx.font = "900 clamp(22px,5vw,38px) Orbitron, system-ui";
     ctx.fillStyle = "#fff"; ctx.shadowColor = "#000"; ctx.shadowBlur = 12;
-    ctx.fillText(this.title, innerWidth / 2, innerHeight / 2 - 150);
+    const titleY = this.options.length > 4 ? 84 : innerHeight / 2 - 150;
+    ctx.fillText(this.title, innerWidth / 2, titleY);
     ctx.font = "700 14px system-ui"; ctx.fillStyle = "rgba(255,255,255,.8)"; ctx.shadowBlur = 5;
-    ctx.fillText(t("holdToPick"), innerWidth / 2, innerHeight / 2 - 112);
+    ctx.fillText(this.options.length > 4 ? t("policyHint") : t("holdToPick"), innerWidth / 2, titleY + 30);
+    if (this.context?.spec) {
+      const sp = this.context.spec, tribe = this.context.tribeIndex + 1;
+      const attrs = TRAITS.map(tr => `${tr.emoji}${"●".repeat(sp[tr.id])}`).join("  ");
+      ctx.font = "800 12px system-ui"; ctx.fillStyle = TRIBE_COLORS[this.context.tribeIndex];
+      ctx.fillText(`${t("tribe")(tribe)} · ${attrs}`, innerWidth / 2, titleY + 54);
+    }
     ctx.shadowBlur = 0; ctx.restore();
 
     const boxes = this.layout(), cur = engine.cursor();
@@ -760,8 +833,8 @@ const SPEC = {
 /* Final look at all three tribes before the run starts — it lets the player
    (and the crowd around the booth) predict who should win. */
 const CONFIRM = {
-  open(specs, onStart) {
-    Object.assign(this, { specs, onStart, hover: false, hoverSince: 0, locked: false });
+  open(specs, policies, onStart) {
+    Object.assign(this, { specs, policies, onStart, hover: false, hoverSince: 0, locked: false });
     activeScreen = this;
   },
   box() { return { x: innerWidth / 2, y: innerHeight - 108, w: Math.min(300, innerWidth - 60), h: 74 }; },
@@ -787,8 +860,11 @@ const CONFIRM = {
       ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
       ctx.font = "900 15px Orbitron, system-ui"; ctx.fillStyle = TRIBE_COLORS[i];
       ctx.fillText(t("tribe")(i + 1), x + cw / 2, y + 30);
+      const policy = policyOf(this.policies[i]);
+      ctx.font = "700 10px system-ui"; ctx.fillStyle = "rgba(255,255,255,.78)";
+      ctx.fillText(`${policy.emoji} ${t(policy.key)}`, x + cw / 2, y + 49);
       TRAITS.forEach((tr, r) => {
-        const ry = y + 66 + r * 40;
+        const ry = y + 78 + r * 35;
         ctx.textAlign = "left"; ctx.font = "700 12px system-ui"; ctx.fillStyle = "rgba(255,255,255,.8)";
         ctx.fillText(`${tr.emoji} ${t(tr.key)}`, x + 14, ry);
         const lv = sp[tr.id];
@@ -854,17 +930,25 @@ function drawCursor(cur) {
 }
 
 let chosenEra = null;
-const chosenSpecs = [];
+const chosenSpecs = [], chosenPolicies = [];
 function startSetup() {
-  chosenEra = null; chosenSpecs.length = 0;
-  CHOOSER.open(t("pickEra"), ERA_KEYS.map(k => ({
-    id: k, emoji: ERAS[k].emoji, label: ERAS[k][lang],
-    sub: `🍎 ${"▮".repeat(Math.round(ERAS[k].food * 2.5))}\n⚔ ${"▮".repeat(Math.round(ERAS[k].strength * 2.5))}`,
-  })), (era) => { chosenEra = era; nextSpec(0); });
+  // Play Again starts from a blank overlay state. The previous activity log
+  // and review chip are removed before another selection screen is drawn.
+  SIM.cleanup(); SIM.exitReview();
+  document.querySelectorAll(".speed-bar,.civ-log,.review-chip").forEach(n => n.remove());
+  chosenEra = "forest"; chosenSpecs.length = 0; chosenPolicies.length = 0;
+  if (!engine.camReady) engine.startVideoStream().then(applyCamBg).catch(() => {});
+  nextSpec(0);
 }
 function nextSpec(i) {
-  if (i >= 3) return CONFIRM.open(chosenSpecs.slice(), () => SIM.start(chosenEra, chosenSpecs.slice()));
+  if (i >= 3) return nextPolicy(0);
   SPEC.open(i, (spec) => { chosenSpecs.push(spec); nextSpec(i + 1); });
+}
+function nextPolicy(i) {
+  if (i >= 3) return CONFIRM.open(chosenSpecs.slice(), chosenPolicies.slice(), () => SIM.start(chosenEra, chosenSpecs.slice(), chosenPolicies.slice()));
+  CHOOSER.open(t("pickPolicy")(i + 1), POLICIES.map(p => ({
+    id: p.id, emoji: p.emoji, label: t(p.key), sub: t(p.subKey),
+  })), (id) => { chosenPolicies.push(id); nextPolicy(i + 1); }, { tribeIndex: i, spec: chosenSpecs[i] });
 }
 
 /* ================================================
@@ -873,15 +957,19 @@ function nextSpec(i) {
 const COLS = 60, ROWS = 34;
 const SIM_DURATION = 150, CONQUEST_AT = 55;
 const SPEEDS = [1, 2, 5, 10];
-const F_NONE = 0, F_TREE = 1, F_ROCK = 2, F_WATER = 3;
+const F_NONE = 0, F_TREE = 1, F_ROCK = 2, F_WATER = 3, F_GEM = 4, F_ANIMAL = 5, F_IRON = 6;
 
 const SIM = {
   feat: [], owner: [], build: [], tribes: [], simT: 0, speed: 1, running: false,
   era: null, ended: false, battles: [], terrainCache: null, logNode: null, speedBar: null,
 
-  start(era, specs) {
+  start(era, specs, policies = []) {
     this.era = era; this.simT = 0; this.speed = 1; this.running = true; this.ended = false;
-    this.battles = []; this.terrainCache = null; this.toasts = []; this.banner = null; this.warAnnounced = false;
+    this.battles = []; this.effects = []; this.terrainCache = null; this.toasts = []; this.banner = null; this.warAnnounced = false; this.timeline = []; this.announcedDiscoveries = new Set(); this.announcementQueue = []; this.momentQueue = []; this.currentMoment = null;
+    // Hand input is only needed for setup. Closing the stream here reduces
+    // heat and battery use while the autonomous simulation is running.
+    engine.stopCamera(); cam.style.display = "none";
+    this.worldEvent = null; this.eventT = 18; this.tradeT = 8; this.autoEvents = true; this.paused = false;
 
     const EG = ERAS[era];
     this.feat = new Array(COLS * ROWS).fill(F_NONE);
@@ -894,21 +982,52 @@ const SIM = {
       else if (m > EG.tRock) f = F_ROCK;
       this.feat[y * COLS + x] = f;
     }
+    // Every world has one named, continuous river. It gives students an easy
+    // landmark, makes water access understandable, and becomes the visible
+    // source when a flood changes nearby tiles.
+    this.river = [];
+    let riverX = Math.floor(COLS * .68);
+    for (let y = 0; y < ROWS; y++) {
+      riverX = Math.max(2, Math.min(COLS - 3, riverX + Math.round(Math.sin(y * .58) * .7 + Math.sin(y * .17) * .55)));
+      for (let dx = -1; dx <= 1; dx++) {
+        const idx = this.idx(riverX + dx, y);
+        this.feat[idx] = F_WATER;
+        this.river.push(idx);
+      }
+    }
+    this.riverSource = this.river[Math.min(this.river.length - 1, Math.floor(this.river.length * .12))];
+    // Rare crystals reward tribes that explore beyond their first camp.
+    this.gems = [];
+    for (let tries = 0; this.gems.length < 9 && tries < 300; tries++) {
+      const i = Math.floor(Math.random() * this.feat.length);
+      if (this.feat[i] === F_NONE && !this.river.includes(i)) { this.feat[i] = F_GEM; this.gems.push(i); }
+    }
+    this.animals = []; this.irons = [];
+    for (let tries = 0; this.animals.length < 12 && tries < 400; tries++) {
+      const i = Math.floor(Math.random() * this.feat.length);
+      if (this.feat[i] === F_NONE) { this.feat[i] = F_ANIMAL; this.animals.push(i); }
+    }
+    for (let tries = 0; this.irons.length < 9 && tries < 400; tries++) {
+      const i = Math.floor(Math.random() * this.feat.length);
+      if (this.feat[i] === F_ROCK) { this.feat[i] = F_IRON; this.irons.push(i); }
+    }
     this.owner = new Array(COLS * ROWS).fill(-1);
     this.build = new Array(COLS * ROWS).fill(0); // 0 none, 1 hut, 2 wall
 
-    const spots = [{ x: 7, y: ROWS - 8 }, { x: COLS - 8, y: 7 }, { x: Math.floor(COLS / 2), y: ROWS - 6 }];
+    const spots = this.randomStartSpots();
     this.tribes = specs.map((spec, i) => {
       const boost = learnedBonus(era, spec);
       const home = this.nearestOpen(spots[i].x, spots[i].y);
       const tr = {
         spec, color: TRIBE_COLORS[i], glow: TRIBE_GLOW[i], name: t("tribe")(i + 1), idx: i,
         int: spec.int, work: spec.work, health: spec.health, aggro: spec.aggro, boost,
+        policy: policyOf(policies[i]), stage: 0, sick: 0, illnessLoss: 0, outbreaks: 0, cureLogged: false,
+        lastThreat: "starvation", collapseT: 0, collapseWarned: false,
         pop: 6, food: 30, morale: 1, home, alive: true,
         known: new Set(), seen: new Set(), explore: 0,
         gainT: 0, expandT: 0, fightT: 0, buildT: 0, ignoreT: 0, lastPopLog: 6,
-        wood: 0, stone: 0, workers: [], activeFrac: 1, idleLogged: 0, jobLogged: {},
-        log: [],
+        wood: 0, stone: 0, iron: 0, workers: [], activeFrac: 1, idleLogged: 0, jobLogged: {},
+        log: [], relations: {}, captures: 0, defeated: [],
       };
       const hp = this.xy(home);
       for (let k = 0; k < WORKER_CAP; k++) {
@@ -918,8 +1037,10 @@ const SIM = {
       this.owner[home] = i;
       this.neighbors(home).forEach(n => { if (this.owner[n] === -1) this.owner[n] = i; });
       this.pushLog(tr, t("evStart"));
+      this.pushLog(tr, t("evPolicy")(t(tr.policy.key)));
       return tr;
     });
+    this.tribes.forEach(a => this.tribes.forEach(b => { if (a !== b) a.relations[b.idx] = "neutral"; }));
 
     this.logNode = el(`<div class="civ-log">${this.tribes.map((tr, i) => `
       <div class="log-col" id="logCol${i}" style="--c:${tr.color}">
@@ -929,33 +1050,66 @@ const SIM = {
         </div>
         <div class="log-traits">${TRAITS.map(x => `${x.emoji}${"●".repeat(tr.spec[x.id])}`).join(" ")}</div>
         <div class="log-disc" id="lgDisc${i}">${t("nothing")}</div>
+        <div class="log-meta" id="lgMeta${i}">${policyOf(policies[i]).emoji} ${t(policyOf(policies[i]).key)}</div>
+        <div class="log-goal" id="lgGoal${i}"></div>
         <div class="log-body" id="lgBody${i}"></div>
       </div>`).join("")}</div>`);
     document.body.appendChild(this.logNode);
+    this.legendNode = el(`<div class="map-legend"><b>${t("legend")}</b><span>🌊 Water</span><span>🌉 Bridge</span><span>💎 Gem</span><span>🐑 Wild animals</span><span>⛓️ Iron</span><span>🏥 Clinic</span><span>🧱 Wall</span></div>`);
+    document.body.appendChild(this.legendNode);
 
     this.speedBar = el(`<div class="speed-bar"><span class="speed-lbl">${t("speed")}</span>
-      ${SPEEDS.map(s => `<button class="speed-btn${s === 1 ? " active" : ""}" data-s="${s}">×${s}</button>`).join("")}</div>`);
+      ${SPEEDS.map(s => `<button class="speed-btn${s === 1 ? " active" : ""}" data-s="${s}">×${s}</button>`).join("")}<button class="stop-btn" id="stopBtn">⏸ STOP</button>
+      <span class="event-divider"></span><button class="event-mode" id="eventMode">⚙ AUTO</button>
+      <span class="event-picks" id="eventPicks" hidden>${[["drought","☀️"],["flood","🌊"],["migration","🚶"],["plague","🦠"],["harvest","🌾"]].map(([id, icon]) => `<button data-event="${id}" title="${id}">${icon}</button>`).join("")}</span><button class="timeline-btn" id="timelineBtn">🕘</button></div>`);
     this.speedBar.querySelectorAll(".speed-btn").forEach(b => {
       b.onclick = () => {
         sfx.click(); this.speed = +b.dataset.s;
         this.speedBar.querySelectorAll(".speed-btn").forEach(o => o.classList.toggle("active", o === b));
       };
     });
+    const stop = this.speedBar.querySelector("#stopBtn");
+    stop.onclick = () => { this.paused = !this.paused; stop.textContent = this.paused ? "▶ RESUME" : "⏸ STOP"; stop.classList.toggle("paused", this.paused); };
+    const mode = this.speedBar.querySelector("#eventMode"), picks = this.speedBar.querySelector("#eventPicks");
+    mode.onclick = () => { this.autoEvents = !this.autoEvents; mode.textContent = this.autoEvents ? "⚙ AUTO" : "⚙ MANUAL"; picks.hidden = this.autoEvents; };
+    picks.querySelectorAll("[data-event]").forEach(b => b.onclick = () => { this.triggerEvent(b.dataset.event); });
+    this.timelineNode = el(`<div class="timeline-panel" hidden><b>🕘 ${t("timeline")}</b><div id="timelineList"></div></div>`);
+    this.speedBar.querySelector("#timelineBtn").onclick = () => { this.timelineNode.hidden = !this.timelineNode.hidden; this.refreshTimeline(); };
     document.body.appendChild(this.speedBar);
+    document.body.appendChild(this.timelineNode);
     activeScreen = this;
     this.refreshLog();
   },
   cleanup() {
     this.logNode?.remove(); this.logNode = null;
     this.speedBar?.remove(); this.speedBar = null;
+    this.timelineNode?.remove(); this.timelineNode = null;
+    this.legendNode?.remove(); this.legendNode = null;
     this.running = false;
   },
 
   pushLog(tr, msg, traitId) {
+    const last = tr.log[tr.log.length - 1], now = performance.now();
+    if (last?.msg === msg && now - (last.at || 0) < 5500) return;
     const r = traitId ? reason(tr, traitId) : null;
-    tr.log.push({ msg, tag: r ? r.tag : "", why: r ? r.why : "" });
+    tr.log.push({ msg, tag: r ? r.tag : "", why: r ? r.why : "", at: now });
     if (tr.log.length > 40) tr.log.shift();
     tr.logDirty = true;
+  },
+  markTimeline(icon, text) {
+    this.timeline.push({ icon, text, time: Math.floor(this.simT) });
+    if (this.timeline.length > 16) this.timeline.shift();
+    this.refreshTimeline();
+  },
+  queueMoment(type, text, color = "#67e8f9") {
+    if (this.currentMoment?.type === type && this.currentMoment?.text === text) return;
+    if (this.momentQueue.some(m => m.type === type && m.text === text)) return;
+    this.momentQueue.push({ type, text, color, life: 2.8, max: 2.8 });
+    if (this.momentQueue.length > 6) this.momentQueue.shift();
+  },
+  refreshTimeline() {
+    const list = this.timelineNode?.querySelector("#timelineList");
+    if (list) list.innerHTML = this.timeline.slice().reverse().map(x => `<div><b>${String(x.time).padStart(3, "0")}s</b> ${x.icon} ${x.text}</div>`).join("") || `<div>—</div>`;
   },
   refreshLog() {
     if (!this.logNode) return;
@@ -964,8 +1118,10 @@ const SIM = {
       tr.logDirty = false;
       const body = this.logNode.querySelector(`#lgBody${i}`);
       if (body) {
-        body.innerHTML = tr.log.slice(-14).map(e =>
-          `<div class="log-line"><span class="lg-msg">${e.msg}</span>${e.tag ? `<span class="lg-tag" title="${e.why}">${e.tag}</span>` : ""}</div>`).join("");
+        body.innerHTML = tr.log.slice(-14).map(e => {
+          const critical = /ATTACK|WAR|DIED|could not continue|ROBBERY|DECLINED|ACCEPTED|cooperation|ILLNESS|Food is running/i.test(e.msg) ? " critical" : /DISCOVERED|EVOLVED|Built|found/i.test(e.msg) ? " positive" : "";
+          return `<div class="log-line${critical}"><span class="lg-msg">${e.msg}</span>${e.tag ? `<span class="lg-tag" title="${e.why}">${e.tag}</span>` : ""}</div>`;
+        }).join("");
         body.scrollTop = body.scrollHeight;
       }
       const disc = this.logNode.querySelector(`#lgDisc${i}`);
@@ -973,6 +1129,13 @@ const SIM = {
         const list = DISCOVERIES.filter(d => tr.known.has(d.id));
         disc.innerHTML = list.length ? list.map(d => `<span title="${discName(d)}">${d.emoji}</span>`).join("") : t("nothing");
       }
+      const meta = this.logNode.querySelector(`#lgMeta${i}`);
+      if (meta) {
+        const rel = Object.values(tr.relations).includes("allied") ? "🤝 ally" : Object.values(tr.relations).includes("rejected") ? "↔ declined" : "↔ neutral";
+        meta.textContent = `${tr.policy.emoji} ${t(tr.policy.key)} · ${this.stageTitle(tr.stage)} · ${rel}${tr.sick > .15 ? ` · 🦠 ${Math.ceil(tr.sick)}` : ""}`;
+      }
+      const goal = this.logNode.querySelector(`#lgGoal${i}`);
+      if (goal) goal.textContent = `${t("objective")}: ${this.nextGoal(tr)}`;
     });
   },
 
@@ -987,6 +1150,14 @@ const SIM = {
     }
     return this.idx(Math.max(1, Math.min(COLS - 2, x)), Math.max(1, Math.min(ROWS - 2, y)));
   },
+  randomStartSpots() {
+    const spots = [];
+    for (let tries = 0; spots.length < 3 && tries < 160; tries++) {
+      const p = this.xy(this.nearestOpen(3 + Math.floor(Math.random() * (COLS - 6)), 3 + Math.floor(Math.random() * (ROWS - 6))));
+      if (spots.every(s => Math.hypot(s.x - p.x, s.y - p.y) >= 17)) spots.push(p);
+    }
+    return spots.length === 3 ? spots : [{ x: 7, y: ROWS - 8 }, { x: COLS - 8, y: 7 }, { x: Math.floor(COLS / 2), y: ROWS - 6 }];
+  },
   neighbors(i) {
     const { x, y } = this.xy(i), out = [];
     if (x > 0) out.push(i - 1);
@@ -1000,6 +1171,7 @@ const SIM = {
     for (let i = 0; i < this.owner.length; i++) if (this.owner[i] === tr.idx && this.feat[i] === f) return true;
     return false;
   },
+  featureForRes(res) { return ({ tree: F_TREE, rock: F_ROCK, water: F_WATER, gem: F_GEM, animal: F_ANIMAL, iron: F_IRON })[res]; },
   // Drinking water: owning a water tile, or holding land right next to one.
   // Frozen eras need fire before that water is any use.
   hasWater(tr, E) {
@@ -1022,39 +1194,260 @@ const SIM = {
       build: huts * 8 + walls * 5,
       know: tr.known.size * 16,
       people: Math.floor(tr.pop) * 0.5,
+      evolve: tr.stage * 12,
     };
-    parts.total = Math.round(parts.land + parts.build + parts.know + parts.people);
+    parts.total = Math.round(parts.land + parts.build + parts.know + parts.people + parts.evolve);
     if (!tr.alive) parts.total = Math.round(parts.total * 0.35);
     return parts;
+  },
+  intelligenceReport(tr) {
+    const smart = tr.known.size * 2 + tr.stage * 4 + (tr.known.has("medicine") ? 4 : 0) + (tr.known.has("sanitation") ? 3 : 0);
+    const risk = Math.round(tr.illnessLoss * 10) + tr.outbreaks * 2 + (tr.policy.id === "conquest" ? 2 : 0);
+    return { smart, risk, tech: DISCOVERIES.filter(d => tr.known.has(d.id)).map(d => d.emoji).join("") || "—" };
+  },
+  choiceFeedback(tr) {
+    const goodKey = { research: "goodResearch", food: "goodFood", defend: "goodDefend", conquest: "goodConquest", cooperate: "goodCooperate" }[tr.policy.id] || "goodResearch";
+    let tryKey = "tryInt";
+    if (tr.illnessLoss > 1.5 || tr.outbreaks > 0) tryKey = "tryMedicine";
+    else if (tr.work <= 2) tryKey = "tryWork";
+    else if (tr.int <= 2) tryKey = "tryInt";
+    else if (tr.health <= 2) tryKey = "tryHealth";
+    return { good: t(goodKey), try: t(tryKey) };
+  },
+  nextGoal(tr) {
+    const bm = lang === "bm";
+    if (!tr.known.has("farming")) return bm ? "🌾 Temui Pertanian" : "🌾 Discover Farming";
+    if (this.ownsFeature(tr, F_ANIMAL) && !tr.known.has("animals")) return bm ? "🐑 Pelajari Ternakan Haiwan" : "🐑 Learn Animal Farming";
+    if (!tr.known.has("boats") && !tr.known.has("bridge")) return bm ? "🌊 Cari cara menyeberangi air" : "🌊 Find a way across water";
+    if (!tr.known.has("medicine")) return bm ? "💊 Temui Ubat" : "💊 Discover Medicine";
+    return bm ? "🗺️ Teroka tanah baharu" : "🗺️ Explore new land";
   },
 
   /* Discovery: expanding reveals resources; whether the tribe can make
      anything of them is gated on the intelligence the player chose. */
   tryDiscover(tr, dt) {
-    tr.explore += dt * (0.35 + this.landOf(tr) * 0.012) * cv("discover", tr.int) * (tr.known.has("writing") ? 1.5 : 1);
+    const research = tr.policy.id === "research" ? 1.65 : tr.policy.id === "conquest" ? .78 : 1;
+    tr.explore += dt * (0.35 + this.landOf(tr) * 0.012) * cv("discover", tr.int) * (tr.known.has("writing") ? 1.5 : 1) * research;
     if (tr.explore < 1) return;
     tr.explore = 0;
     const avail = DISCOVERIES.filter(d =>
       !tr.known.has(d.id) &&
       d.int <= tr.int &&
       (!d.needs || d.needs.every(n => tr.known.has(n))) &&
-      (!d.res || this.ownsFeature(tr, d.res === "tree" ? F_TREE : d.res === "rock" ? F_ROCK : F_WATER)));
+      (!d.res || this.ownsFeature(tr, this.featureForRes(d.res))));
     if (!avail.length) {
       // Owns the resource but is not clever enough to use it — this is the
       // moment the player's trait choice becomes a visible story beat.
       tr.ignoreT += 1;
       if (tr.ignoreT % 3 === 0) {
         const blocked = DISCOVERIES.find(d => !tr.known.has(d.id) && d.res && d.int > tr.int &&
-          this.ownsFeature(tr, d.res === "tree" ? F_TREE : d.res === "rock" ? F_ROCK : F_WATER));
-        if (blocked) this.pushLog(tr, t("evIgnore")(t(blocked.res === "tree" ? "thingTree" : blocked.res === "rock" ? "thingRock" : "thingWater")));
+          this.ownsFeature(tr, this.featureForRes(d.res)));
+        if (blocked) this.pushLog(tr, t("evIgnore")(blocked.res === "gem" ? t("gemName") : t(blocked.res === "tree" ? "thingTree" : blocked.res === "rock" ? "thingRock" : "thingWater")));
       }
       return;
     }
     const d = avail[0];
     tr.known.add(d.id);
     this.pushLog(tr, t("evDiscover")(d.emoji, discName(d)), "int");
-    this.toasts.push({ text: `${d.emoji} ${tr.name}: ${discName(d)}`, color: tr.color, life: 2.4 });
+    const foundAt = d.res ? this.ownedTiles(tr, i => this.feat[i] === this.featureForRes(d.res))[0] : tr.home;
+    const at = this.xy(foundAt ?? tr.home);
+    // The first tribe to make an invention gets the big map moment. Later
+    // discoveries stay in the tribe log, so the screen never becomes spammy.
+    if (!this.announcedDiscoveries.has(d.id)) {
+      this.announcedDiscoveries.add(d.id);
+      this.toasts.push({ text: `${d.emoji} ${tr.name}: ${discName(d)}`, color: tr.color, life: 2.4 });
+      this.announcementQueue.push({ type: "tech", x: at.x, y: at.y, life: 3.2, max: 3.2, color: tr.color, icon: d.emoji, label: discName(d) });
+      this.markTimeline(d.emoji, `${tr.name}: ${discName(d)}`);
+    }
     if (this.speed <= 5) sfx.discover();
+  },
+  stageTitle(stage) {
+    return t(["stageNoob", "stageGatherer", "stageBuilder", "stageScholar", "stageInventor"][stage] || "stageNoob");
+  },
+  evolve(tr) {
+    let next = 0;
+    if (tr.known.size >= 2) next = 1;
+    if (tr.known.has("huts") && tr.known.has("tools")) next = 2;
+    if (tr.known.has("medicine") || tr.known.has("writing")) next = 3;
+    if (tr.known.has("computing") || (tr.known.has("engineering") && tr.known.has("electricity"))) next = 4;
+    if (next > tr.stage) {
+      tr.stage = next;
+      this.pushLog(tr, t("evEvolve")(tr.name, this.stageTitle(next)), "int");
+      this.toasts.push({ text: `⬆️ ${tr.name}: ${this.stageTitle(next)}`, color: tr.color, life: 2.8 });
+      const home = this.xy(tr.home);
+      this.effects.push({ type: "evolve", x: home.x, y: home.y, life: 3, max: 3, color: tr.color, label: this.stageTitle(next) });
+    }
+  },
+  infectedNeighbor(tr) {
+    for (let i = 0; i < this.owner.length; i++) {
+      if (this.owner[i] !== tr.idx) continue;
+      for (const n of this.neighbors(i)) {
+        const other = this.owner[n];
+        if (other >= 0 && other !== tr.idx && this.tribes[other].sick > 1) return true;
+      }
+    }
+    return false;
+  },
+  hasContact(a, b) {
+    for (let i = 0; i < this.owner.length; i++) if (this.owner[i] === a.idx && this.neighbors(i).some(n => this.owner[n] === b.idx)) return true;
+    return false;
+  },
+  updateIllness(tr, dt, water) {
+    const clinic = this.countBuild(tr, 3);
+    const crowded = Math.max(0, tr.pop - 16) * .0035;
+    const exposure = this.infectedNeighbor(tr) ? .035 : 0;
+    const risk = crowded + exposure + (!water ? .018 : 0) + (tr.policy.id === "conquest" ? .012 : 0);
+    if (tr.sick < .1 && Math.random() < risk * dt) {
+      tr.sick = Math.min(tr.pop, 1.1 + tr.pop * .07); tr.outbreaks++;
+      this.pushLog(tr, t("evIllness"), "health");
+      this.toasts.push({ text: `🦠 ${tr.name}`, color: "#f87171", life: 2.4 });
+      const home = this.xy(tr.home);
+      this.effects.push({ type: "illness", x: home.x, y: home.y, life: 3.4, max: 3.4, color: "#7ee787" });
+    }
+    if (tr.sick <= .1) return;
+    const sanitation = tr.known.has("sanitation") ? .46 : 1;
+    const spread = tr.sick * (.045 + crowded * 1.8 + exposure) * sanitation * dt;
+    tr.sick = Math.min(tr.pop, tr.sick + spread);
+    const cure = tr.known.has("medicine") ? (.16 + clinic * .20 + (tr.policy.id === "research" ? .07 : 0)) * dt : 0;
+    if (cure) tr.sick = Math.max(0, tr.sick - cure * (1 + tr.work * .12));
+    else if (!tr.noCureAt || performance.now() - tr.noCureAt > 11000) {
+      tr.noCureAt = performance.now(); this.pushLog(tr, t("evNoCure"), "int");
+    }
+    const loss = tr.sick * .024 * (1.22 - tr.health * .11) * (clinic ? .55 : 1) * dt;
+    tr.pop = Math.max(0, tr.pop - loss); tr.illnessLoss += loss;
+    if (loss > .002) tr.lastThreat = "illness";
+    if (tr.sick < .12 && !tr.cureLogged) { tr.cureLogged = true; this.pushLog(tr, t("evCured"), "int"); }
+    if (tr.sick >= .12) tr.cureLogged = false;
+  },
+  requestEmergencyAid(tr) {
+    if (tr.aidT > 0) return;
+    tr.aidT = 12;
+    const helper = this.tribes.find(other => other.alive && other.idx !== tr.idx && other.food > 18 && tr.relations[other.idx] === "allied");
+    if (helper) {
+      helper.food -= 9; tr.food += 9; tr.sick = Math.max(0, tr.sick - .5);
+      this.pushLog(tr, `🆘 ${helper.name} sent emergency food and help.`);
+      this.pushLog(helper, `🤝 Sent emergency help to ${tr.name}.`);
+      const a = this.xy(helper.home), b = this.xy(tr.home);
+      this.effects.push({ type: "alliance", x: a.x, y: a.y, x2: b.x, y2: b.y, life: 4, max: 4, color: "#6ee7b7" });
+    } else if (!tr.lastChanceUsed) {
+      // Every community gets one recovery chance before a collapse, which
+      // gives the AI time to build, discover, or receive a later treaty.
+      tr.lastChanceUsed = true; tr.food += 6; tr.pop = Math.max(tr.pop, 2.1);
+      this.pushLog(tr, "🏕️ The tribe shares its last supplies and tries again.");
+    }
+  },
+  triggerEvent(forcedType = null) {
+    const types = ["drought", "flood", "migration", "plague", "harvest"];
+    const type = forcedType || types[Math.floor(Math.random() * types.length)];
+    this.worldEvent = { type, life: 13 };
+    const key = { drought: "evDrought", flood: "evFlood", migration: "evMigration", plague: "evPlague", harvest: "evHarvest" }[type];
+    this.banner = { text: `🌍 ${t("evEvent")(t(key))}`, color: type === "plague" ? "#f87171" : "#67e8f9", life: 2.8 };
+    this.markTimeline("🌍", t(key));
+    this.tribes.filter(tr => tr.alive).forEach(tr => {
+      const home = this.xy(tr.home);
+      this.effects.push({ type, x: home.x, y: home.y, life: 4.5, max: 4.5, color: type === "plague" ? "#7ee787" : type === "drought" ? "#ffd95a" : "#67e8f9" });
+      if (type === "plague") tr.sick = Math.max(tr.sick, .8 + tr.pop * .05);
+      if (type === "harvest") tr.food += 16 * (tr.policy.id === "food" ? 1.5 : 1);
+      if (type === "migration" && tr.policy.id === "cooperate") tr.pop += 3;
+      this.pushLog(tr, t("evEvent")(t(key)));
+    });
+    if (type === "flood") this.applyFlood();
+    if (type === "drought") this.applyDrought();
+  },
+  applyFlood() {
+    // Floods start at the river, then spill out to neighboring land. The
+    // changed tiles remain blue afterwards, so the world genuinely remembers
+    // the event instead of only showing a temporary message.
+    const start = this.river[Math.floor(this.river.length * (.22 + Math.random() * .48))] || this.riverSource;
+    const changed = new Set([start]);
+    let frontier = [start];
+    for (let wave = 0; wave < 5; wave++) {
+      const next = [];
+      frontier.forEach(tile => this.neighbors(tile).forEach(n => {
+        if (changed.size >= 68 || changed.has(n) || this.feat[n] === F_WATER) return;
+        changed.add(n); next.push(n);
+      }));
+      frontier = next;
+    }
+    changed.forEach(tile => {
+      this.feat[tile] = F_WATER;
+      if (this.build[tile]) this.build[tile] = 0;
+    });
+    const p = this.xy(start);
+    this.worldEvent.origin = p; this.worldEvent.changed = [...changed];
+    this.effects.push({ type: "floodSource", x: p.x, y: p.y, life: 5.2, max: 5.2, color: "#67e8f9", label: t("floodFromRiver") });
+    this.terrainCache = null;
+  },
+  applyDrought() {
+    // Small ponds can dry up, but the named river remains so the map stays
+    // fair and players can see why settling by a river matters.
+    const riverSet = new Set(this.river);
+    const ponds = [];
+    this.feat.forEach((f, i) => { if (f === F_WATER && !riverSet.has(i)) ponds.push(i); });
+    ponds.slice(0, Math.min(10, ponds.length)).forEach(i => { if (Math.random() < .55) this.feat[i] = F_NONE; });
+    // Drought has lasting consequences: dry trees die and farms/enclosures
+    // fail, so preparation and water access matter in later decisions.
+    let damage = 0;
+    for (let i = 0; i < this.feat.length && damage < 52; i++) {
+      if ((this.feat[i] === F_TREE || this.build[i] === 5 || this.build[i] === 6) && Math.random() < .15) {
+        if (this.feat[i] === F_TREE) this.feat[i] = F_NONE;
+        if (this.build[i] === 5 || this.build[i] === 6) this.build[i] = 0;
+        damage++;
+      }
+    }
+    this.terrainCache = null;
+  },
+  trade() {
+    const alive = this.tribes.filter(tr => tr.alive);
+    alive.filter(a => a.policy.id === "cooperate" && a.known.has("communication")).forEach(a => {
+      const targets = alive.filter(b => b !== a && a.relations[b.idx] === "neutral" && b.known.has("communication") && this.hasContact(a, b));
+      const b = targets[Math.floor(Math.random() * targets.length)];
+      if (!b) return;
+      const aCanDefend = a.known.has("army") || this.countBuild(a, 2) >= 2;
+      const bNeedsDefence = b.defendT > 0 || !b.known.has("walls");
+      const bCanSupply = b.food > 20;
+      const deal = aCanDefend && bNeedsDefence && bCanSupply ? "🛡️ defence ⇄ 🍎 supplies" : a.known.has("medicine") && b.sick > .3 ? "💊 cure ⇄ 🍎 supplies" : "🍎 supplies ⇄ 🤝 safe border";
+      this.pushLog(a, `${t("evOffer")(b.name)} ${deal}`);
+      // A treaty is only accepted when BOTH sides gain something. This makes
+      // cooperation a decision, not a free bonus.
+      const useful = (aCanDefend && bNeedsDefence && bCanSupply) || (a.known.has("medicine") && b.sick > .3 && bCanSupply) || (a.food > b.food + 12);
+      const chance = useful ? (b.policy.id === "conquest" ? .28 : b.policy.id === "defend" ? .68 : .86) : .08;
+      const accepted = Math.random() < chance;
+      a.relations[b.idx] = b.relations[a.idx] = accepted ? "allied" : "rejected";
+      if (accepted) { a.deals ??= {}; b.deals ??= {}; a.deals[b.idx] = b.deals[a.idx] = deal; }
+      const p = this.xy(a.home), q = this.xy(b.home);
+      this.effects.push({ type: accepted ? "alliance" : "reject", x: p.x, y: p.y, x2: q.x, y2: q.y, life: 5, max: 5, color: accepted ? "#6ee7b7" : "#fb7185" });
+      if (accepted) this.queueMoment("cooperate", `COOPERATION · ${a.name} + ${b.name}`, "#6ee7b7");
+      const noReason = !useful ? "no useful exchange yet" : b.policy.id === "conquest" ? "they prefer to take land themselves" : "they are not ready to trust";
+      this.pushLog(a, accepted ? t("evAccept")(b.name) : `${t("evReject")(b.name)} Reason: ${noReason}.`);
+      this.pushLog(b, accepted ? t("evAccept")(a.name) : `${t("evReject")(a.name)} Reason: ${noReason}.`);
+    });
+    alive.forEach(a => alive.forEach(b => {
+      if (a.idx >= b.idx || a.relations[b.idx] !== "allied") return;
+      // Treaty terms have a visible, measurable give-and-take effect.
+      if (a.deals?.[b.idx]?.includes("defence") && b.food >= 5) { b.food -= 5; a.food += 5; b.allyDefence = Math.max(b.allyDefence || 0, 8); this.pushLog(b, `🍎 Supplies sent to ${a.name}; 🛡️ defence received.`); }
+      if (a.known.has("medicine") && a.sick < 1 && b.sick > .3) { b.sick = Math.max(0, b.sick - 1.25); this.pushLog(a, t("evTrade")(b.name)); this.pushLog(b, t("evCured")); }
+      if (b.known.has("medicine") && b.sick < 1 && a.sick > .3) { a.sick = Math.max(0, a.sick - 1.25); this.pushLog(b, t("evTrade")(a.name)); this.pushLog(a, t("evCured")); }
+      if (a.food > b.food + 20) { a.food -= 6; b.food += 6; this.pushLog(a, t("evTrade")(b.name)); }
+      if (b.food > a.food + 20) { b.food -= 6; a.food += 6; this.pushLog(b, t("evTrade")(a.name)); }
+    }));
+    // Risky AI choices: a desperate aggressive tribe may rob, while a smart
+    // tribe can send a disguised scout to learn before choosing a war.
+    alive.forEach(a => {
+      const targets = alive.filter(b => b !== a && a.relations[b.idx] !== "allied");
+      const b = targets[Math.floor(Math.random() * targets.length)];
+      if (!b) return;
+      const p = this.xy(a.home), q = this.xy(b.home);
+      if (a.food < 8 && a.aggro >= 3 && b.food > 12 && Math.random() < .42) {
+        const stolen = Math.min(7, b.food); b.food -= stolen; a.food += stolen;
+        this.pushLog(a, `🕵️ Robbed ${stolen} food from ${b.name}.`, "aggro"); this.pushLog(b, `🚨 Robbery! Food was taken by ${a.name}.`, "health");
+        this.effects.push({ type: "robbery", x: p.x, y: p.y, x2: q.x, y2: q.y, life: 3.5, max: 3.5, color: "#f59e0b" });
+        this.queueMoment("robbery", `ROBBERY · ${a.name} stole from ${b.name}`, "#f59e0b");
+      } else if (a.int >= 3 && Math.random() < .30) {
+        this.pushLog(a, `🥸 Disguised scout learned ${b.name}'s defence: ${this.countBuild(b, 2)} walls.`, "int");
+        this.effects.push({ type: "spy", x: p.x, y: p.y, x2: q.x, y2: q.y, life: 3.5, max: 3.5, color: "#a78bfa" });
+      }
+    });
   },
 
   /* ---- workers: walk to a job, do it, walk home ----
@@ -1073,7 +1466,17 @@ const SIM = {
     // Lazy tribes simply refuse the job and keep standing around.
     if (Math.random() < cv("idleChance", tr.work)) return null;
 
-    if (war && Math.random() < cv("fightUrge", tr.aggro)) {
+    // When an attack lands, protect the settlement before counterattacking.
+    if (tr.defendT > 0 && tr.known.has("walls") && tr.stone >= 3) {
+      const contact = this.ownedTiles(tr, i => !this.build[i] && this.feat[i] !== F_WATER && this.neighbors(i).some(n => this.owner[n] >= 0 && this.owner[n] !== tr.idx));
+      const safe = (contact.length ? contact : this.ownedTiles(tr, i => !this.build[i] && this.feat[i] !== F_WATER)).sort((a, b) => {
+        const pa = this.xy(a), pb = this.xy(b), h = this.xy(tr.home);
+        return Math.hypot(pa.x - h.x, pa.y - h.y) - Math.hypot(pb.x - h.x, pb.y - h.y);
+      });
+      if (safe.length) return { type: JOB_BUILD, build: 2, tile: safe[Math.floor(Math.random() * Math.min(3, safe.length))], dur: 2.1 };
+    }
+
+    if ((war || tr.policy.id === "conquest" || tr.aggro >= 3) && Math.random() < cv("fightUrge", tr.aggro) * (tr.policy.id === "conquest" ? 1.5 : tr.policy.id === "cooperate" ? .45 : 1)) {
       const border = this.ownedTiles(tr, i => this.neighbors(i).some(n => {
         const o = this.owner[n];
         return o !== -1 && o !== tr.idx && this.tribes[o].alive;
@@ -1085,14 +1488,24 @@ const SIM = {
       if (trees.length && Math.random() < 0.4) return { type: JOB_TREE, tile: trees[Math.floor(Math.random() * trees.length)], dur: 2.4 };
     }
     if (tr.known.has("stone")) {
-      const rocks = this.ownedTiles(tr, i => this.feat[i] === F_ROCK);
+      const rocks = this.ownedTiles(tr, i => this.feat[i] === F_ROCK || this.feat[i] === F_IRON);
       if (rocks.length && Math.random() < 0.35) return { type: JOB_ROCK, tile: rocks[Math.floor(Math.random() * rocks.length)], dur: 2.8 };
     }
     const wantHut = tr.known.has("huts") && tr.wood >= 3 && this.countBuild(tr, 1) < Math.floor(tr.pop / 6);
-    const wantWall = tr.known.has("walls") && tr.stone >= 3 && this.countBuild(tr, 2) < 6;
-    if (wantHut || wantWall) {
-      const spots = this.ownedTiles(tr, i => !this.build[i] && this.feat[i] === F_NONE);
-      if (spots.length) return { type: JOB_BUILD, build: wantHut ? 1 : 2, tile: spots[Math.floor(Math.random() * spots.length)], dur: 3 };
+    const wantWall = tr.known.has("walls") && tr.stone >= 3 && this.countBuild(tr, 2) < (tr.policy.id === "defend" ? 9 : 6);
+    const wantClinic = tr.known.has("medicine") && tr.wood >= 2 && tr.stone >= 2 && this.countBuild(tr, 3) < 2 && (tr.sick > .4 || tr.policy.id === "research");
+    const animals = this.ownedTiles(tr, i => !this.build[i] && this.feat[i] === F_ANIMAL);
+    const wantEnclosure = tr.known.has("animals") && tr.wood >= 2 && animals.length && this.countBuild(tr, 5) < 3;
+    const wantFarm = tr.known.has("farming") && tr.wood >= 1 && this.countBuild(tr, 6) < Math.max(1, Math.floor(tr.pop / 12));
+    const wantBarracks = tr.known.has("army") && tr.wood >= 3 && tr.stone >= 4 && this.countBuild(tr, 7) < 1;
+    if (wantHut || wantWall || wantClinic || wantEnclosure || wantFarm || wantBarracks) {
+      const buildKind = wantEnclosure ? 5 : wantClinic ? 3 : wantBarracks ? 7 : wantHut ? 1 : wantWall ? 2 : 6;
+      let spots = wantEnclosure ? animals : this.ownedTiles(tr, i => !this.build[i] && this.feat[i] === F_NONE);
+      if (buildKind === 2) {
+        const border = spots.filter(i => this.neighbors(i).some(n => this.owner[n] >= 0 && this.owner[n] !== tr.idx));
+        if (border.length) spots = border;
+      }
+      if (spots.length) return { type: JOB_BUILD, build: buildKind, tile: spots[Math.floor(Math.random() * spots.length)], dur: wantEnclosure ? 3 : wantClinic ? 3.5 : wantBarracks ? 4 : 2.4 };
     }
     const fields = this.ownedTiles(tr, i => this.feat[i] !== F_WATER);
     if (fields.length) return { type: JOB_FARM, tile: fields[Math.floor(Math.random() * fields.length)], dur: 2 };
@@ -1101,9 +1514,12 @@ const SIM = {
   finishJob(tr, job, E) {
     if (job.type === JOB_TREE) {
       tr.wood += 1;
+      this.feat[job.tile] = F_NONE; this.terrainCache = null;
       if (!tr.jobLogged.chop) { tr.jobLogged.chop = 1; this.pushLog(tr, t("evChop"), "work"); }
     } else if (job.type === JOB_ROCK) {
       tr.stone += 1;
+      if (this.feat[job.tile] === F_IRON) tr.iron += 1;
+      this.feat[job.tile] = F_NONE; this.terrainCache = null;
       if (!tr.jobLogged.mine) { tr.jobLogged.mine = 1; this.pushLog(tr, t("evMine"), "work"); }
     } else if (job.type === JOB_BUILD) {
       if (!this.build[job.tile] && this.owner[job.tile] === tr.idx) {
@@ -1111,6 +1527,14 @@ const SIM = {
           tr.wood -= 3; this.build[job.tile] = 1; this.pushLog(tr, t("evBuildHut"), "int");
         } else if (job.build === 2 && tr.stone >= 3) {
           tr.stone -= 3; this.build[job.tile] = 2; this.pushLog(tr, t("evBuildWall"), "int");
+        } else if (job.build === 3 && tr.wood >= 2 && tr.stone >= 2) {
+          tr.wood -= 2; tr.stone -= 2; this.build[job.tile] = 3; this.pushLog(tr, t("evClinic"), "int");
+        } else if (job.build === 5 && tr.wood >= 2) {
+          tr.wood -= 2; this.build[job.tile] = 5; this.pushLog(tr, "🐑 Built an animal enclosure.", "work");
+        } else if (job.build === 6 && tr.wood >= 1) {
+          tr.wood -= 1; this.build[job.tile] = 6; this.pushLog(tr, "🌾 Built a farm.", "work");
+        } else if (job.build === 7 && tr.wood >= 3 && tr.stone >= 4) {
+          tr.wood -= 3; tr.stone -= 4; this.build[job.tile] = 7; this.pushLog(tr, "🛡️ Built an army base.", "work");
         }
       }
     } else if (job.type === JOB_FIGHT) {
@@ -1140,8 +1564,14 @@ const SIM = {
           if (w.state === "toJob") { w.state = "working"; w.timer = w.job.dur / cv("workSpeed", tr.work); }
           else { w.state = "idle"; w.timer = 0.2 + Math.random() * 0.9; w.job = null; }
         } else {
-          w.x += (dx / d) * speed * dt;
-          w.y += (dy / d) * speed * dt;
+          const nx = w.x + (dx / d) * speed * dt, ny = w.y + (dy / d) * speed * dt;
+          const tile = this.idx(Math.max(0, Math.min(COLS - 1, Math.floor(nx))), Math.max(0, Math.min(ROWS - 1, Math.floor(ny))));
+          if (this.feat[tile] === F_WATER && !tr.known.has("boats") && this.build[tile] !== 4) {
+            // No invisible swimming: without a boat or bridge, turn back.
+            w.state = "toHome";
+          } else {
+            w.x = nx; w.y = ny; w.boat = this.feat[tile] === F_WATER;
+          }
         }
       } else if (w.state === "working") {
         active++;
@@ -1155,8 +1585,17 @@ const SIM = {
   step(dt) {
     const E = ERAS[this.era];
     const war = this.simT >= CONQUEST_AT;
+    this.eventT -= dt;
+    if (this.autoEvents && this.eventT <= 0) { this.triggerEvent(); this.eventT = 23 + Math.random() * 18; }
+    if (this.worldEvent && (this.worldEvent.life -= dt) <= 0) this.worldEvent = null;
+    this.tradeT -= dt;
+    if (this.tradeT <= 0) { this.trade(); this.tradeT = 11; }
+    if (this.announcementQueue.length && !this.effects.some(e => e.type === "tech")) this.effects.push(this.announcementQueue.shift());
     this.tribes.forEach((tr) => {
       if (!tr.alive) return;
+      tr.defendT = Math.max(0, (tr.defendT || 0) - dt);
+      tr.allyDefence = Math.max(0, (tr.allyDefence || 0) - dt);
+      tr.aidT = Math.max(0, (tr.aidT || 0) - dt);
       const land = this.landOf(tr);
 
       // resource discovery from newly owned tiles
@@ -1165,9 +1604,11 @@ const SIM = {
         const f = this.feat[i];
         if (f === F_NONE || tr.seen.has(f)) continue;
         tr.seen.add(f);
-        this.pushLog(tr, f === F_TREE ? t("evFoundTree") : f === F_ROCK ? t("evFoundRock") : t("evFoundWater"));
+        this.pushLog(tr, f === F_TREE ? t("evFoundTree") : f === F_ROCK ? t("evFoundRock") : f === F_GEM ? t("evFoundGem") : f === F_ANIMAL ? t("evFoundAnimal") : f === F_IRON ? t("evFoundIron") : t("evFoundWater"));
+        if (f === F_GEM) { const p = this.xy(i); this.effects.push({ type: "gem", x: p.x, y: p.y, life: 4, max: 4, color: "#c084fc" }); }
       }
       this.tryDiscover(tr, dt);
+      this.evolve(tr);
 
       this.updateWorkers(tr, dt, E);
 
@@ -1182,13 +1623,20 @@ const SIM = {
       // Food scales with population, but is gated by the fraction of workers
       // actually doing something — so visible idling directly starves them.
       const workMul = cv("output", tr.work) * tr.boost;
-      const farmBonus = tr.known.has("farming") ? 1.6 : 0.55;   // no farming = foraging only
+      const gemBoost = this.ownsFeature(tr, F_GEM) ? 1.12 : 1;
+      const animalBonus = 1 + this.countBuild(tr, 5) * .18;
+      const fishingBonus = tr.known.has("fishing") && this.hasWater(tr, E) ? 1.2 : 1;
+      const farmBonus = (tr.known.has("farming") ? 1.6 : 0.55) * (tr.policy.id === "food" ? 1.32 : 1);   // no farming = foraging only
       const toolBonus = tr.known.has("tools") ? 1.3 : 1;
       const fireBonus = tr.known.has("fire") ? 1.25 : 1;
       const effort = 0.25 + tr.activeFrac * 0.75;
 
-      tr.food += tr.pop * workMul * E.food * farmBonus * toolBonus * fireBonus * effort * dt * 1.35;
+      const drought = this.worldEvent?.type === "drought" ? 0.62 : 1;
+      const fieldBonus = 1 + this.countBuild(tr, 6) * .08;
+      tr.food += tr.pop * workMul * E.food * farmBonus * toolBonus * fireBonus * effort * drought * dt * 1.35 * gemBoost * animalBonus * fishingBonus * fieldBonus;
       tr.food -= tr.pop * 0.42 * cv("upkeep", tr.health) * thirst * dt;
+      if (this.worldEvent?.type === "flood" && Math.random() < dt * .012) tr.food = Math.max(0, tr.food - 2);
+      this.updateIllness(tr, dt, water);
 
       if (tr.activeFrac < 0.35 && performance.now() - tr.idleLogged > 12000) {
         tr.idleLogged = performance.now();
@@ -1196,8 +1644,10 @@ const SIM = {
       }
 
       if (tr.food < 0) {
+        this.requestEmergencyAid(tr);
         tr.food = 0;
         tr.pop = Math.max(0, tr.pop - dt * 1.3 * cv("upkeep", tr.health));
+        tr.lastThreat = "starvation";
         tr.morale = Math.max(0.35, tr.morale - dt * 0.08);
         if (!tr.starveLogged) { this.pushLog(tr, t("evStarve")); tr.starveLogged = true; }
       } else {
@@ -1217,29 +1667,60 @@ const SIM = {
       tr.gainT += dt;
       if (tr.food > tr.pop * 1.6 && tr.pop < cap && tr.gainT > 0.9) {
         tr.gainT = 0;
-        tr.pop += 1 * E.growth * cv("growth", tr.health) * (water ? 1 : 0.45);
+        tr.pop += 1 * E.growth * cv("growth", tr.health) * (water ? 1 : 0.45) * (tr.policy.id === "food" ? 1.22 : 1) * (tr.sick > 1 ? .45 : 1);
         tr.food -= tr.pop * 0.35;
         if (Math.floor(tr.pop / 15) > Math.floor(tr.lastPopLog / 15)) { this.pushLog(tr, t("evGrow")(Math.floor(tr.pop))); tr.lastPopLog = tr.pop; }
       }
 
       // Expansion still scales with effort, so a lazy tribe also spreads slowly.
       tr.expandT += dt;
-      const wheel = tr.known.has("wheel") ? 0.65 : 1;
+      // A wheel is only an idea. Fast expansion arrives after the tribe also
+      // learns animal transport and can visibly move people and supplies.
+      const wheel = tr.known.has("transport") ? 0.54 : tr.known.has("wheel") ? 0.86 : 1;
       if (tr.pop >= 4 && tr.expandT > Math.max(0.3, (1.7 - cv("output", tr.work) * 0.5 - tr.pop * 0.01) * wheel)) {
         tr.expandT = 0;
-        if (this.claimFree(tr)) { tr.expandCount = (tr.expandCount || 0) + 1; if (tr.expandCount % 12 === 0) this.pushLog(tr, t("evExpand"), "work"); }
+        const claimed = this.claimFree(tr);
+        if (claimed !== false) {
+          tr.expandCount = (tr.expandCount || 0) + 1;
+          if (tr.known.has("transport")) {
+            const p = this.xy(tr.home), q = this.xy(claimed);
+            this.effects.push({ type: "travel", x: p.x, y: p.y, x2: q.x, y2: q.y, life: 3.5, max: 3.5, color: tr.color });
+            if (!tr.wheelTravelLogged || performance.now() - tr.wheelTravelLogged > 9000) { this.pushLog(tr, t("wheelTravel"), "work"); tr.wheelTravelLogged = performance.now(); }
+            if (Math.random() < .38) this.claimFree(tr);
+          }
+          if (tr.expandCount % 12 === 0) this.pushLog(tr, t("evExpand"), "work");
+          // The final chapter is an exploration rush: by the result screen,
+          // students can read a mostly explored world instead of tiny islands.
+          if (this.simT > SIM_DURATION * .68) for (let n = 0; n < 6; n++) this.claimFree(tr);
+        }
       }
       // Building and fighting are now carried out by the workers themselves
       // (see updateWorkers/finishJob) so what you see on the map is what
       // actually drives the simulation.
 
-      if (tr.pop <= 0.5) { tr.alive = false; this.pushLog(tr, t("evLost"), "health"); sfx.bad(); }
+      // A short visible danger phase makes a collapse understandable instead
+      // of looking like a tribe vanished on the next frame.
+      if (tr.pop <= 1.1) {
+        tr.collapseT += dt;
+        if (!tr.collapseWarned) { tr.collapseWarned = true; this.pushLog(tr, t("evCollapse"), "health"); }
+        if (tr.collapseT > 2.4) {
+          tr.alive = false;
+          const key = tr.lastThreat === "illness" ? "evLostIllness" : "evLostStarve";
+          this.pushLog(tr, t(key), tr.lastThreat === "illness" ? "health" : "work"); sfx.bad();
+          const hp = this.xy(tr.home); this.effects.push({ type: "death", x: hp.x, y: hp.y, life: 5, max: 5, color: tr.color });
+          this.queueMoment("death", `${tr.name} COULD NOT CONTINUE`, tr.color);
+        }
+      } else { tr.collapseT = 0; tr.collapseWarned = false; }
     });
 
     this.tribes.forEach(tr => {
       if (tr.alive && this.owner[tr.home] !== tr.idx) {
-        tr.alive = false; this.pushLog(tr, t("evLost"), "aggro");
+        const conqueror = this.tribes[this.owner[tr.home]];
+        tr.alive = false; tr.lastThreat = "conquest"; this.pushLog(tr, t("evLostConquest"), "aggro");
+        if (conqueror && !conqueror.defeated.includes(tr.name)) conqueror.defeated.push(tr.name);
         this.banner = { text: t("kingFell")(tr.name), color: tr.color, life: 2.2 };
+        const hp = this.xy(tr.home); this.effects.push({ type: "death", x: hp.x, y: hp.y, life: 5, max: 5, color: tr.color });
+        this.queueMoment("death", `${tr.name} CAPITAL FELL`, tr.color);
       }
     });
     if (war && !this.warAnnounced) {
@@ -1247,9 +1728,6 @@ const SIM = {
       this.banner = { text: t("warBegins"), color: "#ff6b6b", life: 2.6 };
       sfx.bad();
     }
-    this.battles = this.battles.filter(b => (b.life -= dt) > 0);
-    this.toasts = this.toasts.filter(x => (x.life -= dt) > 0);
-    if (this.banner && (this.banner.life -= dt) <= 0) this.banner = null;
     if (this.simT >= SIM_DURATION || this.tribes.filter(x => x.alive).length <= 1) this.finish();
   },
 
@@ -1268,13 +1746,21 @@ const SIM = {
       if (this.owner[i] !== tr.idx) continue;
       for (const n of this.neighbors(i)) {
         if (this.owner[n] !== -1) continue;
-        if (this.feat[n] === F_WATER && !tr.known.has("boats")) continue;
-        frontier.push(n); break;
+        if (this.feat[n] === F_WATER && !tr.known.has("boats") && !tr.known.has("bridge")) continue;
+        frontier.push({ tile: n, from: i }); break;
       }
     }
     if (!frontier.length) return false;
-    this.owner[frontier[Math.floor(Math.random() * frontier.length)]] = tr.idx;
-    return true;
+    const chosen = frontier[Math.floor(Math.random() * frontier.length)], tile = chosen.tile;
+    this.owner[tile] = tr.idx;
+    if (this.feat[tile] === F_WATER && !tr.known.has("boats") && tr.known.has("bridge") && tr.wood >= 1 && tr.stone >= 1) {
+      tr.wood--; tr.stone--; this.build[tile] = 4;
+    }
+    if (this.feat[tile] === F_WATER && tr.known.has("boats")) {
+      const a = this.xy(chosen.from), b = this.xy(tile);
+      this.effects.push({ type: "boatTravel", x: a.x, y: a.y, x2: b.x, y2: b.y, life: 3, max: 3, color: tr.color });
+    }
+    return tile;
   },
   attack(tr, E) {
     const targets = [];
@@ -1288,20 +1774,23 @@ const SIM = {
     if (!targets.length) return false;
     const tile = targets[Math.floor(Math.random() * targets.length)];
     const def = this.tribes[this.owner[tile]];
-    const metal = tr.known.has("metal") ? 1.3 : 1, army = tr.known.has("army") ? 1.45 : 1;
+    const metal = tr.known.has("metal") ? 1.3 : 1, army = tr.known.has("army") ? (this.countBuild(tr, 7) ? 1.6 : 1.12) : 1;
     const wall = this.build[tile] === 2 ? 1.5 : 1;
     const atk = tr.pop * cv("attack", tr.aggro) * 0.3 * tr.morale * E.strength * metal * army;
-    const dfn = def.pop * (0.35 + def.health * 0.18) * def.morale * wall * (def.known.has("walls") ? 1.15 : 1);
+    const dfn = def.pop * (0.35 + def.health * 0.18) * def.morale * wall * (def.known.has("walls") ? 1.15 : 1) * (def.allyDefence > 0 ? 1.3 : 1);
     if (!tr.attackLogged || performance.now() - tr.attackLogged > 9000) {
-      this.pushLog(tr, t("evAttack")(def.name)); tr.attackLogged = performance.now();
+      const why = tr.policy.id === "conquest" ? "expand territory" : tr.food < tr.pop * .7 ? "need food" : tr.known.has("army") ? "army is ready" : "protect the border";
+      this.pushLog(tr, t("evAttack")(def.name)); this.pushLog(tr, t("evAttackWhy")(why)); tr.attackLogged = performance.now();
     }
+    def.defendT = 9;
+    const bp = this.xy(tile);
+    this.battles.push({ x: bp.x, y: bp.y, life: 3.1, max: 3.1, attacker: tr.color, defender: def.color, wall: this.build[tile] === 2 });
+    this.queueMoment("fight", `BATTLE · ${tr.name} VS ${def.name}`, "#fb7185");
     if (atk > dfn * (0.75 + Math.random() * 0.5)) {
-      this.owner[tile] = tr.idx; this.build[tile] = 0;
+      this.owner[tile] = tr.idx; this.build[tile] = 0; tr.captures++;
       def.morale = Math.max(0.35, def.morale - 0.05);
       def.pop = Math.max(0, def.pop - 0.35);
       tr.pop = Math.max(0, tr.pop - 0.12);
-      const p = this.xy(tile);
-      this.battles.push({ x: p.x, y: p.y, life: 0.45 });
       if (!tr.capLogged || performance.now() - tr.capLogged > 7000) { this.pushLog(tr, t("evCapture")(def.name)); tr.capLogged = performance.now(); }
       if (this.speed <= 2) sfx.battle();
       return true;
@@ -1334,7 +1823,16 @@ const SIM = {
     ui.classList.remove("passthrough");
     sfx.win();
     const rec = loadLearn();
-    const node = el(`<div class="panel">
+    const runner = ranked[1];
+    const discoveries = DISCOVERIES.filter(d => win.tr.known.has(d.id)).map(d => `${d.emoji} ${discName(d)}`);
+    const story = [];
+    if (win.sc.land > runner.sc.land) story.push(lang === "bm" ? `Menguasai ${win.sc.land - runner.sc.land} petak tanah lebih banyak daripada tempat kedua.` : `Controlled ${win.sc.land - runner.sc.land} more land tiles than second place.`);
+    if (win.tr.captures) story.push(lang === "bm" ? `Menawan ${win.tr.captures} petak musuh dalam pertempuran.` : `Captured ${win.tr.captures} enemy tiles in battle.`);
+    if (win.tr.defeated.length) story.push(lang === "bm" ? `Menjatuhkan ${win.tr.defeated.join(", ")}.` : `Defeated ${win.tr.defeated.join(", ")}.`);
+    else story.push(lang === "bm" ? `Tidak menawan ibu kota puak lain; kemenangan datang daripada perkembangan dan pengetahuan.` : `Did not conquer another capital; the win came from growth and knowledge.`);
+    if (win.sc.know > runner.sc.know) story.push(lang === "bm" ? `Mempunyai kelebihan pengetahuan sebanyak ${win.sc.know - runner.sc.know} mata.` : `Held a ${win.sc.know - runner.sc.know}-point knowledge advantage.`);
+    const conquestResult = win.tr.defeated.length === this.tribes.length - 1 ? (lang === "bm" ? "Ya — semua puak lain telah ditawan." : "Yes — every other tribe was conquered.") : (lang === "bm" ? `Tidak — ${win.tr.defeated.length} daripada ${this.tribes.length - 1} puak ditawan.` : `No — ${win.tr.defeated.length} of ${this.tribes.length - 1} rival tribes were conquered.`);
+    const node = el(`<div class="panel result-panel">
       <div class="big-emoji">🏆</div>
       <h2>${t("resultTitle")}</h2>
       <div class="result-rank" style="color:${win.tr.color}">${t("winner")(win.tr.name)}</div>
@@ -1346,12 +1844,38 @@ const SIM = {
           <span>🏠 ${t("scBuild")}</span><b>${win.sc.build}</b>
           <span>🧠 ${t("scKnow")}</span><b>${win.sc.know}</b>
           <span>👥 ${t("scPeople")}</span><b>${Math.round(win.sc.people)}</b>
+          <span>⬆️ ${t("reportStage")}</span><b>${this.stageTitle(win.tr.stage)}</b>
         </div>
         <div class="why-main">▲ ${t(contrib.k)}</div>
       </div>
+      <div class="victory-story">
+        <b>${lang === "bm" ? "CERITA KEMENANGAN" : "VICTORY STORY"}</b>
+        ${story.map(s => `<p>✓ ${s}</p>`).join("")}
+        <p><strong>${lang === "bm" ? "Menawan semua puak?" : "Conquered every tribe?"}</strong> ${conquestResult}</p>
+        <p><strong>${lang === "bm" ? "Penemuan penting:" : "Important discoveries:"}</strong> ${discoveries.slice(-10).join(" · ") || "—"}</p>
+      </div>
+      <div class="why-box intelligence-box">
+        <div class="why-title">🧠 ${t("reportTitle")}</div>
+        <div class="why-grid">
+          <span>${t("reportPolicy")}</span><b>${win.tr.policy.emoji} ${t(win.tr.policy.key)}</b>
+          <span>${t("reportSmart")}</span><b>${this.intelligenceReport(win.tr).smart}</b>
+          <span>${t("reportIll")}</span><b>${Math.ceil(win.tr.illnessLoss)}</b>
+          <span>${t("reportTech")}</span><b>${this.intelligenceReport(win.tr).tech}</b>
+        </div>
+        <div class="why-main">${t("reportLuck")}: ${this.intelligenceReport(win.tr).risk}</div>
+      </div>
+      <div class="student-summary">
+        ${ranked.map(r => {
+          const note = this.choiceFeedback(r.tr);
+          return `<div class="summary-row" style="--c:${r.tr.color}">
+            <b>${r.tr.name} · ${r.tr.policy.emoji} ${t(r.tr.policy.key)}</b>
+            <span><i>✓</i> ${note.good} <i>→</i> ${note.try}</span>
+          </div>`;
+        }).join("")}
+      </div>
       <div class="civ-rank">${ranked.map((r, i) => `
         <div class="civ-rank-row" style="--c:${r.tr.color}">
-          <span>${i + 1}. ${r.tr.name} ${DISCOVERIES.filter(d => r.tr.known.has(d.id)).map(d => d.emoji).join("")}</span>
+          <span>${i + 1}. ${r.tr.name} · ${this.stageTitle(r.tr.stage)} · ${r.tr.policy.emoji}</span>
           <b>${r.sc.total}</b>
         </div>`).join("")}</div>
       <div class="best-line">${t("bestToday")(bestNow)} · ${t("runsToday")(rec.runs)}</div>
@@ -1378,7 +1902,7 @@ const SIM = {
   exitReview() { this.reviewChip?.remove(); this.reviewChip = null; },
 
   onFrame(dt) {
-    if (this.running) {
+    if (this.running && !this.paused) {
       const total = dt * this.speed;
       const steps = Math.min(12, Math.max(1, Math.ceil(total / 0.05)));
       for (let i = 0; i < steps && this.running; i++) { this.simT += total / steps; this.step(total / steps); }
@@ -1396,6 +1920,17 @@ const SIM = {
         col?.classList.toggle("leading", i === leader);
       });
     }
+    // Visual story moments use real screen time, not simulation time. At
+    // ×10 speed an attack/cooperation/death animation still remains visible
+    // for its full duration instead of vanishing ten times faster.
+    if (!this.paused) {
+      this.battles = this.battles.filter(b => (b.life -= dt) > 0);
+      this.effects = this.effects.filter(e => (e.life -= dt) > 0);
+      this.toasts = this.toasts.filter(x => (x.life -= dt) > 0);
+      if (this.banner && (this.banner.life -= dt) <= 0) this.banner = null;
+      if (!this.currentMoment && this.momentQueue.length) this.currentMoment = this.momentQueue.shift();
+      if (this.currentMoment && (this.currentMoment.life -= dt) <= 0) this.currentMoment = null;
+    }
     this.draw();
   },
 
@@ -1405,39 +1940,229 @@ const SIM = {
     const availW = innerWidth - left - right, availH = innerHeight - top - bottom;
     const cell = Math.max(4, Math.floor(Math.min(availW / COLS, availH / ROWS)));
     const w = cell * COLS, h = cell * ROWS;
-    return { cell, w, h, ox: left + (availW - w) / 2, oy: top + (availH - h) / 2 };
+    // Snap the whole map to physical pixels. Fractional canvas coordinates
+    // soften a pixel sprite even when image smoothing is disabled.
+    return { cell, w, h, ox: Math.round(left + (availW - w) / 2), oy: Math.round(top + (availH - h) / 2) };
   },
   buildTerrain(cell) {
     const E = ERAS[this.era];
     const c = document.createElement("canvas");
     c.width = COLS * cell; c.height = ROWS * cell;
     const g = c.getContext("2d");
+    // Terrain is cached, so we can afford richer tile art without putting
+    // extra work into the simulation's animation loop.
+    g.imageSmoothingEnabled = false;
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
       const i = y * COLS + x, f = this.feat[i];
       const shade = (x + y) % 2 === 0 ? E.ground : E.alt;
+      const px = x * cell, py = y * cell;
+      // Stable, per-tile variation creates a hand-drawn pixel map while
+      // keeping the same world readable for the entire simulation.
+      const seed = ((x * 73856093) ^ (y * 19349663) ^ (i * 83492791)) >>> 0;
+      const dot = Math.max(1, Math.floor(cell * 0.11));
+      const detailed = cell >= 7;
       g.fillStyle = f === F_WATER ? E.water : shade;
-      g.fillRect(x * cell, y * cell, cell, cell);
+      g.fillRect(px, py, cell, cell);
+      // A one-pixel lower edge gives every tile depth at any map scale.
+      g.fillStyle = "rgba(0,0,0,.10)";
+      g.fillRect(px, py + cell - Math.max(1, Math.floor(cell * .08)), cell, Math.max(1, Math.floor(cell * .08)));
+      if (detailed && f !== F_WATER) {
+        g.fillStyle = "rgba(255,255,255,.11)";
+        g.fillRect(px + ((seed >>> 3) % Math.max(1, cell - dot)), py + ((seed >>> 9) % Math.max(1, cell - dot)), dot, dot);
+        g.fillStyle = "rgba(0,0,0,.11)";
+        g.fillRect(px + ((seed >>> 15) % Math.max(1, cell - dot)), py + ((seed >>> 21) % Math.max(1, cell - dot)), dot, dot);
+        // Era-specific micro details make the same simulation rules look like
+        // genuinely different worlds, not just palette swaps.
+        if (this.era === "forest") {
+          g.fillStyle = "rgba(175,235,110,.30)";
+          g.fillRect(px + cell * .17, py + cell * .67, dot, Math.max(1, cell * .17));
+          g.fillRect(px + cell * .23, py + cell * .61, dot, Math.max(1, cell * .23));
+        } else if (this.era === "beach") {
+          g.fillStyle = "rgba(120,82,38,.22)";
+          g.fillRect(px + cell * .22, py + cell * .28, dot, dot);
+          g.fillRect(px + cell * .68, py + cell * .68, dot, dot);
+        } else if (this.era === "cave") {
+          g.fillStyle = "rgba(25,20,18,.30)";
+          g.fillRect(px + cell * .24, py + cell * .31, dot, Math.max(1, cell * .26));
+          g.fillRect(px + cell * .24, py + cell * .51, Math.max(1, cell * .30), dot);
+        } else if (this.era === "ice") {
+          g.fillStyle = "rgba(242,252,255,.25)";
+          g.fillRect(px + cell * .18, py + cell * .24, Math.max(1, cell * .29), dot);
+        }
+      }
       if (f === F_TREE) {
+        // Tree shadow, trunk, two canopy shades and a light leaf pixel.
+        g.fillStyle = "rgba(0,0,0,.20)";
+        g.fillRect(px + cell * .21, py + cell * .76, cell * .62, Math.max(1, cell * .12));
+        g.fillStyle = "#74451f";
+        g.fillRect(px + cell * .43, py + cell * .53, Math.max(1, cell * .16), cell * .34);
         g.fillStyle = E.tree;
-        g.fillRect(x * cell + cell * 0.42, y * cell + cell * 0.55, Math.max(1, cell * 0.16), cell * 0.4);
-        g.beginPath();
-        g.moveTo(x * cell + cell * 0.5, y * cell + cell * 0.08);
-        g.lineTo(x * cell + cell * 0.86, y * cell + cell * 0.66);
-        g.lineTo(x * cell + cell * 0.14, y * cell + cell * 0.66);
-        g.closePath(); g.fill();
+        g.fillRect(px + cell * .24, py + cell * .36, cell * .56, cell * .30);
+        g.fillRect(px + cell * .34, py + cell * .17, cell * .36, cell * .55);
         g.fillStyle = E.treeDot;
-        g.fillRect(x * cell + cell * 0.44, y * cell + cell * 0.3, Math.max(1, cell * 0.12), Math.max(1, cell * 0.12));
+        g.fillRect(px + cell * .39, py + cell * .24, Math.max(1, cell * .19), Math.max(1, cell * .15));
+        if (detailed) {
+          g.fillStyle = "rgba(255,255,255,.16)";
+          g.fillRect(px + cell * .32, py + cell * .39, dot, dot);
+          g.fillStyle = "rgba(0,0,0,.18)";
+          g.fillRect(px + cell * .66, py + cell * .56, dot, dot);
+        }
       } else if (f === F_ROCK) {
+        // Square facets read more clearly than a smooth ellipse at small size.
+        g.fillStyle = "rgba(0,0,0,.20)";
+        g.fillRect(px + cell * .21, py + cell * .73, cell * .60, Math.max(1, cell * .12));
         g.fillStyle = E.rock;
-        g.beginPath(); g.ellipse(x * cell + cell / 2, y * cell + cell * 0.62, cell * 0.34, cell * 0.26, 0, 0, 7); g.fill();
-        g.fillStyle = "rgba(255,255,255,.18)";
-        g.beginPath(); g.ellipse(x * cell + cell * 0.42, y * cell + cell * 0.52, cell * 0.12, cell * 0.09, 0, 0, 7); g.fill();
+        g.fillRect(px + cell * .24, py + cell * .48, cell * .56, cell * .26);
+        g.fillRect(px + cell * .34, py + cell * .36, cell * .34, cell * .42);
+        g.fillStyle = "rgba(255,255,255,.24)";
+        g.fillRect(px + cell * .35, py + cell * .44, Math.max(1, cell * .16), Math.max(1, cell * .12));
+        g.fillStyle = "rgba(0,0,0,.22)";
+        g.fillRect(px + cell * .60, py + cell * .62, Math.max(1, cell * .14), Math.max(1, cell * .12));
+      } else if (f === F_GEM) {
+        g.fillStyle = "rgba(0,0,0,.28)";
+        g.fillRect(px + cell * .22, py + cell * .76, cell * .58, Math.max(1, cell * .1));
+        g.fillStyle = "#573a7d";
+        g.fillRect(px + cell * .37, py + cell * .46, cell * .28, cell * .30);
+        g.fillStyle = "#c084fc";
+        g.fillRect(px + cell * .42, py + cell * .20, cell * .18, cell * .56);
+        g.fillStyle = "#f5d0fe";
+        g.fillRect(px + cell * .45, py + cell * .27, Math.max(1, cell * .09), cell * .18);
+      } else if (f === F_ANIMAL) {
+        // Wild cows and sheep are a findable resource; only Animal Farming turns them into steady food.
+        g.fillStyle = "#f1e1c0";
+        g.fillRect(px + cell * .25, py + cell * .48, cell * .42, cell * .25);
+        g.fillRect(px + cell * .62, py + cell * .40, cell * .18, cell * .20);
+        g.fillStyle = "#5b3c2c";
+        g.fillRect(px + cell * .68, py + cell * .46, Math.max(1, cell * .06), Math.max(1, cell * .06));
+        g.fillRect(px + cell * .32, py + cell * .68, Math.max(1, cell * .08), cell * .14);
+        g.fillRect(px + cell * .58, py + cell * .68, Math.max(1, cell * .08), cell * .14);
+      } else if (f === F_IRON) {
+        g.fillStyle = "#475569";
+        g.fillRect(px + cell * .22, py + cell * .48, cell * .56, cell * .28);
+        g.fillRect(px + cell * .34, py + cell * .35, cell * .34, cell * .43);
+        g.fillStyle = "#f97316";
+        g.fillRect(px + cell * .38, py + cell * .48, cell * .12, cell * .10);
+        g.fillRect(px + cell * .58, py + cell * .62, cell * .11, cell * .09);
       } else if (f === F_WATER) {
-        g.fillStyle = "rgba(255,255,255,.16)";
-        g.fillRect(x * cell + cell * 0.15, y * cell + cell * 0.45, cell * 0.7, Math.max(1, cell * 0.1));
+        // Two offset wave bands avoid a flat blue field. Ice Age additionally
+        // gets a pale crack/ice shard pattern.
+        g.fillStyle = "rgba(0,0,0,.12)";
+        g.fillRect(px, py + cell * .82, cell, Math.max(1, cell * .12));
+        g.fillStyle = "rgba(255,255,255,.24)";
+        g.fillRect(px + cell * .12, py + cell * .34, cell * .35, Math.max(1, cell * .10));
+        g.fillRect(px + cell * .58, py + cell * .60, cell * .26, Math.max(1, cell * .10));
+        if (detailed) {
+          g.fillStyle = "rgba(255,255,255,.15)";
+          g.fillRect(px + ((seed >>> 5) % Math.max(1, cell - dot)), py + ((seed >>> 13) % Math.max(1, cell - dot)), dot, dot);
+        }
+        if (E.frozen) {
+          g.fillStyle = "rgba(235,250,255,.38)";
+          g.fillRect(px + cell * .42, py + cell * .16, Math.max(1, cell * .08), cell * .58);
+          g.fillRect(px + cell * .28, py + cell * .43, cell * .38, Math.max(1, cell * .08));
+        }
+        // White coast pixels outline every shore. This gives rivers and lakes
+        // a readable shape, especially in the Coast era.
+        const edge = Math.max(1, Math.floor(cell * .08));
+        g.fillStyle = "rgba(235,252,255,.48)";
+        const north = y ? this.feat[(y - 1) * COLS + x] : F_NONE;
+        const south = y < ROWS - 1 ? this.feat[(y + 1) * COLS + x] : F_NONE;
+        const west = x ? this.feat[y * COLS + x - 1] : F_NONE;
+        const east = x < COLS - 1 ? this.feat[y * COLS + x + 1] : F_NONE;
+        if (north !== F_WATER) g.fillRect(px + cell * .12, py, cell * .76, edge);
+        if (south !== F_WATER) g.fillRect(px + cell * .12, py + cell - edge, cell * .76, edge);
+        if (west !== F_WATER) g.fillRect(px, py + cell * .16, edge, cell * .68);
+        if (east !== F_WATER) g.fillRect(px + cell - edge, py + cell * .16, edge, cell * .68);
       }
     }
     return c;
+  },
+  drawBuilding(px, py, cell, type, color) {
+    const roof = this.era === "ice" ? "#64748b" : this.era === "cave" ? "#795548" : this.era === "beach" ? "#c46b3c" : "#d9534f";
+    const wall = this.era === "ice" ? "#b8d5e5" : this.era === "cave" ? "#8a735d" : this.era === "beach" ? "#d5a869" : "#79471f";
+    if (type === 4) {
+      // A simple timber bridge is the visible proof that this tribe can cross water.
+      ctx.fillStyle = "#4b2c18";
+      ctx.fillRect(px, py + cell * .42, cell, cell * .22);
+      ctx.fillStyle = "#d59a52";
+      ctx.fillRect(px, py + cell * .47, cell, cell * .10);
+      for (let x = .12; x < 1; x += .25) { ctx.fillStyle = "#2b180e"; ctx.fillRect(px + cell * x, py + cell * .35, Math.max(1, cell * .07), cell * .35); }
+    } else if (type === 1) {
+      // Hut: shadow, walls, door, roof, chimney and a little tribal flag.
+      ctx.fillStyle = "rgba(0,0,0,.25)";
+      ctx.fillRect(px + cell * .18, py + cell * .76, cell * .68, Math.max(1, cell * .12));
+      ctx.fillStyle = wall;
+      ctx.fillRect(px + cell * .24, py + cell * .47, cell * .52, cell * .31);
+      ctx.fillStyle = "#c98b3a";
+      ctx.fillRect(px + cell * .31, py + cell * .51, cell * .38, Math.max(1, cell * .09));
+      ctx.fillStyle = "#3b2415";
+      ctx.fillRect(px + cell * .47, py + cell * .62, cell * .12, cell * .16);
+      ctx.fillStyle = roof;
+      ctx.fillRect(px + cell * .18, py + cell * .35, cell * .64, cell * .16);
+      ctx.fillRect(px + cell * .30, py + cell * .23, cell * .40, cell * .17);
+      ctx.fillStyle = "rgba(255,230,170,.35)";
+      ctx.fillRect(px + cell * .34, py + cell * .29, cell * .16, Math.max(1, cell * .07));
+      if (cell >= 9) {
+        ctx.fillStyle = "#5b361e";
+        ctx.fillRect(px + cell * .68, py + cell * .20, Math.max(1, cell * .08), cell * .24);
+        ctx.fillStyle = color;
+        ctx.fillRect(px + cell * .76, py + cell * .18, cell * .12, cell * .12);
+        ctx.fillStyle = "rgba(255,244,190,.58)";
+        ctx.fillRect(px + cell * .17, py + cell * .59, cell * .10, cell * .09);
+      }
+    } else if (type === 3) {
+      // Clinic: a bright roof and cross make a discovered cure visible on
+      // the map, so students can link Medicine to a real survival benefit.
+      ctx.fillStyle = "rgba(0,0,0,.25)";
+      ctx.fillRect(px + cell * .16, py + cell * .77, cell * .68, Math.max(1, cell * .12));
+      ctx.fillStyle = "#e9f5ff";
+      ctx.fillRect(px + cell * .22, py + cell * .42, cell * .56, cell * .37);
+      ctx.fillStyle = "#d9475d";
+      ctx.fillRect(px + cell * .44, py + cell * .48, cell * .12, cell * .25);
+      ctx.fillRect(px + cell * .36, py + cell * .56, cell * .28, cell * .10);
+      ctx.fillStyle = "#7ac7e6";
+      ctx.fillRect(px + cell * .20, py + cell * .30, cell * .60, cell * .15);
+      ctx.fillStyle = "#334155";
+      ctx.fillRect(px + cell * .48, py + cell * .65, cell * .12, cell * .14);
+    } else if (type === 5) {
+      // Fence, shed and a tiny animal turn Animal Farming into a readable map story.
+      ctx.fillStyle = "#6b3f22";
+      ctx.fillRect(px + cell * .12, py + cell * .70, cell * .76, Math.max(1, cell * .08));
+      [0.16, .42, .68, .84].forEach(k => ctx.fillRect(px + cell * k, py + cell * .43, Math.max(1, cell * .07), cell * .36));
+      ctx.fillStyle = "#b86f35";
+      ctx.fillRect(px + cell * .22, py + cell * .36, cell * .24, cell * .22);
+      ctx.fillStyle = "#f5e4bd";
+      ctx.fillRect(px + cell * .53, py + cell * .52, cell * .20, cell * .13);
+      ctx.fillStyle = "#3f2a21";
+      ctx.fillRect(px + cell * .69, py + cell * .55, Math.max(1, cell * .05), Math.max(1, cell * .05));
+    } else if (type === 6) {
+      ctx.fillStyle = "#9b6a2f";
+      ctx.fillRect(px + cell * .10, py + cell * .18, cell * .80, cell * .68);
+      ctx.fillStyle = "#d8bd45";
+      for (let x = .18; x < .9; x += .18) ctx.fillRect(px + cell * x, py + cell * .28, Math.max(1, cell * .06), cell * .48);
+      ctx.fillStyle = "#65a30d";
+      ctx.fillRect(px + cell * .12, py + cell * .74, cell * .76, Math.max(1, cell * .10));
+    } else if (type === 7) {
+      ctx.fillStyle = "#475569"; ctx.fillRect(px + cell * .15, py + cell * .35, cell * .70, cell * .48);
+      ctx.fillStyle = "#94a3b8";
+      [0.16, .41, .66].forEach(k => ctx.fillRect(px + cell * k, py + cell * .23, cell * .18, cell * .22));
+      ctx.fillStyle = "#1e293b"; ctx.fillRect(px + cell * .42, py + cell * .58, cell * .17, cell * .25);
+      ctx.fillStyle = color; ctx.fillRect(px + cell * .64, py + cell * .18, cell * .22, cell * .14);
+    } else {
+      // Wall: crenellations, brick seams and a gate make conquered borders
+      // feel like an actual defended settlement.
+      ctx.fillStyle = "rgba(0,0,0,.24)";
+      ctx.fillRect(px + cell * .08, py + cell * .70, cell * .84, Math.max(1, cell * .13));
+      ctx.fillStyle = "#77808a";
+      ctx.fillRect(px + cell * .10, py + cell * .37, cell * .80, cell * .38);
+      ctx.fillStyle = "#aeb8c2";
+      [0.12, 0.42, 0.72].forEach(k => ctx.fillRect(px + cell * k, py + cell * .28, cell * .16, cell * .18));
+      ctx.fillStyle = "rgba(0,0,0,.25)";
+      ctx.fillRect(px + cell * .10, py + cell * .55, cell * .80, Math.max(1, cell * .08));
+      ctx.fillRect(px + cell * .38, py + cell * .37, Math.max(1, cell * .08), cell * .38);
+      ctx.fillStyle = "#303943";
+      ctx.fillRect(px + cell * .49, py + cell * .58, cell * .15, cell * .17);
+      if (cell >= 10) { ctx.fillStyle = color; ctx.fillRect(px + cell * .17, py + cell * .42, cell * .12, cell * .10); }
+    }
   },
   /* A tiny pixel person, plus a visible action for whatever they are doing —
      a swinging axe on a tree, a pick on stone, a hammer on a build site, a
@@ -1450,13 +2175,59 @@ const SIM = {
     const bob = walking ? Math.sin(w.anim * 1.6) * s * 0.35 : 0;
     ctx.save();
 
+    if (w.boat) {
+      ctx.fillStyle = "#5b351d"; ctx.fillRect(px - s * 1.4, py + s * .25, s * 2.8, s * .42);
+      ctx.fillStyle = "#f8e0a5"; ctx.fillRect(px - s * .12, py - s * 1.25, s * .16, s * 1.55); ctx.fillRect(px, py - s * 1.2, s * .75, s * .75);
+      ctx.fillStyle = tr.color; ctx.fillRect(px - s * .35, py - s * .28, s * .7, s * .7);
+      ctx.restore(); return;
+    }
+    if (walking && tr.known.has("transport")) {
+      ctx.fillStyle = "#8b5a2b";
+      ctx.fillRect(px - s * 1.25, py + s * .15 + bob, s * 2.1, s * .82);
+      ctx.fillRect(px + s * .60, py - s * .35 + bob, s * .65, s * .85);
+      ctx.fillStyle = "#3d2718";
+      ctx.fillRect(px - s * .92, py + s * .78 + bob, s * .28, s * .72);
+      ctx.fillRect(px + s * .42, py + s * .78 + bob, s * .28, s * .72);
+    }
+
     if (w.state === "idle") ctx.globalAlpha = 0.55;
-    // body
+    // A tiny but readable pixel citizen: ground shadow, boots, tunic, face,
+    // hair and one bright eye. It stays clear even when the map is zoomed out.
+    ctx.fillStyle = "rgba(0,0,0,.28)";
+    ctx.fillRect(px - s * .68, py + s * .70 + bob, s * 1.36, Math.max(1, s * .22));
+    ctx.fillStyle = "#39291f";
+    ctx.fillRect(px - s * .52, py + s * .52 + bob, s * .32, s * .28);
+    ctx.fillRect(px + s * .20, py + s * .52 + bob, s * .32, s * .28);
+    // body/tunic
     ctx.fillStyle = tr.color;
     ctx.fillRect(px - s * 0.5, py - s * 0.6 + bob, s, s * 1.3);
+    ctx.fillStyle = "rgba(255,255,255,.28)";
+    ctx.fillRect(px - s * .34, py - s * .45 + bob, s * .20, s * .82);
     // head
     ctx.fillStyle = "#ffe8c8";
     ctx.fillRect(px - s * 0.45, py - s * 1.75 + bob, s * 0.9, s * 0.95);
+    ctx.fillStyle = "#49301f";
+    ctx.fillRect(px - s * .45, py - s * 1.75 + bob, s * .9, s * .24);
+    ctx.fillStyle = "#16202c";
+    ctx.fillRect(px + s * .13, py - s * 1.34 + bob, Math.max(1, s * .16), Math.max(1, s * .16));
+    // Tiny arms and role-coloured headwear help the viewer distinguish a
+    // gathering worker from a soldier at a quick glance.
+    ctx.fillStyle = "#ffe0bb";
+    ctx.fillRect(px - s * .78, py - s * .40 + bob, s * .28, s * .48);
+    ctx.fillRect(px + s * .50, py - s * .40 + bob, s * .28, s * .48);
+    if (w.job?.type === JOB_FIGHT) {
+      ctx.fillStyle = "#c7d2fe";
+      ctx.fillRect(px - s * .50, py - s * 1.88 + bob, s, s * .22);
+      ctx.fillStyle = "#94a3b8"; ctx.fillRect(px - s * .58, py - s * .72 + bob, s * 1.16, s * .95);
+      ctx.fillStyle = "#dbeafe"; ctx.fillRect(px - s * 1.02, py - s * .58 + bob, s * .42, s * .86);
+    } else if (w.job?.type === JOB_TREE || w.job?.type === JOB_FARM) {
+      ctx.fillStyle = "#d8a34d";
+      ctx.fillRect(px - s * .50, py - s * 1.88 + bob, s, s * .22);
+    }
+    if (tr.stage >= 3) {
+      ctx.fillStyle = tr.stage >= 4 ? "#8be9fd" : "#f5d76e";
+      ctx.fillRect(px - s * .18, py - s * .13 + bob, s * .36, s * .42);
+    }
 
     if (w.state === "working" && w.job) {
       const swing = Math.sin(w.anim * 2.2);
@@ -1507,6 +2278,213 @@ const SIM = {
     }
     ctx.restore();
   },
+  drawHomeMarker(tr, px, py, cell) {
+    const u = Math.max(1, cell * .13), pulse = 1 + Math.sin(performance.now() / 320) * .08;
+    ctx.save();
+    ctx.translate(px + cell / 2, py + cell / 2);
+    ctx.scale(pulse, pulse);
+    // Pixel crown/leader marker instead of a platform-dependent emoji.
+    ctx.fillStyle = "rgba(0,0,0,.28)";
+    ctx.fillRect(-u * 3.1, u * 2.0, u * 6.2, Math.max(1, u));
+    ctx.fillStyle = "#ffd95a";
+    ctx.fillRect(-u * 2.6, -u * 1.1, u * 5.2, u * 2.7);
+    ctx.fillRect(-u * 2.6, -u * 2.4, u * 1.1, u * 1.5);
+    ctx.fillRect(-u * .55, -u * 2.8, u * 1.1, u * 1.9);
+    ctx.fillRect(u * 1.5, -u * 2.4, u * 1.1, u * 1.5);
+    ctx.fillStyle = tr.color;
+    ctx.fillRect(-u * 1.8, -u * .22, u * 3.6, u * .58);
+    ctx.fillStyle = "#fff5c2";
+    ctx.fillRect(-u * .35, -u * .65, u * .7, u * .7);
+    // Flag pole and a two-frame flutter derived from time make the capital
+    // feel alive without adding another image asset.
+    ctx.fillStyle = "#69401d";
+    ctx.fillRect(u * 2.35, -u * 3.2, Math.max(1, u * .28), u * 4.2);
+    ctx.fillStyle = tr.color;
+    ctx.fillRect(u * 2.58, -u * 3.05, u * (Math.sin(performance.now() / 260) > 0 ? 1.55 : 1.15), u * .85);
+    ctx.restore();
+  },
+  drawLivingTerrain(ox, oy, cell) {
+    // Only a few tiny wave pixels animate each frame. The static terrain is
+    // still cached, so this gives life to the world without costing frame rate.
+    if (cell < 7) return;
+    const phase = Math.floor(performance.now() / 220) % 3;
+    const wave = Math.max(1, Math.floor(cell * .11));
+    ctx.fillStyle = "rgba(235,252,255,.30)";
+    for (let i = phase; i < this.feat.length; i += 3) {
+      if (this.feat[i] !== F_WATER) continue;
+      const p = this.xy(i);
+      const px = ox + p.x * cell, py = oy + p.y * cell;
+      ctx.fillRect(px + cell * .28, py + cell * (phase === 1 ? .66 : .43), cell * .22, wave);
+    }
+  },
+  drawRiverLabel(ox, oy, cell) {
+    if (!this.river?.length || cell < 6) return;
+    const p = this.xy(this.river[Math.floor(this.river.length * .48)]);
+    const x = ox + (p.x + .5) * cell, y = oy + (p.y + .5) * cell;
+    ctx.save();
+    ctx.font = `900 ${Math.max(9, cell * .52)}px Orbitron, system-ui`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(235,252,255,.78)"; ctx.shadowColor = "#0284c7"; ctx.shadowBlur = 6;
+    ctx.fillText(`≈ ${t("riverName")} ≈`, x, y);
+    ctx.restore();
+  },
+  drawWorldEventOverlay(ox, oy, cell) {
+    const event = this.worldEvent;
+    if (!event) return;
+    const now = performance.now();
+    ctx.save();
+    if (event.type === "drought") {
+      ctx.fillStyle = "rgba(91,52,28,.58)";
+      for (let i = 0; i < this.feat.length; i++) if (this.feat[i] !== F_WATER) {
+        const p = this.xy(i), px = ox + p.x * cell, py = oy + p.y * cell;
+        ctx.fillRect(px, py, cell, cell);
+        if ((p.x * 7 + p.y * 11) % 9 === 0) { ctx.fillStyle = "rgba(55,30,18,.55)"; ctx.fillRect(px + cell * .35, py + cell * .25, Math.max(1, cell * .1), cell * .5); ctx.fillStyle = "rgba(91,52,28,.58)"; }
+      }
+    } else if (event.type === "flood" && event.changed) {
+      ctx.fillStyle = "rgba(186,245,255,.75)";
+      event.changed.forEach((i, n) => { const p = this.xy(i); ctx.fillRect(ox + p.x * cell + ((n + Math.floor(now / 160)) % 2) * cell * .22, oy + p.y * cell + cell * .48, cell * .46, Math.max(1, cell * .11)); });
+    } else if (event.type === "harvest") {
+      ctx.fillStyle = "rgba(250,204,21,.65)";
+      this.tribes.filter(tr => tr.alive).forEach(tr => this.ownedTiles(tr).slice(0, 18).forEach((i, n) => { if (n % 4) return; const p = this.xy(i); ctx.fillRect(ox + (p.x + .38) * cell, oy + (p.y + .24) * cell, Math.max(1, cell * .18), Math.max(1, cell * .5)); }));
+    } else if (event.type === "plague") {
+      ctx.fillStyle = "rgba(126,231,135,.88)";
+      this.tribes.filter(tr => tr.alive).forEach(tr => this.ownedTiles(tr).slice(0, 30).forEach((i, n) => {
+        if (n % 6) return;
+        const p = this.xy(i), px = ox + (p.x + .5) * cell, py = oy + (p.y + .5) * cell, u = Math.max(1, cell * .1);
+        [[0,0],[-2,0],[2,0],[0,-2],[0,2]].forEach(([x,y]) => ctx.fillRect(px + x * u, py + y * u, u, u));
+      }));
+    }
+    ctx.restore();
+  },
+  drawMapEffects(ox, oy, cell) {
+    if (!this.effects?.length) return;
+    const now = performance.now();
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    this.effects.forEach(e => {
+      const a = Math.max(0, Math.min(1, e.life / e.max));
+      const cx = ox + (e.x + .5) * cell, cy = oy + (e.y + .5) * cell;
+      const u = Math.max(1, Math.floor(cell * .16));
+      const pulse = 1 + Math.sin(now / 100 + e.x) * .22;
+      ctx.globalAlpha = Math.min(1, a * 1.45);
+      if (e.type === "tech" || e.type === "evolve") {
+        // Four expanding pixel sparks turn every discovery into a visible
+        // map moment, rather than leaving it only in the text log.
+        const r = cell * (1.0 + (1 - a) * 2.4) * pulse;
+        ctx.fillStyle = e.color;
+        [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dx,dy]) => ctx.fillRect(cx + dx * r - u / 2, cy + dy * r - u / 2, u, u));
+        ctx.fillStyle = "#fff8be";
+        ctx.fillRect(cx - u, cy - u, u * 2, u * 2);
+        ctx.globalAlpha = Math.min(1, a * 2);
+        ctx.font = `900 ${Math.max(10, cell * .72)}px system-ui`;
+        ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+        ctx.fillStyle = "#fff"; ctx.shadowColor = e.color; ctx.shadowBlur = 10;
+        ctx.fillText(e.type === "tech" ? `${t("newDiscovery")} · ${e.icon} ${e.label}` : `⬆️ ${e.label}`, cx, cy - cell * 1.55);
+        ctx.shadowBlur = 0;
+      } else if (e.type === "drought") {
+        ctx.fillStyle = "#ffd95a";
+        ctx.fillRect(cx - u, cy - u, u * 2, u * 2);
+        [[-3,0],[3,0],[0,-3],[0,3],[-2,-2],[2,2],[2,-2],[-2,2]].forEach(([dx,dy]) => ctx.fillRect(cx + dx * u - u / 2, cy + dy * u - u / 2, u, u));
+      } else if (e.type === "flood") {
+        ctx.fillStyle = "#67e8f9";
+        for (let n = 0; n < 3; n++) ctx.fillRect(cx - cell + ((n + Math.floor(now / 190)) % 3) * cell * .65, cy + (n - 1) * u * 2, cell * .46, u);
+      } else if (e.type === "floodSource") {
+        ctx.fillStyle = "#7dd3fc";
+        for (let ring = 1; ring <= 3; ring++) {
+          const r = ring * cell * (.38 + (1 - a) * .16);
+          ctx.fillRect(cx - r, cy - r, r * 2, u);
+          ctx.fillRect(cx - r, cy + r - u, r * 2, u);
+          ctx.fillRect(cx - r, cy - r, u, r * 2);
+          ctx.fillRect(cx + r - u, cy - r, u, r * 2);
+        }
+        ctx.globalAlpha = Math.min(1, a * 2);
+        ctx.font = `900 ${Math.max(10, cell * .68)}px system-ui`;
+        ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+        ctx.fillStyle = "#e0f7ff"; ctx.shadowColor = "#0284c7"; ctx.shadowBlur = 10;
+        ctx.fillText(`🌊 ${e.label}`, cx, cy - cell * 1.6);
+        ctx.shadowBlur = 0;
+      } else if (e.type === "plague" || e.type === "illness") {
+        ctx.fillStyle = "#7ee787";
+        [[0,0],[-2,0],[2,0],[0,-2],[0,2],[-1,-1],[1,1]].forEach(([dx,dy]) => ctx.fillRect(cx + dx * u - u / 2, cy + dy * u - u / 2, u, u));
+        ctx.fillStyle = "#203a2a";
+        ctx.fillRect(cx - u * .4, cy - u * .4, u * .8, u * .8);
+      } else if (e.type === "harvest") {
+        ctx.fillStyle = "#facc15";
+        for (let n = -2; n <= 2; n++) { ctx.fillRect(cx + n * u, cy + u, u, u * 2); ctx.fillRect(cx + n * u - u, cy, u * 3, u); }
+      } else if (e.type === "migration") {
+        ctx.fillStyle = "#f8fafc";
+        for (let n = 0; n < 4; n++) ctx.fillRect(cx - cell + n * u * 2, cy + (n % 2 ? u : -u), u, u);
+      } else if (e.type === "gem") {
+        ctx.fillStyle = "#e9d5ff";
+        for (let n = 0; n < 4; n++) ctx.fillRect(cx + Math.cos(now / 150 + n * 1.57) * cell, cy + Math.sin(now / 150 + n * 1.57) * cell, u * 2, u * 2);
+      } else if (e.type === "death") {
+        const rise = (1 - a) * cell * 2.2;
+        ctx.fillStyle = "rgba(255,255,255,.82)";
+        ctx.fillRect(cx - u, cy - rise - u * 2, u * 2, u * 2);
+        ctx.fillStyle = e.color; ctx.fillRect(cx - u * 1.5, cy - rise, u * 3, u * 2.2);
+        ctx.fillStyle = "#cbd5e1";
+        for (let n = 0; n < 5; n++) ctx.fillRect(cx + (n - 2) * u * 1.3, cy + cell * .7 + Math.sin(now / 130 + n) * u, u, u);
+      } else if (e.type === "alliance" || e.type === "reject" || e.type === "travel" || e.type === "boatTravel" || e.type === "robbery" || e.type === "spy") {
+        const ex = ox + (e.x2 + .5) * cell, ey = oy + (e.y2 + .5) * cell;
+        ctx.strokeStyle = e.color; ctx.lineWidth = Math.max(1, cell * .1); ctx.setLineDash([Math.max(2, cell * .35), Math.max(2, cell * .28)]);
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
+        const progress = (e.type === "travel" || e.type === "boatTravel") ? 1 - a : .5;
+        const mx = cx + (ex - cx) * progress, my = cy + (ey - cy) * progress;
+        ctx.fillStyle = e.type === "boatTravel" ? "#f8e0a5" : e.color;
+        if (e.type === "boatTravel") { ctx.fillRect(mx - u * 2, my, u * 4, u); ctx.fillRect(mx - u, my - u * 2, u * 2, u * 2); }
+        else ctx.fillRect(mx - u, my - u, u * 2, u * 2);
+        if (e.type === "alliance") {
+          ctx.fillStyle = "#ecfdf5"; ctx.fillRect(mx - u * 2.6, my - u, u * 1.5, u * 3); ctx.fillRect(mx + u * 1.1, my - u, u * 1.5, u * 3);
+          ctx.fillStyle = "#fbbf24"; ctx.fillRect(mx - u * 1.1, my, u * 2.2, u);
+          ctx.fillStyle = "#fb7185"; ctx.fillRect(mx - u * .5, my - u * 2.2, u, u); ctx.fillRect(mx - u, my - u * 1.7, u * 2, u);
+        }
+        if (e.type === "reject") { ctx.fillStyle = "#ffe4e6"; ctx.fillRect(ex - u, ey - u, u * 2, u * 2); }
+        if (e.type === "robbery" || e.type === "spy") {
+          ctx.font = `900 ${Math.max(9, cell * .55)}px system-ui`; ctx.textAlign = "center"; ctx.fillStyle = e.color;
+          ctx.fillText(e.type === "robbery" ? "🚨" : "🥸", mx, my - cell);
+        }
+      }
+    });
+    ctx.restore();
+  },
+  drawStoryMoment(ox, oy, mapW) {
+    const m = this.currentMoment;
+    if (!m) return;
+    const progress = 1 - m.life / m.max, pulse = Math.sin(progress * Math.PI * 8);
+    const w = Math.min(360, mapW * .58), h = 92, x = ox + mapW / 2 - w / 2, y = oy + 18;
+    const u = Math.max(3, Math.floor(h / 18)), cy = y + 50;
+    ctx.save(); ctx.globalAlpha = Math.min(1, (m.max - m.life) * 5, m.life * 3);
+    ctx.fillStyle = "rgba(4,2,15,.92)"; ctx.strokeStyle = m.color; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.fill(); ctx.stroke();
+    ctx.shadowColor = m.color; ctx.shadowBlur = 16;
+    const left = x + w * .34, right = x + w * .66;
+    const person = (px, color, lean = 0) => {
+      ctx.fillStyle = color; ctx.fillRect(px - u, cy - u + lean, u * 2, u * 3);
+      ctx.fillStyle = "#ffe1bd"; ctx.fillRect(px - u * .7, cy - u * 2.7 + lean, u * 1.4, u * 1.4);
+    };
+    if (m.type === "fight") {
+      person(left + pulse * u * 2, "#fb7185"); person(right - pulse * u * 2, "#60a5fa");
+      ctx.strokeStyle = "#fff1a8"; ctx.lineWidth = u * .55;
+      ctx.beginPath(); ctx.moveTo(left + u, cy); ctx.lineTo(x + w / 2 + u, cy - u * 3); ctx.moveTo(right - u, cy); ctx.lineTo(x + w / 2 - u, cy - u * 3); ctx.stroke();
+      ctx.fillStyle = "#fff"; ctx.fillRect(x + w / 2 - u, cy - u * 2, u * 2, u * 2);
+    } else if (m.type === "cooperate") {
+      const meet = Math.min(1, progress * 2.2) * w * .10;
+      person(left + meet, "#22d3ee"); person(right - meet, "#facc15");
+      ctx.fillStyle = "#fb7185"; ctx.fillRect(x + w / 2 - u, cy - u * 4 - Math.abs(pulse) * u, u * 2, u * 2); ctx.fillRect(x + w / 2 - u * 1.5, cy - u * 3.4 - Math.abs(pulse) * u, u * 3, u);
+    } else if (m.type === "robbery") {
+      const run = progress * w * .24;
+      person(right - run, "#7c3aed", pulse * u * .3);
+      ctx.fillStyle = "#d6a85f"; ctx.fillRect(right - run + u, cy, u * 2, u * 2);
+      ctx.fillStyle = "#fbbf24"; ctx.fillRect(right - run + u * 1.5, cy + u * .4, u, u);
+      ctx.fillStyle = "#fb7185"; ctx.fillRect(left - u, cy - u * 2, u * 2, u * 5);
+    } else if (m.type === "death") {
+      const fall = Math.min(1, progress * 2.5);
+      ctx.save(); ctx.translate(x + w / 2, cy); ctx.rotate(fall * Math.PI / 2); person(0, m.color); ctx.restore();
+      ctx.fillStyle = "#cbd5e1"; for (let n = 0; n < 5; n++) ctx.fillRect(x + w / 2 + (n - 2) * u * 2, cy + u * 3 + pulse * u, u, u);
+    }
+    ctx.shadowBlur = 0; ctx.font = `900 ${Math.max(10, w * .038)}px Orbitron, system-ui`; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillStyle = "#fff";
+    ctx.fillText(m.text, x + w / 2, y + 10, w - 20); ctx.restore();
+  },
 
   draw() {
     const E = ERAS[this.era];
@@ -1518,30 +2496,50 @@ const SIM = {
     if (!this.terrainCache || this.terrainCache.cell !== cell) {
       this.terrainCache = { cell, canvas: this.buildTerrain(cell) };
     }
+    ctx.imageSmoothingEnabled = false;
     ctx.drawImage(this.terrainCache.canvas, ox, oy);
+    this.drawLivingTerrain(ox, oy, cell);
+    this.drawWorldEventOverlay(ox, oy, cell);
+    this.drawRiverLabel(ox, oy, cell);
 
-    // ownership tint + buildings
+    // Ownership tint, crisp borders and buildings. Border pixels make each
+    // civilization's expanding territory much easier to read at a glance.
     for (let i = 0; i < this.owner.length; i++) {
       const o = this.owner[i];
       if (o === -1) continue;
       const p = this.xy(i), px = ox + p.x * cell, py = oy + p.y * cell;
-      ctx.fillStyle = this.tribes[o].glow + "0.4)";
+      ctx.fillStyle = this.tribes[o].glow + "0.27)";
       ctx.fillRect(px, py, cell, cell);
+      if (cell >= 6) {
+        const edge = Math.max(1, Math.floor(cell * .08));
+        ctx.fillStyle = this.tribes[o].color;
+        const north = p.y === 0 ? -1 : i - COLS, south = p.y === ROWS - 1 ? -1 : i + COLS;
+        const west = p.x === 0 ? -1 : i - 1, east = p.x === COLS - 1 ? -1 : i + 1;
+        if (north < 0 || this.owner[north] !== o) ctx.fillRect(px, py, cell, edge);
+        if (south < 0 || this.owner[south] !== o) ctx.fillRect(px, py + cell - edge, cell, edge);
+        if (west < 0 || this.owner[west] !== o) ctx.fillRect(px, py, edge, cell);
+        if (east < 0 || this.owner[east] !== o) ctx.fillRect(px + cell - edge, py, edge, cell);
+      }
       const b = this.build[i];
-      if (b === 1) {
-        ctx.fillStyle = "#8b5a2b";
-        ctx.fillRect(px + cell * 0.22, py + cell * 0.45, cell * 0.56, cell * 0.42);
-        ctx.fillStyle = "#d9534f";
-        ctx.beginPath();
-        ctx.moveTo(px + cell * 0.5, py + cell * 0.16);
-        ctx.lineTo(px + cell * 0.88, py + cell * 0.5);
-        ctx.lineTo(px + cell * 0.12, py + cell * 0.5);
-        ctx.closePath(); ctx.fill();
-      } else if (b === 2) {
-        ctx.fillStyle = "#9aa0a6";
-        ctx.fillRect(px + cell * 0.1, py + cell * 0.3, cell * 0.8, cell * 0.5);
-        ctx.fillStyle = "rgba(0,0,0,.28)";
-        ctx.fillRect(px + cell * 0.1, py + cell * 0.5, cell * 0.8, Math.max(1, cell * 0.09));
+      if (b) {
+        this.drawBuilding(px, py, cell, b, this.tribes[o].color);
+        if (b === 2) {
+          // Extend the wall sprite onto the exact contested edges so it reads
+          // as a defensive line between civilizations, not a random monument.
+          const edge = Math.max(2, cell * .18);
+          ctx.fillStyle = "#aeb8c2";
+          const foreign = n => n >= 0 && this.owner[n] >= 0 && this.owner[n] !== o;
+          if (foreign(p.y ? i - COLS : -1)) ctx.fillRect(px, py, cell, edge);
+          if (foreign(p.y < ROWS - 1 ? i + COLS : -1)) ctx.fillRect(px, py + cell - edge, cell, edge);
+          if (foreign(p.x ? i - 1 : -1)) ctx.fillRect(px, py, edge, cell);
+          if (foreign(p.x < COLS - 1 ? i + 1 : -1)) ctx.fillRect(px + cell - edge, py, edge, cell);
+        }
+        if (cell >= 10) {
+          const label = ({ 1: "HUT", 2: "WALL", 3: "CLINIC", 4: "BRIDGE", 5: "ANIMAL PEN", 6: "FARM", 7: "ARMY BASE" })[b];
+          ctx.save(); ctx.font = `900 ${Math.max(6, cell * .34)}px Orbitron, system-ui`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+          ctx.fillStyle = "#fff"; ctx.shadowColor = "#05020d"; ctx.shadowBlur = 4;
+          ctx.fillText(label, px + cell * .5, py - Math.max(1, cell * .08)); ctx.restore();
+        }
       }
     }
 
@@ -1551,10 +2549,25 @@ const SIM = {
       tr.workers.forEach(w => this.drawWorker(tr, w, ox, oy, cell));
     });
 
+    // Discoveries, evolution, outbreaks and world events are animated at
+    // the relevant tribe's capital so students can see cause and effect.
+    this.drawMapEffects(ox, oy, cell);
+
     this.battles.forEach(b => {
-      ctx.fillStyle = `rgba(255,220,120,${b.life * 1.7})`;
-      ctx.fillRect(ox + b.x * cell - cell * .3, oy + b.y * cell - cell * .3, cell * 1.6, cell * 1.6);
+      const bx = ox + b.x * cell, by = oy + b.y * cell;
+      const u = Math.max(1, cell * .13), swing = Math.sin(performance.now() / 90) * u * 1.6;
+      // Two pixel citizens/armies meet at the real border tile. A wall is
+      // visible behind the defender, making its combat value easy to see.
+      if (b.wall) { ctx.fillStyle = "#aeb8c2"; ctx.fillRect(bx + cell * .62, by + cell * .12, cell * .18, cell * .72); }
+      [[.18, b.attacker, 1], [.62, b.defender, -1]].forEach(([x, color, dir]) => {
+        ctx.fillStyle = color; ctx.fillRect(bx + cell * x, by + cell * .38, u * 2, u * 3);
+        ctx.fillStyle = "#f7d6b5"; ctx.fillRect(bx + cell * x + u * .45, by + cell * .16, u * 1.1, u * 1.1);
+        ctx.strokeStyle = "#fff1a8"; ctx.lineWidth = u;
+        ctx.beginPath(); ctx.moveTo(bx + cell * x + u, by + cell * .6); ctx.lineTo(bx + cell * x + u + dir * (u * 2 + swing), by + cell * .22); ctx.stroke();
+      });
+      ctx.fillStyle = "#fff4a8"; ctx.fillRect(bx + cell * .46, by + cell * .38, u * 2, u * 2);
     });
+    this.drawStoryMoment(ox, oy, w);
 
     // kings
     this.tribes.forEach(tr => {
@@ -1568,10 +2581,17 @@ const SIM = {
         ctx.beginPath(); ctx.arc(cx, cy, cell * 1.4 * pulse, 0, 7); ctx.stroke();
       }
       ctx.shadowBlur = 0;
-      ctx.font = `${Math.max(13, cell * 1.6)}px system-ui`;
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.globalAlpha = tr.alive ? 1 : 0.35;
-      ctx.fillText(tr.alive ? "👑" : "💀", cx, cy);
+      if (tr.alive) this.drawHomeMarker(tr, ox + p.x * cell, oy + p.y * cell, cell);
+      else {
+        const skull = Math.max(2, cell * .18);
+        ctx.fillStyle = "#d6d6d6";
+        ctx.fillRect(cx - skull, cy - skull, skull * 2, skull * 1.5);
+        ctx.fillStyle = "#31313a";
+        ctx.fillRect(cx - skull * .55, cy - skull * .45, skull * .35, skull * .35);
+        ctx.fillRect(cx + skull * .20, cy - skull * .45, skull * .35, skull * .35);
+        ctx.fillRect(cx - skull * .6, cy + skull * .6, skull * 1.2, skull * .5);
+      }
       ctx.restore();
     });
 
@@ -1630,9 +2650,15 @@ const SIM = {
 
 /* ---------------- boot ---------------- */
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+  navigator.serviceWorker.register("sw.js").then(reg => reg.update()).catch(() => {});
+  let refreshingForNewWorker = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshingForNewWorker) return;
+    refreshingForNewWorker = true;
+    location.reload();
+  });
 }
-window.__civ = { engine, SIM, CHOOSER, SPEC, CONFIRM, loadLearn, DISCOVERIES, TRAITS, ERAS,
-  _confirm: (era, specs, cb) => { chosenEra = era; show(null); ui.classList.add("passthrough"); CONFIRM.open(specs, cb || (() => {})); },
-  _force: (era, specs) => { show(null); ui.classList.add("passthrough"); SIM.start(era, specs); } };
+window.__civ = { engine, SIM, CHOOSER, SPEC, CONFIRM, loadLearn, DISCOVERIES, TRAITS, ERAS, POLICIES,
+  _confirm: (era, specs, policies = ["research", "food", "defend"], cb = () => {}) => { chosenEra = era; show(null); ui.classList.add("passthrough"); CONFIRM.open(specs, policies, cb); },
+  _force: (era, specs, policies = ["research", "food", "defend"]) => { show(null); ui.classList.add("passthrough"); SIM.start(era, specs, policies); } };
 showIntro();
