@@ -1101,10 +1101,10 @@ const SIM = {
     if (this.timeline.length > 16) this.timeline.shift();
     this.refreshTimeline();
   },
-  queueMoment(type, text, color = "#67e8f9") {
+  queueMoment(type, text, color = "#67e8f9", detail = {}) {
     if (this.currentMoment?.type === type && this.currentMoment?.text === text) return;
     if (this.momentQueue.some(m => m.type === type && m.text === text)) return;
-    this.momentQueue.push({ type, text, color, life: 2.8, max: 2.8 });
+    this.momentQueue.push({ type, text, color, detail, life: 3.6, max: 3.6 });
     if (this.momentQueue.length > 6) this.momentQueue.shift();
   },
   refreshTimeline() {
@@ -1417,7 +1417,7 @@ const SIM = {
       if (accepted) { a.deals ??= {}; b.deals ??= {}; a.deals[b.idx] = b.deals[a.idx] = deal; }
       const p = this.xy(a.home), q = this.xy(b.home);
       this.effects.push({ type: accepted ? "alliance" : "reject", x: p.x, y: p.y, x2: q.x, y2: q.y, life: 5, max: 5, color: accepted ? "#6ee7b7" : "#fb7185" });
-      if (accepted) this.queueMoment("cooperate", `COOPERATION · ${a.name} + ${b.name}`, "#6ee7b7");
+      if (accepted) this.queueMoment("cooperate", `COOPERATION · ${a.name} + ${b.name}`, "#6ee7b7", { left: a.color, right: b.color, deal });
       const noReason = !useful ? "no useful exchange yet" : b.policy.id === "conquest" ? "they prefer to take land themselves" : "they are not ready to trust";
       this.pushLog(a, accepted ? t("evAccept")(b.name) : `${t("evReject")(b.name)} Reason: ${noReason}.`);
       this.pushLog(b, accepted ? t("evAccept")(a.name) : `${t("evReject")(a.name)} Reason: ${noReason}.`);
@@ -1442,7 +1442,7 @@ const SIM = {
         const stolen = Math.min(7, b.food); b.food -= stolen; a.food += stolen;
         this.pushLog(a, `🕵️ Robbed ${stolen} food from ${b.name}.`, "aggro"); this.pushLog(b, `🚨 Robbery! Food was taken by ${a.name}.`, "health");
         this.effects.push({ type: "robbery", x: p.x, y: p.y, x2: q.x, y2: q.y, life: 3.5, max: 3.5, color: "#f59e0b" });
-        this.queueMoment("robbery", `ROBBERY · ${a.name} stole from ${b.name}`, "#f59e0b");
+        this.queueMoment("robbery", `ROBBERY · ${a.name} stole from ${b.name}`, "#f59e0b", { left: a.color, right: b.color, stolen });
       } else if (a.int >= 3 && Math.random() < .30) {
         this.pushLog(a, `🥸 Disguised scout learned ${b.name}'s defence: ${this.countBuild(b, 2)} walls.`, "int");
         this.effects.push({ type: "spy", x: p.x, y: p.y, x2: q.x, y2: q.y, life: 3.5, max: 3.5, color: "#a78bfa" });
@@ -1785,8 +1785,12 @@ const SIM = {
     def.defendT = 9;
     const bp = this.xy(tile);
     this.battles.push({ x: bp.x, y: bp.y, life: 3.1, max: 3.1, attacker: tr.color, defender: def.color, wall: this.build[tile] === 2 });
-    this.queueMoment("fight", `BATTLE · ${tr.name} VS ${def.name}`, "#fb7185");
-    if (atk > dfn * (0.75 + Math.random() * 0.5)) {
+    const attackWon = atk > dfn * (0.75 + Math.random() * 0.5);
+    this.queueMoment("fight", `BATTLE · ${tr.name} VS ${def.name}`, "#fb7185", {
+      left: tr.color, right: def.color, winner: attackWon ? "left" : "right",
+      wall: this.build[tile] === 2, result: attackWon ? "LAND CAPTURED" : "DEFENCE HELD",
+    });
+    if (attackWon) {
       this.owner[tile] = tr.idx; this.build[tile] = 0; tr.captures++;
       def.morale = Math.max(0.35, def.morale - 0.05);
       def.pop = Math.max(0, def.pop - 0.35);
@@ -2450,40 +2454,156 @@ const SIM = {
   drawStoryMoment(ox, oy, mapW) {
     const m = this.currentMoment;
     if (!m) return;
-    const progress = 1 - m.life / m.max, pulse = Math.sin(progress * Math.PI * 8);
-    const w = Math.min(360, mapW * .58), h = 92, x = ox + mapW / 2 - w / 2, y = oy + 18;
-    const u = Math.max(3, Math.floor(h / 18)), cy = y + 50;
-    ctx.save(); ctx.globalAlpha = Math.min(1, (m.max - m.life) * 5, m.life * 3);
-    ctx.fillStyle = "rgba(4,2,15,.92)"; ctx.strokeStyle = m.color; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.fill(); ctx.stroke();
-    ctx.shadowColor = m.color; ctx.shadowBlur = 16;
-    const left = x + w * .34, right = x + w * .66;
-    const person = (px, color, lean = 0) => {
-      ctx.fillStyle = color; ctx.fillRect(px - u, cy - u + lean, u * 2, u * 3);
-      ctx.fillStyle = "#ffe1bd"; ctx.fillRect(px - u * .7, cy - u * 2.7 + lean, u * 1.4, u * 1.4);
-    };
-    if (m.type === "fight") {
-      person(left + pulse * u * 2, "#fb7185"); person(right - pulse * u * 2, "#60a5fa");
-      ctx.strokeStyle = "#fff1a8"; ctx.lineWidth = u * .55;
-      ctx.beginPath(); ctx.moveTo(left + u, cy); ctx.lineTo(x + w / 2 + u, cy - u * 3); ctx.moveTo(right - u, cy); ctx.lineTo(x + w / 2 - u, cy - u * 3); ctx.stroke();
-      ctx.fillStyle = "#fff"; ctx.fillRect(x + w / 2 - u, cy - u * 2, u * 2, u * 2);
-    } else if (m.type === "cooperate") {
-      const meet = Math.min(1, progress * 2.2) * w * .10;
-      person(left + meet, "#22d3ee"); person(right - meet, "#facc15");
-      ctx.fillStyle = "#fb7185"; ctx.fillRect(x + w / 2 - u, cy - u * 4 - Math.abs(pulse) * u, u * 2, u * 2); ctx.fillRect(x + w / 2 - u * 1.5, cy - u * 3.4 - Math.abs(pulse) * u, u * 3, u);
-    } else if (m.type === "robbery") {
-      const run = progress * w * .24;
-      person(right - run, "#7c3aed", pulse * u * .3);
-      ctx.fillStyle = "#d6a85f"; ctx.fillRect(right - run + u, cy, u * 2, u * 2);
-      ctx.fillStyle = "#fbbf24"; ctx.fillRect(right - run + u * 1.5, cy + u * .4, u, u);
-      ctx.fillStyle = "#fb7185"; ctx.fillRect(left - u, cy - u * 2, u * 2, u * 5);
-    } else if (m.type === "death") {
-      const fall = Math.min(1, progress * 2.5);
-      ctx.save(); ctx.translate(x + w / 2, cy); ctx.rotate(fall * Math.PI / 2); person(0, m.color); ctx.restore();
-      ctx.fillStyle = "#cbd5e1"; for (let n = 0; n < 5; n++) ctx.fillRect(x + w / 2 + (n - 2) * u * 2, cy + u * 3 + pulse * u, u, u);
+    const p = Math.max(0, Math.min(1, 1 - m.life / m.max));
+    const ease = v => 1 - Math.pow(1 - Math.max(0, Math.min(1, v)), 3);
+    const enter = ease(p / .12), leave = ease((1 - p) / .10), visible = Math.min(enter, leave);
+    const w = Math.min(470, mapW - 24), h = Math.min(142, Math.max(116, w * .31));
+    const x = ox + mapW / 2 - w / 2, y = oy + 12 - (1 - enter) * 24;
+    const u = Math.max(3, Math.floor(h / 28)), ground = y + h - u * 3.2;
+    const d = m.detail || {}, leftColor = d.left || "#fb7185", rightColor = d.right || "#38bdf8";
+    const beat = Math.sin(p * Math.PI * 18), hitBeat = Math.max(0, Math.sin(p * Math.PI * 10));
+
+    ctx.save(); ctx.globalAlpha = visible;
+    ctx.shadowColor = m.color; ctx.shadowBlur = 22;
+    const panel = ctx.createLinearGradient(x, y, x, y + h);
+    panel.addColorStop(0, "rgba(8,7,22,.97)"); panel.addColorStop(1, "rgba(17,10,31,.94)");
+    ctx.fillStyle = panel; ctx.strokeStyle = m.color; ctx.lineWidth = Math.max(2, u * .6);
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 15); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.save(); ctx.beginPath(); ctx.roundRect(x + 3, y + 3, w - 6, h - 6, 12); ctx.clip();
+    // Pixel sky, distant terrain and scanlines make this read as a small
+    // animated scene rather than a notification covering the map.
+    ctx.fillStyle = "rgba(255,255,255,.025)";
+    for (let sy = y + 30; sy < y + h; sy += 8) ctx.fillRect(x + 4, sy, w - 8, 1);
+    ctx.fillStyle = "rgba(103,232,249,.07)";
+    for (let n = 0; n < 9; n++) {
+      const px = x + ((n * 67 + Math.floor(p * 18)) % Math.max(1, w - 20)) + 10;
+      ctx.fillRect(px, y + 36 + (n % 3) * 7, u * .65, u * .65);
     }
-    ctx.shadowBlur = 0; ctx.font = `900 ${Math.max(10, w * .038)}px Orbitron, system-ui`; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillStyle = "#fff";
-    ctx.fillText(m.text, x + w / 2, y + 10, w - 20); ctx.restore();
+    ctx.fillStyle = "rgba(24,38,48,.92)"; ctx.fillRect(x + 4, ground, w - 8, h);
+    ctx.fillStyle = "rgba(92,126,104,.52)"; ctx.fillRect(x + 4, ground, w - 8, u);
+    for (let gx = x + 8; gx < x + w; gx += u * 5) {
+      ctx.fillStyle = gx % 2 ? "#273f38" : "#21352f"; ctx.fillRect(gx, ground + u, u * 3, u);
+    }
+
+    const flag = (px, color, flip = 1) => {
+      ctx.fillStyle = "#d6c7a1"; ctx.fillRect(px, ground - u * 8, u * .65, u * 8);
+      ctx.fillStyle = color; ctx.fillRect(px + (flip < 0 ? -u * 4 : u * .65), ground - u * 8, u * 4, u * 2.5);
+      ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.fillRect(px + (flip < 0 ? -u * 3.2 : u * 1.3), ground - u * 7.5, u * 1.2, u * .7);
+    };
+    const fighter = (px, py, color, face = 1, action = 0, fall = 0, small = 1) => {
+      const z = small, q = u * z, bob = Math.abs(Math.sin(p * Math.PI * 18 + px)) * q * .45;
+      ctx.save(); ctx.translate(px, py - bob); ctx.rotate(fall * face * Math.PI * .46);
+      ctx.globalAlpha *= small < 1 ? .62 : 1;
+      ctx.fillStyle = "rgba(0,0,0,.42)"; ctx.fillRect(-q * 2.2, q * 2.7, q * 4.4, q * .7);
+      // Boots and animated legs.
+      ctx.fillStyle = "#192231";
+      ctx.fillRect(-q * 1.25 + action * q * .35, q * .8, q, q * 2); ctx.fillRect(q * .25 - action * q * .35, q * .8, q, q * 2);
+      ctx.fillStyle = "#111827"; ctx.fillRect(-q * 1.5 + action * q * .35, q * 2.35, q * 1.4, q * .65); ctx.fillRect(q * .1 - action * q * .35, q * 2.35, q * 1.4, q * .65);
+      // Armour, belt and shoulder plates.
+      ctx.fillStyle = color; ctx.fillRect(-q * 1.45, -q * 1.65, q * 2.9, q * 2.7);
+      ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(-q * 1.8, -q * 1.35, q * .65, q * 1.3); ctx.fillRect(q * 1.15, -q * 1.35, q * .65, q * 1.3);
+      ctx.fillStyle = "#3f2e2b"; ctx.fillRect(-q * 1.45, q * .35, q * 2.9, q * .55);
+      // Face, helmet and one bright eye pixel.
+      ctx.fillStyle = "#f3c99c"; ctx.fillRect(-q, -q * 3.1, q * 2, q * 1.7);
+      ctx.fillStyle = "#64748b"; ctx.fillRect(-q * 1.2, -q * 3.55, q * 2.4, q * .8); ctx.fillRect(-q * 1.05, -q * 3.1, q * 2.1, q * .45);
+      ctx.fillStyle = "#f8fafc"; ctx.fillRect(face > 0 ? q * .35 : -q * .7, -q * 2.45, q * .35, q * .35);
+      // Shield on the rear arm.
+      ctx.fillStyle = "#334155"; ctx.fillRect(face > 0 ? -q * 2.25 : q * 1.35, -q * 1.2, q * .9, q * 2.4);
+      ctx.strokeStyle = "#cbd5e1"; ctx.lineWidth = Math.max(1, q * .28); ctx.strokeRect(face > 0 ? -q * 2.25 : q * 1.35, -q * 1.2, q * .9, q * 2.4);
+      // Sword arm swings during each clash.
+      const handX = face * q * 1.4, handY = -q * .8;
+      ctx.save(); ctx.translate(handX, handY); ctx.rotate(face * (-.72 + action * 1.18));
+      ctx.fillStyle = "#9a6b3b"; ctx.fillRect(-q * .25, -q * .15, q * .5, q * 1.1);
+      ctx.fillStyle = "#f8e7ad"; ctx.fillRect(-q * .22, -q * 3.2, q * .44, q * 3.1);
+      ctx.fillStyle = "#fff"; ctx.fillRect(-q * .1, -q * 3.05, q * .18, q * 2.6);
+      ctx.restore(); ctx.restore();
+    };
+    const label = (text, px, color) => {
+      ctx.font = `900 ${Math.max(7, u * 1.55)}px Orbitron, system-ui`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = color; ctx.fillText(text, px, y + 42);
+    };
+
+    if (m.type === "fight") {
+      flag(x + u * 5, leftColor, 1); flag(x + w - u * 5, rightColor, -1);
+      label("ATTACK", x + w * .18, leftColor); label(d.wall ? "WALL DEFENCE" : "DEFEND", x + w * .82, rightColor);
+      const approach = ease(p / .28), outcome = ease((p - .70) / .16);
+      const clash = p > .24 && p < .76 ? beat : 0, leftWon = d.winner !== "right";
+      const lx = x + w * (.19 + approach * .23) + clash * u * 1.2;
+      const rx = x + w * (.81 - approach * .23) - clash * u * 1.2;
+      // Background troops make the battle feel larger without hiding the map.
+      fighter(lx - u * 7, ground - u * .1, leftColor, 1, -clash, 0, .66);
+      fighter(rx + u * 7, ground - u * .1, rightColor, -1, clash, 0, .66);
+      fighter(lx, ground - u * .1, leftColor, 1, clash, leftWon ? 0 : outcome, 1);
+      fighter(rx, ground - u * .1, rightColor, -1, -clash, leftWon ? outcome : 0, 1);
+      // Impact flash, flying sparks and dust only appear while weapons meet.
+      if (p > .25 && p < .76) {
+        const mx = (lx + rx) / 2, my = ground - u * 3.5;
+        ctx.fillStyle = `rgba(255,247,190,${.25 + hitBeat * .75})`; ctx.fillRect(mx - u, my - u, u * 2, u * 2);
+        for (let n = 0; n < 8; n++) {
+          const a = n * Math.PI / 4 + p * 4, r = u * (2 + hitBeat * 3);
+          ctx.fillStyle = n % 2 ? "#fb7185" : "#fde68a";
+          ctx.fillRect(mx + Math.cos(a) * r, my + Math.sin(a) * r, u * .55, u * .55);
+        }
+        ctx.fillStyle = "rgba(203,213,225,.24)";
+        for (let n = 0; n < 5; n++) ctx.fillRect(mx + (n - 2) * u * 2, ground - Math.abs(beat) * u * 2, u * 1.4, u * .65);
+      }
+      // Health bars drain toward the final result.
+      const barW = w * .23, barY = y + 51;
+      [[x + w * .08, leftColor, leftWon ? .66 : .13], [x + w * .69, rightColor, leftWon ? .13 : .66]].forEach(([bx, color, end]) => {
+        ctx.fillStyle = "#1f2937"; ctx.fillRect(bx, barY, barW, u * .9);
+        ctx.fillStyle = color; ctx.fillRect(bx, barY, barW * (1 - outcome * (1 - end)), u * .9);
+      });
+      if (outcome > .15) {
+        const wx = leftWon ? lx : rx;
+        ctx.globalAlpha *= outcome; ctx.fillStyle = "#facc15";
+        ctx.fillRect(wx - u * 1.4, ground - u * 7.6, u * 2.8, u * .6);
+        ctx.fillRect(wx - u * 1.2, ground - u * 8.5, u * .6, u); ctx.fillRect(wx - u * .3, ground - u * 8.8, u * .6, u * 1.3); ctx.fillRect(wx + u * .6, ground - u * 8.5, u * .6, u);
+      }
+    } else if (m.type === "cooperate") {
+      const meet = ease(p / .42), lx = x + w * (.20 + meet * .25), rx = x + w * (.80 - meet * .25);
+      flag(x + u * 5, leftColor, 1); flag(x + w - u * 5, rightColor, -1);
+      fighter(lx, ground, leftColor, 1, 0, 0, .9); fighter(rx, ground, rightColor, -1, 0, 0, .9);
+      if (p > .35) {
+        const glow = Math.min(1, (p - .35) * 5);
+        ctx.globalAlpha *= glow; ctx.fillStyle = "#facc15"; ctx.fillRect(x + w / 2 - u * 2.6, ground - u * 2.4, u * 5.2, u * 2.4);
+        ctx.fillStyle = "#9a6b3b"; ctx.fillRect(x + w / 2 - u * 2.2, ground - u * 2, u * 4.4, u * 1.6);
+        ctx.fillStyle = "#fb7185"; ctx.fillRect(x + w / 2 - u * .8, ground - u * 6 - Math.abs(beat) * u, u * 1.6, u * 1.6); ctx.fillRect(x + w / 2 - u * 1.2, ground - u * 5.4 - Math.abs(beat) * u, u * 2.4, u);
+      }
+      label("SHARE", x + w * .2, leftColor); label("PROTECT", x + w * .8, rightColor);
+    } else if (m.type === "robbery") {
+      const run = ease(p / .82), tx = x + w * (.76 - run * .56), alarm = p > .55;
+      // Storehouse and sleeping guard.
+      ctx.fillStyle = rightColor; ctx.fillRect(x + w * .76, ground - u * 5, u * 7, u * 5);
+      ctx.fillStyle = "#422006"; ctx.fillRect(x + w * .76 + u * 2.5, ground - u * 2.5, u * 2, u * 2.5);
+      fighter(x + w * .69, ground, rightColor, 1, 0, 0, .7);
+      fighter(tx, ground - Math.abs(beat) * u * .3, leftColor, -1, beat, 0, .85);
+      ctx.fillStyle = "#9a6b3b"; ctx.fillRect(tx + u, ground - u * 2.3, u * 2.4, u * 2.5);
+      ctx.fillStyle = "#facc15"; for (let n = 0; n < 3; n++) ctx.fillRect(tx + u * (1.3 + n * .6), ground - u * (1.9 + n % 2 * .5), u * .4, u * .4);
+      if (alarm) {
+        ctx.fillStyle = "#fb7185"; ctx.fillRect(x + w * .68, y + 41, u * 1.2, u * 3);
+        for (let n = 0; n < 3; n++) ctx.fillRect(x + w * .68 + (n - 1) * u * 2, y + 38 - Math.abs(beat) * u, u, u);
+      }
+      label(`-${d.stolen || "?"} FOOD`, x + w * .5, "#fbbf24");
+    } else if (m.type === "death") {
+      const fall = ease(p / .45), rise = ease((p - .28) / .58), cx = x + w / 2;
+      fighter(cx, ground, d.left || m.color, 1, 0, fall, 1.05);
+      ctx.globalAlpha *= rise * .75; ctx.fillStyle = "#e2e8f0";
+      const gy = ground - u * (4 + rise * 6);
+      ctx.fillRect(cx - u, gy - u * 2, u * 2, u * 2); ctx.fillRect(cx - u * 1.5, gy, u * 3, u * 2.2);
+      ctx.fillStyle = "#94a3b8"; for (let n = 0; n < 6; n++) ctx.fillRect(cx + (n - 3) * u * 1.5, ground + Math.sin(p * 16 + n) * u, u, u);
+    }
+    ctx.restore();
+
+    // Title and outcome remain crisp above the pixel scene.
+    ctx.font = `900 ${Math.max(11, Math.min(18, w * .043))}px Orbitron, system-ui`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillStyle = "#fff"; ctx.shadowColor = m.color; ctx.shadowBlur = 8; ctx.fillText(m.text, x + w / 2, y + 9, w - 24); ctx.shadowBlur = 0;
+    if (m.type === "fight" && d.result && p > .70) {
+      const resultAlpha = ease((p - .70) / .12);
+      ctx.globalAlpha = visible * resultAlpha; ctx.font = `900 ${Math.max(9, u * 1.7)}px Orbitron, system-ui`;
+      ctx.fillStyle = d.winner === "left" ? leftColor : rightColor; ctx.fillText(d.result, x + w / 2, y + h - u * 3, w - 30);
+    }
+    ctx.restore();
   },
 
   draw() {
