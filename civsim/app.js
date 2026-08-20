@@ -10,8 +10,8 @@
    which trait profile won in which era, those real statistics are shown
    back on the setup screen, and they nudge later tribes' starting edge.
 
-   Hand input is deliberately minimal: hold your hand over an option for
-   one second to choose it. No pinching, no gestures.
+   Input is deliberately simple: hold your hand over an option for one
+   second, or point and click with a mouse/trackpad. No pinching required.
 ================================================== */
 import { FilesetResolver, HandLandmarker } from "../gesturegame/vendor/vision_bundle.mjs";
 
@@ -23,8 +23,8 @@ const STR = {
     langBtn: "BM",
     title: "AI Civilization",
     desc: "Give three tribes their stats, choose an era, then watch them explore, discover and fight for the land.",
-    how: "✋ HOLD your hand over an option for 1 second to choose. Then just watch — use the speed buttons to fast-forward.",
-    start: "START ▶", back: "← HUB", again: "PLAY AGAIN ↺",
+    how: "Choose with either your hand or cursor. Hold your hand for 1 second, or simply point and click. Then watch the AI run the world.",
+    start: "START ▶", startHand: "✋ USE HAND + CAMERA", startCursor: "🖱️ USE CURSOR + CLICK", back: "← HUB", again: "PLAY AGAIN ↺",
     loading: "Waking up the AI brain… 🧠",
     loadingCam: "Turning on the camera… 📷",
     camFail: "Camera blocked! Allow camera access in your browser settings, then reload.",
@@ -33,10 +33,10 @@ const STR = {
     calibReady: "Got it! Ready…", calibSkip: "Can't see your hand? Start anyway →",
     camTroubleTitle: "Camera trouble", camTroubleDesc: "The camera feed froze. Trying to reconnect…",
     camReconnecting: "Reconnecting camera…", camRetryBtn: "🔄 TRY AGAIN",
-    handLost: "Show your hand to choose.",
+    handLost: "Show your hand or move the cursor to choose.",
     pickEra: "CHOOSE THE ERA",
     pickSpec: n => `SET UP TRIBE ${n}`,
-    holdToPick: "✋ Hold your hand over an option for 1 second",
+    holdToPick: "✋ Hold for 1 second, or 🖱️ click an option",
     specHint: "Set a level for every stat",
     aiLearned: "🧠 WHAT THE AI HAS LEARNED",
     aiNoData: "🧠 No games yet today — the AI is starting fresh!",
@@ -114,8 +114,8 @@ const STR = {
     langBtn: "EN",
     title: "Tamadun AI",
     desc: "Beri tiga puak statistik mereka, pilih era, kemudian tonton mereka meneroka, menemui dan berebut tanah.",
-    how: "✋ TAHAN tangan di atas pilihan selama 1 saat. Kemudian tonton — guna butang laju untuk mempercepat.",
-    start: "MULA ▶", back: "← HUB", again: "MAIN LAGI ↺",
+    how: "Pilih menggunakan tangan atau kursor. Tahan tangan selama 1 saat, atau tunjuk dan klik. Kemudian tonton AI mengurus dunia.",
+    start: "MULA ▶", startHand: "✋ GUNA TANGAN + KAMERA", startCursor: "🖱️ GUNA KURSOR + KLIK", back: "← HUB", again: "MAIN LAGI ↺",
     loading: "Mengejutkan otak AI… 🧠",
     loadingCam: "Menghidupkan kamera… 📷",
     camFail: "Kamera disekat! Benarkan akses kamera dalam tetapan pelayar, kemudian muat semula.",
@@ -124,10 +124,10 @@ const STR = {
     calibReady: "Dapat! Bersedia…", calibSkip: "Kamera tak nampak tangan? Mula juga →",
     camTroubleTitle: "Masalah kamera", camTroubleDesc: "Suapan kamera terhenti. Cuba sambung semula…",
     camReconnecting: "Menyambung semula kamera…", camRetryBtn: "🔄 CUBA LAGI",
-    handLost: "Tunjukkan tangan untuk memilih.",
+    handLost: "Tunjukkan tangan atau gerakkan kursor untuk memilih.",
     pickEra: "PILIH ERA",
     pickSpec: n => `TETAPKAN PUAK ${n}`,
-    holdToPick: "✋ Tahan tangan di atas pilihan selama 1 saat",
+    holdToPick: "✋ Tahan 1 saat, atau 🖱️ klik pilihan",
     specHint: "Tetapkan tahap untuk setiap statistik",
     aiLearned: "🧠 APA YANG AI TELAH PELAJARI",
     aiNoData: "🧠 Belum ada permainan hari ini — AI bermula dari kosong!",
@@ -509,6 +509,25 @@ const traitLabel = (id) => t(TRAITS.find(x => x.id === id).key);
 
 /* ---------------- loop ---------------- */
 let activeScreen = null;
+let setupUsesCamera = false;
+const pointerInput = { x: 0, y: 0, inside: false };
+function updatePointer(e) {
+  const r = canvas.getBoundingClientRect();
+  pointerInput.x = (e.clientX - r.left) * innerWidth / Math.max(1, r.width);
+  pointerInput.y = (e.clientY - r.top) * innerHeight / Math.max(1, r.height);
+  pointerInput.inside = true;
+}
+function selectionCursor() {
+  return pointerInput.inside ? { x: pointerInput.x, y: pointerInput.y, pointer: true } : engine.cursor();
+}
+canvas.addEventListener("pointermove", updatePointer);
+canvas.addEventListener("pointerenter", updatePointer);
+canvas.addEventListener("pointerleave", (e) => { if (e.pointerType !== "touch") pointerInput.inside = false; });
+canvas.addEventListener("pointerup", (e) => { if (e.pointerType === "touch") pointerInput.inside = false; });
+canvas.addEventListener("pointerdown", (e) => {
+  updatePointer(e);
+  if (activeScreen?.onPointerDown) activeScreen.onPointerDown(pointerInput.x, pointerInput.y);
+});
 let lastT = performance.now();
 function loop(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000);
@@ -527,6 +546,7 @@ requestAnimationFrame(loop);
 function stopAll() {
   if (activeScreen && activeScreen.cleanup) activeScreen.cleanup();
   activeScreen = null;
+  pointerInput.inside = false;
   engine.stopCamera();
   document.body.classList.remove("playing");
   homeBtn.classList.add("hidden"); camBtn.classList.add("hidden"); handStatus.classList.add("hidden");
@@ -622,12 +642,21 @@ function showIntro() {
     ${learnHtml}
     ${rec.runs ? `<div class="best-line">${t("runsToday")(rec.runs)}</div>` : ""}
     <div id="loadArea"></div>
-    <button class="btn" id="startBtn">${t("start")}</button>
+    <button class="btn" id="cursorBtn">${t("startCursor")}</button>
+    <br><button class="btn ghost" id="startBtn" style="font-size:15px;padding:11px 25px">${t("startHand")}</button>
     <br><button class="btn ghost" id="backBtn" style="font-size:15px;padding:10px 24px">${t("back")}</button>
   </div>`);
   node.querySelector("#backBtn").onclick = () => { sfx.click(); location.href = "../"; };
+  node.querySelector("#cursorBtn").onclick = () => {
+    sfx.click(); setupUsesCamera = false; pointerInput.inside = false;
+    document.body.classList.add("playing");
+    homeBtn.classList.remove("hidden"); handStatus.classList.add("hidden"); camBtn.classList.add("hidden");
+    engine.stopCamera(); cam.style.display = "none";
+    show(null); ui.classList.add("passthrough"); startSetup();
+  };
   node.querySelector("#startBtn").onclick = async () => {
     sfx.click();
+    setupUsesCamera = true;
     const b = node.querySelector("#startBtn");
     b.disabled = true; b.style.opacity = 0.4;
     const loadArea = node.querySelector("#loadArea");
@@ -673,6 +702,14 @@ const CHOOSER = {
         y: baseY + (row - (rows - 1) / 2) * (h + gap) };
     });
   },
+  onPointerDown(x, y) {
+    if (this.locked) return;
+    const i = this.layout().findIndex(b => Math.abs(x - b.x) < b.w / 2 && Math.abs(y - b.y) < b.h / 2);
+    if (i < 0) return;
+    this.locked = true; sfx.pick();
+    const chosen = this.options[i];
+    setTimeout(() => this.onPick(chosen.id), 110);
+  },
   onFrame() {
     drawBackdrop();
     ctx.save();
@@ -691,13 +728,13 @@ const CHOOSER = {
     }
     ctx.shadowBlur = 0; ctx.restore();
 
-    const boxes = this.layout(), cur = engine.cursor();
+    const boxes = this.layout(), cur = selectionCursor();
     let hovering = -1;
     if (cur && !this.locked) boxes.forEach((b, i) => {
       if (Math.abs(cur.x - b.x) < b.w / 2 && Math.abs(cur.y - b.y) < b.h / 2) hovering = i;
     });
     if (hovering !== this.hoverIndex) { this.hoverIndex = hovering; this.hoverSince = performance.now(); }
-    const prog = hovering >= 0 ? Math.min(1, (performance.now() - this.hoverSince) / DWELL_MS) : 0;
+    const prog = hovering >= 0 && !cur?.pointer ? Math.min(1, (performance.now() - this.hoverSince) / DWELL_MS) : 0;
 
     boxes.forEach((b, i) => {
       const hot = i === hovering;
@@ -757,6 +794,22 @@ const SPEC = {
     });
     return out;
   },
+  chooseCell(c) {
+    if (this.locked || !c || this.values[c.trait.id] === c.lv) return;
+    const wasComplete = TRAITS.every(x => this.values[x.id]);
+    this.values[c.trait.id] = c.lv;
+    this.hoverKey = ""; this.hoverSince = performance.now();
+    sfx.pick();
+    if (!wasComplete && TRAITS.every(x => this.values[x.id])) {
+      this.locked = true;
+      const spec = { ...this.values };
+      setTimeout(() => this.onDone(spec), 300);
+    }
+  },
+  onPointerDown(x, y) {
+    const c = this.layout().find(cell => Math.abs(x - cell.x) < cell.w / 2 && Math.abs(y - cell.y) < cell.h / 2);
+    this.chooseCell(c);
+  },
   onFrame() {
     drawBackdrop();
     const color = TRIBE_COLORS[this.tribeIndex];
@@ -769,7 +822,7 @@ const SPEC = {
     ctx.fillText(t("specHint") + " · " + t("holdToPick"), innerWidth / 2, 146);
     ctx.shadowBlur = 0; ctx.restore();
 
-    const cells = this.layout(), cur = engine.cursor();
+    const cells = this.layout(), cur = selectionCursor();
     let hoverKey = "";
     // Any row stays re-selectable, so a mis-set stat can simply be held
     // again rather than being locked in for the whole run.
@@ -778,7 +831,7 @@ const SPEC = {
       if (Math.abs(cur.x - c.x) < c.w / 2 && Math.abs(cur.y - c.y) < c.h / 2) hoverKey = `${c.trait.id}:${c.lv}`;
     });
     if (hoverKey !== this.hoverKey) { this.hoverKey = hoverKey; this.hoverSince = performance.now(); }
-    const prog = hoverKey ? Math.min(1, (performance.now() - this.hoverSince) / DWELL_MS) : 0;
+    const prog = hoverKey && !cur?.pointer ? Math.min(1, (performance.now() - this.hoverSince) / DWELL_MS) : 0;
 
     TRAITS.forEach((tr, r) => {
       const row = cells.filter(c => c.trait.id === tr.id);
@@ -815,17 +868,7 @@ const SPEC = {
 
     if (prog >= 1 && !this.locked) {
       const [tid, lv] = hoverKey.split(":");
-      const wasComplete = TRAITS.every(x => this.values[x.id]);
-      this.values[tid] = +lv;
-      this.hoverKey = ""; this.hoverSince = performance.now();
-      sfx.pick();
-      // Only advance the first time the sheet fills up — after that the
-      // player is correcting a choice and should stay on this screen.
-      if (!wasComplete && TRAITS.every(x => this.values[x.id])) {
-        this.locked = true;
-        const spec = { ...this.values };
-        setTimeout(() => this.onDone(spec), 300);
-      }
+      this.chooseCell(cells.find(c => c.trait.id === tid && c.lv === +lv));
     }
   },
 };
@@ -838,6 +881,12 @@ const CONFIRM = {
     activeScreen = this;
   },
   box() { return { x: innerWidth / 2, y: innerHeight - 108, w: Math.min(300, innerWidth - 60), h: 74 }; },
+  onPointerDown(x, y) {
+    if (this.locked) return;
+    const b = this.box();
+    if (Math.abs(x - b.x) >= b.w / 2 || Math.abs(y - b.y) >= b.h / 2) return;
+    this.locked = true; sfx.pick(); setTimeout(() => this.onStart(), 120);
+  },
   onFrame() {
     drawBackdrop();
     const EE = ERAS[chosenEra];
@@ -876,10 +925,10 @@ const CONFIRM = {
       ctx.restore();
     });
 
-    const b = this.box(), cur = engine.cursor();
+    const b = this.box(), cur = selectionCursor();
     const hot = !!cur && !this.locked && Math.abs(cur.x - b.x) < b.w / 2 && Math.abs(cur.y - b.y) < b.h / 2;
     if (hot !== this.hover) { this.hover = hot; this.hoverSince = performance.now(); }
-    const prog = hot ? Math.min(1, (performance.now() - this.hoverSince) / DWELL_MS) : 0;
+    const prog = hot && !cur?.pointer ? Math.min(1, (performance.now() - this.hoverSince) / DWELL_MS) : 0;
     ctx.save();
     ctx.fillStyle = hot ? "rgba(74,222,128,.22)" : "rgba(10,6,22,.85)";
     ctx.strokeStyle = "#4ade80"; ctx.lineWidth = hot ? 4 : 2;
@@ -937,7 +986,8 @@ function startSetup() {
   SIM.cleanup(); SIM.exitReview();
   document.querySelectorAll(".speed-bar,.civ-log,.review-chip").forEach(n => n.remove());
   chosenEra = "forest"; chosenSpecs.length = 0; chosenPolicies.length = 0;
-  if (!engine.camReady) engine.startVideoStream().then(applyCamBg).catch(() => {});
+  canvas.style.cursor = "pointer";
+  if (setupUsesCamera && !engine.camReady) engine.startVideoStream().then(applyCamBg).catch(() => {});
   nextSpec(0);
 }
 function nextSpec(i) {
@@ -968,7 +1018,7 @@ const SIM = {
     this.battles = []; this.effects = []; this.terrainCache = null; this.toasts = []; this.banner = null; this.warAnnounced = false; this.timeline = []; this.announcedDiscoveries = new Set(); this.announcementQueue = []; this.momentQueue = []; this.currentMoment = null;
     // Hand input is only needed for setup. Closing the stream here reduces
     // heat and battery use while the autonomous simulation is running.
-    engine.stopCamera(); cam.style.display = "none";
+    engine.stopCamera(); cam.style.display = "none"; canvas.style.cursor = "default"; pointerInput.inside = false;
     this.worldEvent = null; this.eventT = 18; this.tradeT = 8; this.autoEvents = true; this.paused = false;
 
     const EG = ERAS[era];
