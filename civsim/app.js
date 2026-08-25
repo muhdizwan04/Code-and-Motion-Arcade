@@ -68,7 +68,7 @@ const STR = {
     evAttack: n => `⚔️ Attacking ${n}!`, evAttackWhy: reason => `⚔️ Attack reason: ${reason}.`,
     evCapture: n => `🚩 Took land from ${n}.`,
     evLost: "💀 This tribe could not continue.",
-    evLostStarve: "💀 This tribe could not continue because food ran out.", evLostIllness: "💀 This tribe could not continue because of illness.", evLostConquest: "💀 Their capital was captured.",
+    evLostStarve: "💀 This tribe could not continue because food ran out.", evLostThirst: "💀 This tribe died of thirst — it never reached water.", evLostIllness: "💀 This tribe could not continue because of illness.", evLostConquest: "💀 Their capital was captured.",
     evCollapse: "⚠️ Population is collapsing — help is needed!",
     evExpand: "🚶 Claimed new land.",
     thingTree: "trees", thingRock: "stones", thingWater: "water",
@@ -82,6 +82,9 @@ const STR = {
     whyAggro: lv => `Aggression ${lv}/4 — ${lv >= 3 ? "they attack often and hit hard" : "they rarely pick a fight"}`,
     jobChop: "chopping", jobMine: "mining", jobFarm: "farming", jobBuild: "building", jobFight: "fighting", jobIdle: "resting",
     evThirst: "💧 No water nearby — people are thirsty!",
+    evThirst2: "🥵 Still no water — no babies are being born.",
+    evThirst3: "☠️ Dying of thirst!",
+    evForgot: (e, n) => `🧠💨 Forgot how to make ${e} ${n} — no writing!`,
     evWaterFound: "💧 Found drinking water!",
     evNoRoom: "🏕️ No huts — the camp cannot hold more people.",
     warBegins: "⚔️ THE CONQUEST BEGINS",
@@ -109,6 +112,7 @@ const STR = {
     stIgnorant: n => `never worked out how to use what it found (only ${n} discoveries)`,
     stIdle: "spent most of the time standing idle",
     stThirsty: "never found drinking water",
+    stDiedThirst: "died of thirst — it never reached water",
     stElite: "too many skilled mouths to feed for this land",
     stSteady: "steady, but simply out-built",
     stOverrun: "overrun — its capital was taken",
@@ -179,7 +183,7 @@ const STR = {
     evAttack: n => `⚔️ Menyerang ${n}!`, evAttackWhy: reason => `⚔️ Sebab serangan: ${reason}.`,
     evCapture: n => `🚩 Rampas tanah ${n}.`,
     evLost: "💀 Puak ini tidak dapat meneruskan.",
-    evLostStarve: "💀 Puak ini tidak dapat meneruskan kerana makanan habis.", evLostIllness: "💀 Puak ini tidak dapat meneruskan kerana penyakit.", evLostConquest: "💀 Ibu kota mereka telah dirampas.",
+    evLostStarve: "💀 Puak ini tidak dapat meneruskan kerana makanan habis.", evLostThirst: "💀 Puak ini mati kehausan — tidak pernah sampai ke air.", evLostIllness: "💀 Puak ini tidak dapat meneruskan kerana penyakit.", evLostConquest: "💀 Ibu kota mereka telah dirampas.",
     evCollapse: "⚠️ Penduduk semakin pupus — bantuan diperlukan!",
     evExpand: "🚶 Menuntut tanah baru.",
     thingTree: "pokok", thingRock: "batu", thingWater: "air",
@@ -193,6 +197,9 @@ const STR = {
     whyAggro: lv => `Agresif ${lv}/4 — ${lv >= 3 ? "kerap menyerang dan kuat" : "jarang mencari gaduh"}`,
     jobChop: "menebang", jobMine: "melombong", jobFarm: "bertani", jobBuild: "membina", jobFight: "berperang", jobIdle: "berehat",
     evThirst: "💧 Tiada air berdekatan — rakyat kehausan!",
+    evThirst2: "🥵 Masih tiada air — tiada bayi dilahirkan.",
+    evThirst3: "☠️ Mati kehausan!",
+    evForgot: (e, n) => `🧠💨 Lupa cara membuat ${e} ${n} — tiada tulisan!`,
     evWaterFound: "💧 Jumpa air minuman!",
     evNoRoom: "🏕️ Tiada pondok — perkampungan tidak muat lagi.",
     warBegins: "⚔️ PENAKLUKAN BERMULA",
@@ -220,6 +227,7 @@ const STR = {
     stIgnorant: n => `tidak tahu menggunakan apa yang dijumpai (hanya ${n} penemuan)`,
     stIdle: "menghabiskan masa menganggur",
     stThirsty: "tidak pernah menjumpai air minuman",
+    stDiedThirst: "mati kehausan — tidak pernah sampai ke air",
     stElite: "terlalu ramai mulut mahir untuk tanah ini",
     stSteady: "stabil, tetapi kalah dari segi pembinaan",
     stOverrun: "tumpas — ibu kotanya dirampas",
@@ -396,20 +404,11 @@ const engine = {
 /* Each era now generates visibly different land: the thresholds below decide
    how common trees / rock / water are, which in turn decides which
    discoveries are even reachable and whether a tribe can find drinking
-   water at all. `frozen` means the water is ice until the tribe finds fire. */
+   water at all. Forest is the only era the game ships with. */
 const ERAS = {
-  ice:    { emoji: "❄️", en: "Ice Age", bm: "Zaman Ais", food: 0.62, growth: 0.82, strength: 1.20,
-            tTree: 1.72, tRock: 1.05, tWater: -1.72, frozen: true,
-            ground: "#8aa6bd", alt: "#9db7cc", rock: "#e9f3fb", tree: "#4a6b57", water: "#7fb4d4", treeDot: "#dff0e6" },
   forest: { emoji: "🌲", en: "Forest", bm: "Hutan", food: 1.15, growth: 1.10, strength: 0.95,
-            tTree: 0.82, tRock: 1.55, tWater: -1.55, frozen: false,
+            tTree: 0.82, tRock: 1.55, tWater: -1.55,
             ground: "#3a7a45", alt: "#488a52", rock: "#6b6157", tree: "#14401f", water: "#2b6f9c", treeDot: "#1c5c2b" },
-  cave:   { emoji: "🪨", en: "Caves", bm: "Gua", food: 0.80, growth: 0.92, strength: 1.15,
-            tTree: 1.95, tRock: 0.72, tWater: -1.60, frozen: false,
-            ground: "#5f564c", alt: "#6e6459", rock: "#38312b", tree: "#4a5540", water: "#2f5f73", treeDot: "#59684c" },
-  beach:  { emoji: "🏖️", en: "Coast", bm: "Pantai", food: 1.30, growth: 1.20, strength: 0.82,
-            tTree: 1.30, tRock: 1.62, tWater: -0.72, frozen: false,
-            ground: "#cdb68a", alt: "#dcc79e", rock: "#8b8070", tree: "#3f7a4a", water: "#1e83b8", treeDot: "#2f6f3c" },
 };
 const ERA_KEYS = Object.keys(ERAS);
 const eraName = (k) => ERAS[k][lang];
@@ -482,6 +481,7 @@ const DISCOVERIES = [
   { id: "walls",   emoji: "🧱", en: "Walls",     bm: "Tembok",    int: 3, needs: ["stone"] },
   { id: "boats",   emoji: "⛵", en: "Boats",     bm: "Bot",       int: 3, needs: ["wood"], res: "water" },
   { id: "bridge",  emoji: "🌉", en: "Bridges",   bm: "Jambatan",  int: 3, needs: ["wood", "stone"] },
+  { id: "well",    emoji: "🪣", en: "Wells",      bm: "Perigi",    int: 3, needs: ["stone"] },
   { id: "metal",   emoji: "⚒️", en: "Metal",     bm: "Logam",     int: 4, needs: ["stone", "fire"] },
   { id: "iron",    emoji: "⛓️", en: "Ironworking", bm: "Kerja Besi", int: 3, needs: ["tools"], res: "iron" },
   { id: "animals", emoji: "🐑", en: "Animal Farming", bm: "Ternakan Haiwan", int: 2, needs: ["farming"], res: "animal" },
@@ -1136,6 +1136,7 @@ const SIM = {
     this.build = new Array(COLS * ROWS).fill(0); // 0 none, 1 hut, 2 wall
 
     const spots = this.randomStartSpots();
+    spots.forEach(sp => this.ensureWaterNear(sp));
     this.tribes = specs.map((spec, i) => {
       const boost = learnedBonus(era, spec);
       const home = this.nearestOpen(spots[i].x, spots[i].y);
@@ -1176,6 +1177,7 @@ const SIM = {
           <span class="log-stats"><b id="lgPop${i}">6</b>👥 <b id="lgLand${i}">1</b>🗺️</span>
         </div>
         <div class="log-traits">${TRAITS.map(x => `${x.emoji}${"●".repeat(tr.spec[x.id])}`).join(" ")}</div>
+        <div class="log-needs" id="lgNeeds${i}"></div>
         <div class="log-disc" id="lgDisc${i}">${t("nothing")}</div>
         <div class="log-meta" id="lgMeta${i}">${policyOf(policies[i]).emoji} ${t(policyOf(policies[i]).key)}</div>
         <div class="log-goal" id="lgGoal${i}"></div>
@@ -1277,6 +1279,30 @@ const SIM = {
     }
     return this.idx(Math.max(1, Math.min(COLS - 2, x)), Math.max(1, Math.min(ROWS - 2, y)));
   },
+  // Nearest water distance from a tile, in steps (Manhattan is close enough
+  // for a fairness check on a small grid).
+  waterDistance(x, y) {
+    let best = 999;
+    for (let i = 0; i < this.feat.length; i++) {
+      if (this.feat[i] !== F_WATER) continue;
+      const p = this.xy(i), d = Math.abs(p.x - x) + Math.abs(p.y - y);
+      if (d < best) best = d;
+    }
+    return best;
+  },
+  // Spawns used to be up to 20+ tiles from any water, so thirst deaths were
+  // decided by the map rather than by the player. Every capital now gets a
+  // pond within reach — dying of thirst has to be a consequence of choices.
+  ensureWaterNear(spot, maxDist = 3) {
+    if (this.waterDistance(spot.x, spot.y) <= maxDist) return;
+    const ang = Math.random() * Math.PI * 2, r = 2 + Math.random() * 1.5;
+    const cx = Math.max(2, Math.min(COLS - 3, Math.round(spot.x + Math.cos(ang) * r)));
+    const cy = Math.max(2, Math.min(ROWS - 3, Math.round(spot.y + Math.sin(ang) * r)));
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (Math.abs(dx) + Math.abs(dy) > 1 && Math.random() < .5) continue;
+      this.feat[this.idx(Math.max(1, Math.min(COLS - 2, cx + dx)), Math.max(1, Math.min(ROWS - 2, cy + dy)))] = F_WATER;
+    }
+  },
   randomStartSpots() {
     const spots = [];
     for (let tries = 0; spots.length < 3 && tries < 160; tries++) {
@@ -1302,7 +1328,8 @@ const SIM = {
   // Drinking water: owning a water tile, or holding land right next to one.
   // Frozen eras need fire before that water is any use.
   hasWater(tr, E) {
-    if (E.frozen && !tr.known.has("fire")) return false;
+    // A tribe clever enough to dig wells is no longer at the mercy of the map.
+    if (tr.known.has("well")) return true;
     for (let i = 0; i < this.owner.length; i++) {
       if (this.owner[i] !== tr.idx) continue;
       if (this.feat[i] === F_WATER) return true;
@@ -1686,7 +1713,10 @@ const SIM = {
     }
   },
   updateWorkers(tr, dt, E) {
-    const speed = 2.6 * cv("workSpeed", tr.work);
+    // Roads and animal transport actually move workers faster now, instead
+    // of only being a line in the discovery list.
+    const roadBonus = (tr.known.has("wheel") ? 1.18 : 1) * (tr.known.has("transport") ? 1.22 : 1);
+    const speed = 2.6 * cv("workSpeed", tr.work) * roadBonus;
     let active = 0;
     tr.workers.forEach(w => {
       w.anim += dt * 8;
@@ -1758,13 +1788,33 @@ const SIM = {
       this.updateWorkers(tr, dt, E);
 
       // --- water: a civilization without drinking water is in real trouble.
-      // In the Ice Age the water is frozen solid, so it only counts once the
-      // tribe has discovered fire to melt it.
       const water = this.hasWater(tr, E);
-      if (!water && !tr.thirstLogged) { tr.thirstLogged = true; this.pushLog(tr, t("evThirst"), "int"); }
-      if (water && tr.thirstLogged) { tr.thirstLogged = false; this.pushLog(tr, t("evWaterFound"), "int"); }
+      // Thirst is now cumulative and lethal rather than a flat tax. People
+      // stop being born quickly, then start dying, then the tribe collapses —
+      // so finding water is a survival requirement, not an optimisation.
+      if (water) {
+        if (tr.thirstT > 0) { this.pushLog(tr, t("evWaterFound"), "int"); tr.thirstStage = 0; }
+        tr.thirstT = 0; tr.thirstLogged = false;
+      } else {
+        tr.thirstT = (tr.thirstT || 0) + dt;
+        tr.stats.thirstySecs += dt;
+        if (!tr.thirstLogged) { tr.thirstLogged = true; this.pushLog(tr, t("evThirst"), "int"); }
+        if (tr.thirstT > 15 && (tr.thirstStage | 0) < 1) { tr.thirstStage = 1; this.pushLog(tr, t("evThirst2"), "health"); }
+        if (tr.thirstT > 45 && (tr.thirstStage | 0) < 2) {
+          tr.thirstStage = 2; this.pushLog(tr, t("evThirst3"), "health");
+          this.banner = { text: t("evThirst3"), color: tr.color, life: 2.2 };
+        }
+      }
+      tr.dying = !water && tr.thirstT > 45;
+      if (tr.dying) tr.lastThreat = "thirst";
       const thirst = water ? 1 : 1.85;
-      if (!water) tr.stats.thirstySecs += dt;
+      if (!water && tr.thirstT > 45) {
+        // Dying of thirst: losses accelerate the longer it goes on.
+        const lost = dt * (0.9 + (tr.thirstT - 45) * 0.06) * (2 - cv("growth", tr.health) * 0.4);
+        tr.stats.famine += Math.min(tr.pop, lost);
+        tr.pop = Math.max(0, tr.pop - lost);
+        tr.morale = Math.max(0.25, tr.morale - dt * 0.05);
+      }
       if (tr.activeFrac < 0.4) tr.stats.idleSecs += dt;
       if (tr.pop > tr.stats.peakPop) tr.stats.peakPop = tr.pop;
 
@@ -1780,9 +1830,20 @@ const SIM = {
       const effort = 0.25 + tr.activeFrac * 0.75;
 
       const drought = this.worldEvent?.type === "drought" ? 0.62 : 1;
-      const fieldBonus = 1 + this.countBuild(tr, 6) * .08;
+      // Irrigation: fields next to water are worth far more than dry ones,
+      // so water is something to seek out, not merely a penalty to dodge.
+      let wetFields = 0, dryFields = 0;
+      for (let i = 0; i < this.build.length; i++) {
+        if (this.build[i] !== 6 || this.owner[i] !== tr.idx) continue;
+        if (this.neighbors(i).some(n => this.feat[n] === F_WATER)) wetFields++; else dryFields++;
+      }
+      const fieldBonus = 1 + wetFields * .20 + dryFields * .06;
       tr.food += tr.pop * workMul * E.food * farmBonus * toolBonus * fireBonus * effort * drought * dt * 1.35 * gemBoost * animalBonus * fishingBonus * fieldBonus;
-      tr.food -= tr.pop * 0.42 * cv("upkeep", tr.health) * thirst * tr.elite * dt;
+      // Holding a huge territory costs: beyond ~120 tiles the administrative
+      // strain shows up as extra food burned keeping it together.
+      const sprawl = 1 + Math.max(0, land - 120) * 0.0022;
+      tr.sprawl = sprawl;
+      tr.food -= tr.pop * 0.42 * cv("upkeep", tr.health) * thirst * tr.elite * sprawl * dt;
       if (this.worldEvent?.type === "flood" && Math.random() < dt * .012) tr.food = Math.max(0, tr.food - 2);
       this.updateIllness(tr, dt, water);
 
@@ -1826,7 +1887,7 @@ const SIM = {
       tr.gainT += dt;
       if (tr.food > tr.pop * 1.6 && tr.pop < cap && tr.gainT > 0.9) {
         tr.gainT = 0;
-        tr.pop += 1 * E.growth * cv("growth", tr.health) * (water ? 1 : 0.45) * (tr.policy.id === "food" ? 1.22 : 1) * (tr.sick > 1 ? .45 : 1);
+        tr.pop += 1 * E.growth * cv("growth", tr.health) * (water ? 1 : (tr.thirstT > 15 ? 0 : 0.35)) * (tr.policy.id === "food" ? 1.22 : 1) * (tr.sick > 1 ? .45 : 1);
         tr.food -= tr.pop * 0.35;
         if (Math.floor(tr.pop / 15) > Math.floor(tr.lastPopLog / 15)) { this.pushLog(tr, t("evGrow")(Math.floor(tr.pop))); tr.lastPopLog = tr.pop; }
       }
@@ -1836,7 +1897,7 @@ const SIM = {
       // A wheel is only an idea. Fast expansion arrives after the tribe also
       // learns animal transport and can visibly move people and supplies.
       const wheel = tr.known.has("transport") ? 0.54 : tr.known.has("wheel") ? 0.86 : 1;
-      if (tr.pop >= 4 && tr.expandT > Math.max(0.3, (1.7 - cv("output", tr.work) * 0.5 - tr.pop * 0.01) * wheel)) {
+      if (tr.pop >= 4 && tr.expandT > Math.max(0.3, (1.7 - cv("output", tr.work) * 0.5 - tr.pop * 0.01) * wheel * (tr.sprawl || 1))) {
         tr.expandT = 0;
         const claimed = this.claimFree(tr);
         if (claimed !== false) {
@@ -1857,6 +1918,22 @@ const SIM = {
       // (see updateWorkers/finishJob) so what you see on the map is what
       // actually drives the simulation.
 
+      // Without writing, knowledge lives only in people's heads — a heavy
+      // population loss takes a discovery with it. This is what Writing is for.
+      if (!tr.known.has("writing") && tr.pop < (tr.stats.peakPop || 6) * 0.45 && tr.known.size > 2) {
+        tr.forgetT = (tr.forgetT || 0) + dt;
+        if (tr.forgetT > 6) {
+          tr.forgetT = 0;
+          const losable = [...tr.known].filter(k => !["fire", "farming"].includes(k));
+          const lost = losable[losable.length - 1];
+          if (lost) {
+            tr.known.delete(lost);
+            const d = DISCOVERIES.find(x => x.id === lost);
+            this.pushLog(tr, t("evForgot")(d ? d.emoji : "", d ? discName(d) : lost), "int");
+          }
+        }
+      } else tr.forgetT = 0;
+
       // A short visible danger phase makes a collapse understandable instead
       // of looking like a tribe vanished on the next frame.
       if (tr.pop <= 1.1) {
@@ -1864,7 +1941,8 @@ const SIM = {
         if (!tr.collapseWarned) { tr.collapseWarned = true; this.pushLog(tr, t("evCollapse"), "health"); }
         if (tr.collapseT > 2.4) {
           tr.alive = false;
-          const key = tr.lastThreat === "illness" ? "evLostIllness" : "evLostStarve";
+          const key = tr.lastThreat === "thirst" ? "evLostThirst"
+            : tr.lastThreat === "illness" ? "evLostIllness" : "evLostStarve";
           this.pushLog(tr, t(key), tr.lastThreat === "illness" ? "health" : "work"); sfx.bad();
           const hp = this.xy(tr.home); this.effects.push({ type: "death", x: hp.x, y: hp.y, life: 5, max: 5, color: tr.color });
           this.queueMoment("death", `${tr.name} COULD NOT CONTINUE`, tr.color);
@@ -1910,7 +1988,18 @@ const SIM = {
       }
     }
     if (!frontier.length) return false;
-    const chosen = frontier[Math.floor(Math.random() * frontier.length)], tile = chosen.tile;
+    // Thirsty people go looking for water: while a tribe has no source, its
+    // expansion is aimed at the nearest water rather than chosen at random.
+    let chosen;
+    if (tr.thirstT > 3 && !tr.known.has("well")) {
+      let best = Infinity;
+      frontier.forEach(f => {
+        const p = this.xy(f.tile), d = this.waterDistance(p.x, p.y);
+        if (d < best) { best = d; chosen = f; }
+      });
+    }
+    if (!chosen) chosen = frontier[Math.floor(Math.random() * frontier.length)];
+    const tile = chosen.tile;
     this.owner[tile] = tr.idx;
     if (this.feat[tile] === F_WATER && !tr.known.has("boats") && tr.known.has("bridge") && tr.wood >= 1 && tr.stone >= 1) {
       tr.wood--; tr.stone--; this.build[tile] = 4;
@@ -2024,9 +2113,11 @@ const SIM = {
     if (!tr.alive) {
       const killer = this.tribes.find(o => o.defeated && o.defeated.includes(tr.name));
       if (killer) return t("stConquered")(killer.name);
+      if (tr.lastThreat === "thirst") return t("stDiedThirst");
       return st.famine >= 1 ? t("stStarved")(Math.round(st.famine)) : t("stOverrun");
     }
     if (st.famine > tr.pop * 0.5 && st.famine > 12) return t("stStarved")(Math.round(st.famine));
+    if (tr.lastThreat === "thirst") return t("stDiedThirst");
     if (st.thirstySecs > 25) return t("stThirsty");
     if (tr.elite > 1.2 && st.famine > 6) return t("stElite");
     if (st.outOfWood && tr.known.has("huts")) return t("stNoWood");
@@ -2155,6 +2246,17 @@ const SIM = {
       let leader = -1, best = -1;
       this.tribes.forEach((tr, i) => { const s = this.scoreOf(tr).total; if (tr.alive && s > best) { best = s; leader = i; } });
       this.tribes.forEach((tr, i) => {
+        // Three survival needs at a glance, so a death is never a mystery.
+        const needsEl = this.logNode?.querySelector(`#lgNeeds${i}`);
+        if (needsEl) {
+          const okWater = tr.known.has("well") || this.hasWater(tr, ERAS[this.era]);
+          const okFood = tr.food > tr.pop * 0.6;
+          const okHome = this.countBuild(tr, 1) > 0 || tr.pop < 14;
+          needsEl.innerHTML =
+            `<span class="${okWater ? "ok" : "bad"}" title="Water">💧</span>` +
+            `<span class="${okFood ? "ok" : "bad"}" title="Food">🍖</span>` +
+            `<span class="${okHome ? "ok" : "bad"}" title="Shelter">🏠</span>`;
+        }
         const p = this.logNode?.querySelector(`#lgPop${i}`), l = this.logNode?.querySelector(`#lgLand${i}`);
         if (p) p.textContent = Math.floor(tr.pop);
         if (l) l.textContent = this.landOf(tr);
@@ -2287,8 +2389,7 @@ const SIM = {
         g.fillRect(px + cell * .38, py + cell * .48, cell * .12, cell * .10);
         g.fillRect(px + cell * .58, py + cell * .62, cell * .11, cell * .09);
       } else if (f === F_WATER) {
-        // Two offset wave bands avoid a flat blue field. Ice Age additionally
-        // gets a pale crack/ice shard pattern.
+        // Two offset wave bands avoid a flat blue field.
         g.fillStyle = "rgba(0,0,0,.12)";
         g.fillRect(px, py + cell * .82, cell, Math.max(1, cell * .12));
         g.fillStyle = "rgba(255,255,255,.24)";
@@ -2298,13 +2399,8 @@ const SIM = {
           g.fillStyle = "rgba(255,255,255,.15)";
           g.fillRect(px + ((seed >>> 5) % Math.max(1, cell - dot)), py + ((seed >>> 13) % Math.max(1, cell - dot)), dot, dot);
         }
-        if (E.frozen) {
-          g.fillStyle = "rgba(235,250,255,.38)";
-          g.fillRect(px + cell * .42, py + cell * .16, Math.max(1, cell * .08), cell * .58);
-          g.fillRect(px + cell * .28, py + cell * .43, cell * .38, Math.max(1, cell * .08));
-        }
         // White coast pixels outline every shore. This gives rivers and lakes
-        // a readable shape, especially in the Coast era.
+        // a readable shape.
         const edge = Math.max(1, Math.floor(cell * .08));
         g.fillStyle = "rgba(235,252,255,.48)";
         const north = y ? this.feat[(y - 1) * COLS + x] : F_NONE;

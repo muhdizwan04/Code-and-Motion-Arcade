@@ -1,4 +1,4 @@
-const CACHE = "civsim-v7";
+const CACHE = "civsim-v8";
 const FILES = [
   ".",
   "index.html",
