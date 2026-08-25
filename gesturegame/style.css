@@ -203,7 +203,6 @@ h1.arcade {
 .card:nth-child(2)::after { animation-delay: 1.6s; }
 .card:nth-child(3)::after { animation-delay: 3.2s; }
 .card:nth-child(4)::after { animation-delay: 4.0s; }
-.card:nth-child(5)::after { animation-delay: 0.8s; }
 @keyframes sheen { 25% { transform: translateX(110%); } 100% { transform: translateX(110%); } }
 
 /* Card spotlight state (attract loop) */
@@ -217,7 +216,6 @@ h1.arcade {
 
 /* Per-game accent colors */
 .card.ninja  { --card-accent: var(--cyan); }
-.card.battle { --card-accent: var(--red); }
 .card.snake  { --card-accent: var(--purple); }
 .card.blast  { --card-accent: var(--amber); }
 .card.lab    { --card-accent: var(--lime); }
@@ -233,7 +231,6 @@ h1.arcade {
 .card:nth-child(2) .emo { animation-delay: -0.6s; }
 .card:nth-child(3) .emo { animation-delay: -1.2s; }
 .card:nth-child(4) .emo { animation-delay: -1.8s; }
-.card:nth-child(5) .emo { animation-delay: -2.4s; }
 
 @keyframes card-emoji-float {
   0%, 100% { transform: translateY(0) rotate(0); }
@@ -242,7 +239,6 @@ h1.arcade {
 .card:hover .emo { transform: scale(1.1) rotate(-6deg); animation-play-state: paused; }
 
 .card.ninja  .emo { background: linear-gradient(135deg, rgba(0,240,255,0.15), rgba(0,240,255,0.05)); box-shadow: 0 0 18px rgba(0,240,255,0.2); }
-.card.battle .emo { background: linear-gradient(135deg, rgba(255,56,96,0.15), rgba(251,191,36,0.05)); box-shadow: 0 0 18px rgba(255,56,96,0.2); }
 .card.snake  .emo { background: linear-gradient(135deg, rgba(180,108,255,0.15), rgba(180,108,255,0.05)); box-shadow: 0 0 18px rgba(180,108,255,0.2); }
 .card.blast  .emo { background: linear-gradient(135deg, rgba(255,200,87,0.15), rgba(255,200,87,0.05)); box-shadow: 0 0 18px rgba(255,200,87,0.2); }
 .card.lab    .emo { background: linear-gradient(135deg, rgba(163,230,53,0.15), rgba(163,230,53,0.05)); box-shadow: 0 0 18px rgba(163,230,53,0.2); }
@@ -598,95 +594,6 @@ h1.arcade {
   animation: impactflash 0.3s both;
 }
 @keyframes impactflash { from { opacity: 0.9; } to { opacity: 0; transform: scale(1.03); } }
-
-/* ── Battle arena ────────────────────────────────────────────── */
-.arena {
-  position: fixed; z-index: 25; left: 0; right: 0;
-  bottom: calc(18px + env(safe-area-inset-bottom));
-  display: flex; flex-direction: column; align-items: center; gap: 10px;
-  pointer-events: none; padding: 0 14px;
-}
-.arena .vs-row { display: flex; gap: 16px; align-items: center; justify-content: center; }
-.arena .fighter {
-  background: rgba(3, 0, 10, 0.72);
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  border-radius: 22px;
-  width: clamp(110px, 30vw, 165px);
-  padding: 12px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  text-align: center;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.arena .fighter .who {
-  font-family: var(--font-display);
-  font-size: 10px; letter-spacing: 0.18em;
-  color: var(--muted); text-transform: uppercase;
-}
-.arena .fighter .hand { font-size: clamp(44px, 14vw, 76px); min-height: 1.3em; }
-.arena .fighter .pts {
-  font-family: var(--font-display);
-  font-size: 24px; font-weight: 900; color: var(--amber);
-  text-shadow: 0 0 12px rgba(255, 200, 87, 0.6);
-}
-.arena .fighter.winner {
-  border-color: var(--lime);
-  box-shadow: 0 0 28px rgba(163, 230, 53, 0.5);
-  animation: fighterwin 0.7s cubic-bezier(0.22, 1.7, 0.36, 1) both;
-}
-@keyframes fighterwin {
-  40% { transform: translateY(-18px) scale(1.14) rotate(-3deg); box-shadow: 0 0 50px rgba(163, 230, 53, 0.8); }
-}
-.arena .vs {
-  font-family: var(--font-display);
-  font-size: clamp(18px, 5.5vw, 28px); font-weight: 900; color: var(--muted);
-}
-.brain-box {
-  pointer-events: auto;
-  background: rgba(3, 0, 10, 0.75);
-  border: 1px dashed rgba(0, 240, 255, 0.45);
-  border-radius: 14px; padding: 10px 16px;
-  font-family: var(--font-body);
-  font-size: clamp(12px, 3.2vw, 14px); color: var(--cyan);
-  max-width: 520px; line-height: 1.5;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-/* ── Battle result overlay ───────────────────────────────────── */
-.battle-result {
-  z-index: 27; padding: 20px;
-  background: radial-gradient(circle at center, rgba(3, 0, 10, 0.8), rgba(3, 0, 10, 0.2) 50%, transparent 72%);
-}
-.battle-result .huge {
-  font-family: var(--font-display);
-  color: #fff; font-size: clamp(68px, 22vw, 138px);
-  text-shadow: 0 0 28px var(--cyan), 0 7px 0 rgba(0, 0, 0, 0.5);
-}
-.battle-result .word {
-  font-family: var(--font-display);
-  white-space: pre-line; max-width: 720px;
-  font-size: clamp(22px, 6.5vw, 46px); line-height: 1.2;
-  background: rgba(3, 0, 10, 0.78);
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  border-radius: 22px; padding: 16px 22px;
-}
-.battle-result.player-result .huge,
-.battle-result.player-result .word { color: var(--lime); border-color: var(--lime); text-shadow: 0 0 20px rgba(163, 230, 53, 0.5); }
-.battle-result.ai-result .huge,
-.battle-result.ai-result .word     { color: var(--red); border-color: var(--red); text-shadow: 0 0 20px rgba(255, 56, 96, 0.5); }
-.battle-result.draw-result .huge,
-.battle-result.draw-result .word   { color: var(--amber); border-color: var(--amber); text-shadow: 0 0 20px rgba(255, 200, 87, 0.5); }
-
-/* ── Round spark ─────────────────────────────────────────────── */
-.round-spark {
-  position: fixed; left: 50%; top: 48%; z-index: -1; font-size: 28px;
-  animation: sparkfly 1.1s ease-out both;
-}
-@keyframes sparkfly {
-  from { opacity: 1; transform: translate(-50%, -50%) rotate(var(--angle)) translateX(30px); }
-  to   { opacity: 0; transform: translate(-50%, -50%) rotate(var(--angle)) translateX(min(46vw, 390px)) scale(0.4); }
-}
 
 /* ── Results ─────────────────────────────────────────────────── */
 .result-rank {

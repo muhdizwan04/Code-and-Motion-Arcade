@@ -1,7 +1,7 @@
 {
   "name": "AI Hand Arcade",
   "short_name": "Hand Arcade",
-  "description": "Camera AI games: Air Ninja, Gesture Battle and Sign Speller",
+  "description": "Camera AI games: Air Ninja, Hand Snake, Hand Blast and Hand Lab",
   "start_url": ".",
   "display": "fullscreen",
   "orientation": "any",

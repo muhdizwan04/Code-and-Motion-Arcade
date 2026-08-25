@@ -1,7 +1,6 @@
 /* ================= AI HAND ARCADE =================
-   5 games powered by one hand-tracking AI (MediaPipe, runs 100% on-device):
+   4 games powered by one hand-tracking AI (MediaPipe, runs 100% on-device):
    - Air Ninja: slice fruit with your fingertip (Time Attack or 3-life Survival)
-   - Gesture Battle: rock-paper-scissors vs a pattern-learning AI
    - Hand Snake: your fingertip is a free-moving snake
    - Hand Blast: pinch-drag block puzzle
    - Hand Lab: pinch-craft elements, Infinite-Craft style
@@ -23,8 +22,6 @@ const STR = {
     tagline: "The camera AI sees your hand. No touching allowed! 🖐️",
     ninjaTitle: "Air Ninja",
     ninjaDesc: "Slice the fruit with your finger — in the air!",
-    battleTitle: "Gesture Battle",
-    battleDesc: "Rock-paper-scissors vs an AI that learns your mind",
     madeWith: "PWA · AI runs on this device · no internet needed",
     loading: "Waking up the AI brain… 🧠",
     loadingCam: "Turning on the camera… 📷",
@@ -58,22 +55,6 @@ const STR = {
     ninjaModeTimeDesc: "60 seconds on the clock — score as much as you can!",
     ninjaModeLife: "❤️ SURVIVAL",
     ninjaModeLifeDesc: "3 lives, no clock — slicing a bomb costs a life!",
-    // battle
-    battleHow: "First to 5 wins! Show ✊ ✋ or ✌️ to the camera when I say GO. Warning: my AI brain learns your pattern… 🧠",
-    you: "You", ai: "AI",
-    show: "SHOW!",
-    win: "YOU WIN! 🎉", lose: "AI WINS 🤖", draw: "DRAW 😐",
-    roundPraise: "BRILLIANT MOVE! +1 POINT",
-    roundRetry: "Good try — read the AI and strike back!",
-    roundDraw: "Same move! Get ready for the next round.",
-    noHand: "I couldn't see your hand! 👀",
-    brainStart: "🧠 AI brain: watching you…",
-    brainLearn: (g, c) => `🧠 AI brain: I predicted you'd play ${g} (${c}% sure)`,
-    battleWinYou: "YOU BEAT THE AI!",
-    battleWinAi: "THE AI READ YOUR MIND!",
-    battleMsgYou: "Impressive! You stayed unpredictable. That's the only way to beat a pattern-learning AI!",
-    battleMsgAi: "Humans always fall into patterns — and AI is built to find patterns. That's exactly how real AI learns!",
-    predicted: (p) => `AI predicted your moves ${p}% of the time`,
     handLost: "Show your full hand inside the camera.",
     // snake
     snakeTitle: "Hand Snake",
@@ -119,8 +100,6 @@ const STR = {
     tagline: "AI kamera nampak tangan anda. Tak boleh sentuh skrin! 🖐️",
     ninjaTitle: "Air Ninja",
     ninjaDesc: "Tetak buah dengan jari — di udara!",
-    battleTitle: "Gesture Battle",
-    battleDesc: "Batu-kertas-gunting lawan AI yang belajar corak anda",
     madeWith: "PWA · AI berjalan pada peranti ini · tiada internet diperlukan",
     loading: "Mengejutkan otak AI… 🧠",
     loadingCam: "Menghidupkan kamera… 📷",
@@ -153,21 +132,6 @@ const STR = {
     ninjaModeTimeDesc: "60 saat di jam — kumpul skor sebanyak mungkin!",
     ninjaModeLife: "❤️ BERTAHAN",
     ninjaModeLifeDesc: "3 nyawa, tiada jam — tetak bom hilang satu nyawa!",
-    battleHow: "Siapa dapat 5 dulu menang! Tunjuk ✊ ✋ atau ✌️ pada kamera bila saya kata GO. Amaran: otak AI saya belajar corak anda… 🧠",
-    you: "Anda", ai: "AI",
-    show: "TUNJUK!",
-    win: "ANDA MENANG! 🎉", lose: "AI MENANG 🤖", draw: "SERI 😐",
-    roundPraise: "GERAKAN HEBAT! +1 MATA",
-    roundRetry: "Cubaan baik — baca AI dan lawan semula!",
-    roundDraw: "Gerakan sama! Bersedia untuk pusingan seterusnya.",
-    noHand: "Saya tak nampak tangan anda! 👀",
-    brainStart: "🧠 Otak AI: sedang memerhati…",
-    brainLearn: (g, c) => `🧠 Otak AI: Saya ramal anda akan tunjuk ${g} (${c}% yakin)`,
-    battleWinYou: "ANDA KALAHKAN AI!",
-    battleWinAi: "AI BACA FIKIRAN ANDA!",
-    battleMsgYou: "Hebat! Anda kekal tidak menentu. Itu saja cara nak kalahkan AI yang belajar corak!",
-    battleMsgAi: "Manusia selalu ada corak — dan AI dibina untuk mencari corak. Beginilah cara AI sebenar belajar!",
-    predicted: (p) => `AI meramal pergerakan anda ${p}% daripada masa`,
     handLost: "Tunjukkan seluruh tangan di dalam kamera.",
     // snake
     snakeTitle: "Ular Tangan",
@@ -539,14 +503,6 @@ function pinchState() {
     center: { x: (thumb.x + index.x) / 2, y: (thumb.y + index.y) / 2 },
   };
 }
-function classifyRPS(lms) {
-  const f = fingerStates(lms);
-  const n = [f.index, f.middle, f.ring, f.pinky].filter(Boolean).length;
-  if (n === 0 || (n === 1 && !f.index && !f.middle)) return "rock";
-  if (f.index && f.middle && !f.ring && !f.pinky) return "scissors";
-  if (n >= 3) return "paper";
-  return null;
-}
 function drawSkeleton(lms, color = "rgba(34,211,238,.9)") {
   if (!lms) return;
   const C = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
@@ -738,7 +694,7 @@ function bumpPlayCount(gameKey) {
 function showPlayStats() {
   let counts = {};
   try { counts = JSON.parse(localStorage.getItem(PLAY_COUNT_KEY) || "{}"); } catch {}
-  const labels = { ninja: "🥷 Air Ninja", battle: "✊ Gesture Battle", snake: "🐍 Hand Snake", blast: "🧱 Hand Blast", lab: "🧪 Hand Lab" };
+  const labels = { ninja: "🥷 Air Ninja", snake: "🐍 Hand Snake", blast: "🧱 Hand Blast", lab: "🧪 Hand Lab" };
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const rows = Object.keys(labels).map(k => `<div class="stats-row"><span>${labels[k]}</span><b>${counts[k] || 0}</b></div>`).join("");
   const node = el(`<div class="lab-book" id="statsOverlay">
@@ -766,10 +722,6 @@ function menu() {
         <div class="emo">🥷</div>
         <div><h3>${t("ninjaTitle")} <span style="font-size:14px">🍉</span></h3><p>${t("ninjaDesc")}</p>${dailyBadge("ninja")}</div>
       </div>
-      <div class="card battle" id="cBattle">
-        <div class="emo">✊</div>
-        <div><h3>${t("battleTitle")} <span style="font-size:14px">🧠</span></h3><p>${t("battleDesc")}</p></div>
-      </div>
       <div class="card snake" id="cSnake">
         <div class="emo">🐍</div>
         <div><h3>${t("snakeTitle")} <span style="font-size:14px">🎮</span></h3><p>${t("snakeDesc")}</p>${dailyBadge("snake")}</div>
@@ -786,7 +738,6 @@ function menu() {
     <div class="made-with">🤖 ${t("madeWith")}</div>
   </div>`);
   node.querySelector("#cNinja").onclick = () => { sfx.open(); intro(NINJA); };
-  node.querySelector("#cBattle").onclick = () => { sfx.open(); intro(BATTLE); };
   node.querySelector("#cSnake").onclick = () => { sfx.open(); intro(SNAKE); };
   node.querySelector("#cBlast").onclick = () => { sfx.open(); intro(BLAST); };
   node.querySelector("#cLab").onclick = () => { sfx.open(); intro(LAB); };
@@ -1260,212 +1211,7 @@ const NINJA = {
 };
 
 /* ================================================
-   GAME 2 : GESTURE BATTLE (with mind-reading AI)
-================================================ */
-const RPS_EMO = { rock: "✊", paper: "✋", scissors: "✌️" };
-const BEATS = { rock: "paper", paper: "scissors", scissors: "rock" };
-const BATTLE = {
-  emoji: "🧠", titleKey: "battleTitle", howKey: "battleHow", bgToggle: true,
-  you: 0, ai: 0, history: [], trans: {}, predHits: 0, predTotal: 0,
-  state: "idle", samples: [], arena: null, pop: null, timers: [],
-
-  start() {
-    this.you = 0; this.ai = 0; this.history = []; this.trans = {}; this.predHits = 0; this.predTotal = 0;
-    this.state = "countdown"; this.timers = [];
-    this.arena = el(`<div class="arena">
-      <div class="brain-box" id="brainBox">${t("brainStart")}</div>
-      <div class="vs-row">
-        <div class="fighter" id="fYou"><div class="who">${t("you")}</div><div class="hand" id="hYou">❔</div><div class="pts" id="pYou">0</div></div>
-        <div class="vs">VS</div>
-        <div class="fighter" id="fAi"><div class="who">🤖 ${t("ai")}</div><div class="hand" id="hAi">❔</div><div class="pts" id="pAi">0</div></div>
-      </div>
-    </div>`);
-    document.body.appendChild(this.arena);
-    this.pop = el(`<div class="center-pop"><div class="huge" id="popBig"></div><div class="word" id="popWord"></div></div>`);
-    document.body.appendChild(this.pop);
-    this.round();
-  },
-  cleanup() {
-    this.timers.forEach(clearTimeout);
-    if (this.arena) this.arena.remove();
-    if (this.pop) this.pop.remove();
-    this.state = "idle";
-  },
-  later(fn, ms) { this.timers.push(setTimeout(fn, ms)); },
-  celebrateRound() {
-    for (let i = 0; i < 14; i++) {
-      const spark = el(`<span class="round-spark">${["✨", "⭐", "🎉"][i % 3]}</span>`);
-      spark.style.setProperty("--angle", `${i * 27}deg`);
-      this.pop.appendChild(spark);
-    }
-  },
-
-  predict() {
-    // order-2 then order-1 then global frequency
-    const h = this.history;
-    const tryKey = (key, table) => {
-      const c = table[key];
-      if (!c) return null;
-      const total = c.rock + c.paper + c.scissors;
-      if (total < 1) return null;
-      const bestMove = ["rock", "paper", "scissors"].reduce((a, b) => (c[a] >= c[b] ? a : b));
-      return { move: bestMove, conf: Math.round((c[bestMove] / total) * 100) };
-    };
-    if (h.length >= 2) {
-      const p2 = tryKey(h.slice(-2).join(","), this.trans);
-      if (p2 && p2.conf > 40) return p2;
-    }
-    if (h.length >= 1) {
-      const p1 = tryKey(h[h.length - 1], this.trans);
-      if (p1) return p1;
-    }
-    if (h.length >= 3) {
-      const c = { rock: 0, paper: 0, scissors: 0 };
-      h.forEach(m => c[m]++);
-      const bestMove = ["rock", "paper", "scissors"].reduce((a, b) => (c[a] >= c[b] ? a : b));
-      return { move: bestMove, conf: Math.round((c[bestMove] / h.length) * 100) };
-    }
-    const moves = ["rock", "paper", "scissors"];
-    return { move: moves[Math.floor(Math.random() * 3)], conf: 33 };
-  },
-  learn(move) {
-    const h = this.history;
-    if (h.length >= 1) {
-      const k1 = h[h.length - 1];
-      this.trans[k1] = this.trans[k1] || { rock: 0, paper: 0, scissors: 0 };
-      this.trans[k1][move]++;
-    }
-    if (h.length >= 2) {
-      const k2 = h.slice(-2).join(",");
-      this.trans[k2] = this.trans[k2] || { rock: 0, paper: 0, scissors: 0 };
-      this.trans[k2][move]++;
-    }
-    h.push(move);
-  },
-
-  round() {
-    if (this.state === "idle") return;
-    this.prediction = this.predict();
-    this.aiMove = BEATS[this.prediction.move]; // counter the predicted player move
-    this.arena.querySelector("#hYou").textContent = "❔";
-    this.arena.querySelector("#hAi").textContent = "❔";
-    this.arena.querySelectorAll(".fighter").forEach(f => f.classList.remove("winner"));
-    const big = this.pop.querySelector("#popBig"), word = this.pop.querySelector("#popWord");
-    this.pop.className = "center-pop";
-    this.pop.querySelectorAll(".round-spark").forEach(spark => spark.remove());
-    word.textContent = "";
-    let n = 3;
-    const step = () => {
-      if (this.state === "idle") return;
-      if (n > 0) {
-        big.textContent = n; big.style.animation = "none"; void big.offsetWidth; big.style.animation = "";
-        sfx.count(); n--;
-        this.later(step, 750);
-      } else {
-        big.textContent = "";
-        word.textContent = "✊ ✋ ✌️ " + t("show");
-        sfx.go();
-        this.samples = [];
-        this.state = "capture";
-        this.later(() => this.resolve(), 1100);
-      }
-    };
-    this.state = "countdown";
-    step();
-  },
-
-  onFrame() {
-    if (!camBgOn) {
-      ctx.fillStyle = "#0b0518"; ctx.fillRect(0, 0, innerWidth, innerHeight);
-      drawRobotHand(engine.hand);
-    } else {
-      drawSkeleton(engine.hand);
-    }
-    if (this.state === "capture" && engine.norm) {
-      const g = classifyRPS(engine.norm);
-      if (g) this.samples.push(g);
-    }
-  },
-
-  resolve() {
-    if (this.state === "idle") return;
-    this.state = "reveal";
-    const word = this.pop.querySelector("#popWord");
-    if (!this.samples.length) {
-      this.pop.className = "center-pop battle-result no-hand-result";
-      this.pop.querySelector("#popBig").textContent = "👀";
-      word.textContent = t("noHand");
-      sfx.bad();
-      this.later(() => this.round(), 2300);
-      return;
-    }
-    const counts = {};
-    this.samples.forEach(s => counts[s] = (counts[s] || 0) + 1);
-    const player = Object.keys(counts).reduce((a, b) => (counts[a] >= counts[b] ? a : b));
-
-    // honest bookkeeping: prediction was made BEFORE seeing the move
-    this.predTotal++;
-    if (player === this.prediction.move) this.predHits++;
-    this.arena.querySelector("#brainBox").textContent =
-      t("brainLearn")(RPS_EMO[this.prediction.move], this.prediction.conf) +
-      (player === this.prediction.move ? " ✔" : " ✘");
-    this.learn(player);
-
-    this.arena.querySelector("#hYou").textContent = RPS_EMO[player];
-    this.arena.querySelector("#hAi").textContent = RPS_EMO[this.aiMove];
-
-    let msg, detail, resultClass;
-    if (player === this.aiMove) {
-      msg = t("draw"); detail = t("roundDraw"); resultClass = "draw-result";
-      this.pop.querySelector("#popBig").textContent = "EVEN";
-    }
-    else if (BEATS[player] === this.aiMove) {
-      this.ai++; msg = t("lose"); detail = t("roundRetry"); resultClass = "ai-result";
-      this.pop.querySelector("#popBig").textContent = "AI +1";
-      sfx.bad();
-      shakeScreen();
-      this.arena.querySelector("#fAi").classList.add("winner");
-    }
-    else {
-      this.you++; msg = t("win"); detail = t("roundPraise"); resultClass = "player-result";
-      this.pop.querySelector("#popBig").textContent = "+1";
-      sfx.good(); this.arena.querySelector("#fYou").classList.add("winner");
-      this.celebrateRound();
-    }
-    this.pop.className = `center-pop battle-result ${resultClass}`;
-    word.textContent = `${msg}\n${detail}`;
-    this.arena.querySelector("#pYou").textContent = this.you;
-    this.arena.querySelector("#pAi").textContent = this.ai;
-
-    if (this.you >= 5 || this.ai >= 5) { this.later(() => this.end(), 3000); }
-    else this.later(() => this.round(), 3200);
-  },
-
-  end() {
-    const youWon = this.you > this.ai;
-    sfx.win();
-    const acc = this.predTotal ? Math.round((this.predHits / this.predTotal) * 100) : 0;
-    this.cleanup();
-    this.state = "idle";
-    activeGame = this; // keep skeleton off; ui shown
-    ui.classList.remove("passthrough");
-    const node = el(`<div class="panel">
-      <div class="big-emoji">${youWon ? "🏆" : "🤖"}</div>
-      <h2>${youWon ? t("battleWinYou") : t("battleWinAi")}</h2>
-      <div class="score-line">${this.you} : ${this.ai}</div>
-      <div class="desc" style="color:var(--cyan)">🧠 ${t("predicted")(acc)}</div>
-      <div class="desc">${youWon ? t("battleMsgYou") : t("battleMsgAi")}</div>
-      <button class="btn" id="againBtn">${t("again")}</button>
-      <br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button>
-    </div>`);
-    node.querySelector("#againBtn").onclick = () => { sfx.click(); show(null); ui.classList.add("passthrough"); this.start(); };
-    node.querySelector("#menuBtn").onclick = () => { sfx.click(); menu(); };
-    show(node);
-  },
-};
-
-/* ================================================
-   GAME 3 : HAND SNAKE
+   GAME 2 : HAND SNAKE
 ================================================ */
 /* Free-movement snake: the head IS the smoothed fingertip position every
    frame — there is no grid tick to fall behind on, so it can never "outrun"
@@ -1658,7 +1404,7 @@ const SNAKE = {
 };
 
 /* ================================================
-   GAME 4 : HAND BLAST
+   GAME 3 : HAND BLAST
 ================================================ */
 /* Weighted shape bag — small pieces stay common so the board keeps breathing,
    while the rarer 5–9 cell shapes give older students something to plan around. */
@@ -2000,7 +1746,7 @@ const BLAST = {
 };
 
 /* ================================================
-   GAME 5 : HAND LAB (element combining)
+   GAME 4 : HAND LAB (element combining)
 ================================================ */
 const LAB_ELEMENTS = {
   fire: { emoji: "🔥", en: { name: "Fire", fact: "Fire needs fuel, heat and oxygen to burn." }, bm: { name: "Api", fact: "Api perlukan bahan bakar, haba dan oksigen untuk menyala." } },
@@ -2501,6 +2247,6 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 })();
 
 /* debug hook (harmless in production) */
-window.__ha = { engine, NINJA, BATTLE, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60) };
+window.__ha = { engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60) };
 
 menu();
