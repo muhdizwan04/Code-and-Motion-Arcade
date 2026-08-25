@@ -38,6 +38,7 @@ const STR = {
     pickSpec: n => `SET UP TRIBE ${n}`,
     holdToPick: "✋ Hold for 1 second, or 🖱️ click an option",
     specHint: "Set a level for every stat",
+    budget: (used, total) => `POINTS  ${used} / ${total}  ·  spend wisely`,
     aiLearned: "🧠 WHAT THE AI HAS LEARNED",
     aiNoData: "🧠 No games yet today — the AI is starting fresh!",
     aiStat: (trait, era, pct, runs) => `High ${trait} wins ${era} ${pct}% of the time (${runs} runs)`,
@@ -149,6 +150,7 @@ const STR = {
     pickSpec: n => `TETAPKAN PUAK ${n}`,
     holdToPick: "✋ Tahan 1 saat, atau 🖱️ klik pilihan",
     specHint: "Tetapkan tahap untuk setiap statistik",
+    budget: (used, total) => `MATA  ${used} / ${total}  ·  guna dengan bijak`,
     aiLearned: "🧠 APA YANG AI TELAH PELAJARI",
     aiNoData: "🧠 Belum ada permainan hari ini — AI bermula dari kosong!",
     aiStat: (trait, era, pct, runs) => `${trait} tinggi menang ${era} ${pct}% masa (${runs} larian)`,
@@ -807,6 +809,12 @@ const CHOOSER = {
 };
 
 /* Spec sheet: 4 stat rows × 4 levels, one hold per row. */
+/* Every tribe shares one pool of points, so a stat can only be raised by
+   giving something else up — 4/4/4/4 would need 16 and is simply not
+   buyable. Each stat costs its own level, and one point is always held
+   back for every stat still unset so the sheet can never be made
+   impossible to finish. */
+const SPEC_BUDGET = 12;
 const SPEC = {
   open(tribeIndex, onDone) {
     Object.assign(this, {
@@ -834,8 +842,20 @@ const SPEC = {
     });
     return out;
   },
+  spent() { return TRAITS.reduce((n, x) => n + (this.values[x.id] || 0), 0); },
+  // Can this level be afforded, leaving at least 1 point for each stat
+  // that has not been set yet?
+  affordable(traitId, lv) {
+    let other = 0, unset = 0;
+    TRAITS.forEach(x => {
+      if (x.id === traitId) return;
+      if (this.values[x.id]) other += this.values[x.id]; else unset++;
+    });
+    return other + lv + unset <= SPEC_BUDGET;
+  },
   chooseCell(c) {
     if (this.locked || !c || this.values[c.trait.id] === c.lv) return;
+    if (!this.affordable(c.trait.id, c.lv)) { sfx.bad(); return; }
     const wasComplete = TRAITS.every(x => this.values[x.id]);
     this.values[c.trait.id] = c.lv;
     this.hoverKey = ""; this.hoverSince = performance.now();
@@ -860,7 +880,12 @@ const SPEC = {
     ctx.fillText(t("pickSpec")(this.tribeIndex + 1), innerWidth / 2, 118);
     ctx.font = "700 13px system-ui"; ctx.fillStyle = "rgba(255,255,255,.82)"; ctx.shadowBlur = 5;
     ctx.fillText(t("specHint") + " · " + t("holdToPick"), innerWidth / 2, 146);
-    ctx.shadowBlur = 0; ctx.restore();
+    ctx.shadowBlur = 0;
+    const left = SPEC_BUDGET - this.spent();
+    ctx.font = "900 15px Orbitron, system-ui";
+    ctx.fillStyle = left > 0 ? "#4ade80" : "#ffc857";
+    ctx.fillText(t("budget")(this.spent(), SPEC_BUDGET), innerWidth / 2, 174);
+    ctx.restore();
 
     const cells = this.layout(), cur = selectionCursor();
     let hoverKey = "";
@@ -868,6 +893,7 @@ const SPEC = {
     // again rather than being locked in for the whole run.
     if (cur && !this.locked) cells.forEach(c => {
       if (this.values[c.trait.id] === c.lv) return;
+      if (!this.affordable(c.trait.id, c.lv)) return;
       if (Math.abs(cur.x - c.x) < c.w / 2 && Math.abs(cur.y - c.y) < c.h / 2) hoverKey = `${c.trait.id}:${c.lv}`;
     });
     if (hoverKey !== this.hoverKey) { this.hoverKey = hoverKey; this.hoverSince = performance.now(); }
@@ -886,9 +912,10 @@ const SPEC = {
         const key = `${tr.id}:${c.lv}`;
         const hot = key === hoverKey;
         const isChosen = chosen === c.lv;
-        const dim = chosen && !isChosen;
+        const tooDear = !isChosen && !this.affordable(tr.id, c.lv);
+        const dim = (chosen && !isChosen) || tooDear;
         ctx.save();
-        ctx.globalAlpha = dim ? 0.28 : 1;
+        ctx.globalAlpha = tooDear ? 0.16 : dim ? 0.28 : 1;
         ctx.fillStyle = isChosen ? "rgba(74,222,128,.3)" : hot ? "rgba(74,222,128,.18)" : "rgba(10,6,22,.8)";
         ctx.strokeStyle = isChosen ? "#4ade80" : hot ? "#4ade80" : "rgba(255,255,255,.2)";
         ctx.lineWidth = isChosen || hot ? 3 : 2;
@@ -900,6 +927,10 @@ const SPEC = {
         ctx.fillText("●".repeat(c.lv), c.x, c.y - 8);
         ctx.font = "600 10.5px system-ui"; ctx.fillStyle = "rgba(255,255,255,.75)";
         ctx.fillText(t(tr.lvlKey)[c.lv], c.x, c.y + 12);
+        if (tooDear) {
+          ctx.globalAlpha = 0.5; ctx.font = "12px system-ui";
+          ctx.fillText("🔒", c.x + c.w / 2 - 12, c.y - c.h / 2 + 12);
+        }
         if (hot && prog > 0) drawDwellRing(c.x, c.y, prog, 15);
         ctx.restore();
       });
