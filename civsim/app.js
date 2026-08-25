@@ -91,6 +91,26 @@ const STR = {
     confirmTitle: "READY?", confirmStart: "▶ START",
     redo: "↩ REDO", holdRedo: "Hold over a row again to change it",
     bestToday: n => `🏆 Best score today: ${n}`,
+    evNoTrees: "🪵 The last tree is gone!",
+    evSpoil: "🥀 Food is spoiling — not enough storage!",
+    evNoStone: "⛏️ All the stone is mined out.",
+    evGangUp: n => `⚔️ Everyone is attacking ${n} — they are in front!`,
+    evCoalition: n => `🤝 Alliance formed against ${n}!`,
+    evCoalitionOn: n => `🎯 The others have allied against ${n}.`,
+    evElite: "🍖 So many skilled people to feed!",
+    storyTitle: "WHAT HAPPENED",
+    stTop: (d, h) => `built the strongest civilization — ${d} discoveries, ${h} huts`,
+    stConquered: n => `conquered by ${n}`,
+    stStarved: n => `starved — ${n} people lost to famine`,
+    stNoWood: "stripped its forest bare and ran out of wood",
+    stNoStone: "mined out all its stone",
+    stGanged: "led early, so both rivals turned on it",
+    stIgnorant: n => `never worked out how to use what it found (only ${n} discoveries)`,
+    stIdle: "spent most of the time standing idle",
+    stThirsty: "never found drinking water",
+    stElite: "too many skilled mouths to feed for this land",
+    stSteady: "steady, but simply out-built",
+    stOverrun: "overrun — its capital was taken",
     pickPolicy: n => `CHOOSE TRIBE ${n} POLICY`,
     policyHint: "A policy changes what this civilization values most",
     policyResearch: "Research First", policyResearchSub: "Find inventions and cures sooner",
@@ -181,6 +201,26 @@ const STR = {
     confirmTitle: "SEDIA?", confirmStart: "▶ MULA",
     redo: "↩ ULANG", holdRedo: "Tahan semula pada baris untuk menukar",
     bestToday: n => `🏆 Skor terbaik hari ini: ${n}`,
+    evNoTrees: "🪵 Pokok terakhir sudah habis!",
+    evSpoil: "🥀 Makanan rosak — tiada tempat simpanan!",
+    evNoStone: "⛏️ Semua batu sudah habis dilombong.",
+    evGangUp: n => `⚔️ Semua menyerang ${n} — mereka di hadapan!`,
+    evCoalition: n => `🤝 Pakatan dibentuk menentang ${n}!`,
+    evCoalitionOn: n => `🎯 Yang lain berpakat menentang ${n}.`,
+    evElite: "🍖 Terlalu ramai orang mahir untuk diberi makan!",
+    storyTitle: "APA YANG BERLAKU",
+    stTop: (d, h) => `membina tamadun terkuat — ${d} penemuan, ${h} pondok`,
+    stConquered: n => `ditakluk oleh ${n}`,
+    stStarved: n => `kebuluran — ${n} rakyat terkorban`,
+    stNoWood: "menebang habis hutannya dan kehabisan kayu",
+    stNoStone: "melombong habis semua batunya",
+    stGanged: "mendahulu awal, jadi kedua-dua lawan menyerangnya",
+    stIgnorant: n => `tidak tahu menggunakan apa yang dijumpai (hanya ${n} penemuan)`,
+    stIdle: "menghabiskan masa menganggur",
+    stThirsty: "tidak pernah menjumpai air minuman",
+    stElite: "terlalu ramai mulut mahir untuk tanah ini",
+    stSteady: "stabil, tetapi kalah dari segi pembinaan",
+    stOverrun: "tumpas — ibu kotanya dirampas",
     pickPolicy: n => `PILIH DASAR PUAK ${n}`,
     policyHint: "Dasar mengubah keutamaan tamadun ini",
     policyResearch: "Utamakan Kajian", policyResearchSub: "Temui ciptaan dan penawar lebih awal",
@@ -1078,6 +1118,12 @@ const SIM = {
         gainT: 0, expandT: 0, fightT: 0, buildT: 0, ignoreT: 0, lastPopLog: 6,
         wood: 0, stone: 0, iron: 0, workers: [], activeFrac: 1, idleLogged: 0, jobLogged: {},
         log: [], relations: {}, captures: 0, defeated: [],
+        // Cost of excellence: a tribe of geniuses, tireless workers and
+        // warriors simply eats more than a modest one, so a maxed-out spec
+        // is expensive to keep alive on poor land.
+        elite: 1 + ((spec.int + spec.work + spec.health + spec.aggro) - 10) * 0.10,
+        stats: { famine: 0, attacksTaken: 0, outOfWood: false, outOfStone: false,
+                 leaderSecs: 0, thirstySecs: 0, idleSecs: 0, peakPop: 6 },
       };
       const hp = this.xy(home);
       for (let k = 0; k < WORKER_CAP; k++) {
@@ -1526,7 +1572,13 @@ const SIM = {
       if (safe.length) return { type: JOB_BUILD, build: 2, tile: safe[Math.floor(Math.random() * Math.min(3, safe.length))], dur: 2.1 };
     }
 
-    if ((war || tr.policy.id === "conquest" || tr.aggro >= 3) && Math.random() < cv("fightUrge", tr.aggro) * (tr.policy.id === "conquest" ? 1.5 : tr.policy.id === "cooperate" ? .45 : 1)) {
+    // Being behind the front-runner is itself a reason to pick up a spear.
+    const behindLeader = this.leaderIdx !== undefined && this.leaderIdx !== -1 &&
+      this.leaderIdx !== tr.idx && this.scoreOf(tr).total < this.leaderScore * 0.85;
+    const urge = cv("fightUrge", tr.aggro)
+      * (tr.policy.id === "conquest" ? 1.5 : tr.policy.id === "cooperate" ? .45 : 1)
+      * (behindLeader ? 1.8 : 1);
+    if ((war || tr.policy.id === "conquest" || tr.aggro >= 3) && Math.random() < urge) {
       const border = this.ownedTiles(tr, i => this.neighbors(i).some(n => {
         const o = this.owner[n];
         return o !== -1 && o !== tr.idx && this.tribes[o].alive;
@@ -1561,16 +1613,27 @@ const SIM = {
     if (fields.length) return { type: JOB_FARM, tile: fields[Math.floor(Math.random() * fields.length)], dur: 2 };
     return null;
   },
+  // Did this tribe just take the last of a resource it still needs?
+  noteExhausted(tr) {
+    if (!tr.stats.outOfWood && tr.known.has("wood") && !this.ownedTiles(tr, i => this.feat[i] === F_TREE).length) {
+      tr.stats.outOfWood = true; this.pushLog(tr, t("evNoTrees"), "work");
+    }
+    if (!tr.stats.outOfStone && tr.known.has("stone") && !this.ownedTiles(tr, i => this.feat[i] === F_ROCK).length) {
+      tr.stats.outOfStone = true; this.pushLog(tr, t("evNoStone"), "work");
+    }
+  },
   finishJob(tr, job, E) {
     if (job.type === JOB_TREE) {
       tr.wood += 1;
       this.feat[job.tile] = F_NONE; this.terrainCache = null;
       if (!tr.jobLogged.chop) { tr.jobLogged.chop = 1; this.pushLog(tr, t("evChop"), "work"); }
+      this.noteExhausted(tr);
     } else if (job.type === JOB_ROCK) {
       tr.stone += 1;
       if (this.feat[job.tile] === F_IRON) tr.iron += 1;
       this.feat[job.tile] = F_NONE; this.terrainCache = null;
       if (!tr.jobLogged.mine) { tr.jobLogged.mine = 1; this.pushLog(tr, t("evMine"), "work"); }
+      this.noteExhausted(tr);
     } else if (job.type === JOB_BUILD) {
       if (!this.build[job.tile] && this.owner[job.tile] === tr.idx) {
         if (job.build === 1 && tr.wood >= 3) {
@@ -1635,6 +1698,7 @@ const SIM = {
   step(dt) {
     const E = ERAS[this.era];
     const war = this.simT >= CONQUEST_AT;
+    this.refreshLeader(dt);
     this.eventT -= dt;
     if (this.autoEvents && this.eventT <= 0) { this.triggerEvent(); this.eventT = 23 + Math.random() * 18; }
     if (this.worldEvent && (this.worldEvent.life -= dt) <= 0) this.worldEvent = null;
@@ -1669,6 +1733,9 @@ const SIM = {
       if (!water && !tr.thirstLogged) { tr.thirstLogged = true; this.pushLog(tr, t("evThirst"), "int"); }
       if (water && tr.thirstLogged) { tr.thirstLogged = false; this.pushLog(tr, t("evWaterFound"), "int"); }
       const thirst = water ? 1 : 1.85;
+      if (!water) tr.stats.thirstySecs += dt;
+      if (tr.activeFrac < 0.4) tr.stats.idleSecs += dt;
+      if (tr.pop > tr.stats.peakPop) tr.stats.peakPop = tr.pop;
 
       // Food scales with population, but is gated by the fraction of workers
       // actually doing something — so visible idling directly starves them.
@@ -1684,7 +1751,7 @@ const SIM = {
       const drought = this.worldEvent?.type === "drought" ? 0.62 : 1;
       const fieldBonus = 1 + this.countBuild(tr, 6) * .08;
       tr.food += tr.pop * workMul * E.food * farmBonus * toolBonus * fireBonus * effort * drought * dt * 1.35 * gemBoost * animalBonus * fishingBonus * fieldBonus;
-      tr.food -= tr.pop * 0.42 * cv("upkeep", tr.health) * thirst * dt;
+      tr.food -= tr.pop * 0.42 * cv("upkeep", tr.health) * thirst * tr.elite * dt;
       if (this.worldEvent?.type === "flood" && Math.random() < dt * .012) tr.food = Math.max(0, tr.food - 2);
       this.updateIllness(tr, dt, water);
 
@@ -1693,10 +1760,21 @@ const SIM = {
         this.pushLog(tr, t("evIdle"), "work");
       }
 
+      // Storage limit: without granaries most of a huge harvest simply rots,
+      // so a big elite population cannot coast on an endless food pile.
+      const store = 60 + this.countBuild(tr, 1) * 26 + (tr.known.has("farming") ? 40 : 0);
+      if (tr.food > store) {
+        const spoiled = tr.food - store;
+        tr.food = store;
+        tr.stats.spoiled = (tr.stats.spoiled || 0) + spoiled;
+        if (!tr.spoilLogged && spoiled > 8) { tr.spoilLogged = true; this.pushLog(tr, t("evSpoil"), "int"); }
+      }
       if (tr.food < 0) {
         this.requestEmergencyAid(tr);
         tr.food = 0;
-        tr.pop = Math.max(0, tr.pop - dt * 1.3 * cv("upkeep", tr.health));
+        const lost = dt * 1.3 * cv("upkeep", tr.health);
+        tr.stats.famine += Math.min(tr.pop, lost);
+        tr.pop = Math.max(0, tr.pop - lost);
         tr.lastThreat = "starvation";
         tr.morale = Math.max(0.35, tr.morale - dt * 0.08);
         if (!tr.starveLogged) { this.pushLog(tr, t("evStarve")); tr.starveLogged = true; }
@@ -1812,6 +1890,44 @@ const SIM = {
     }
     return tile;
   },
+  // Whoever is ahead becomes everyone's problem. Recomputed about once a
+  // sim-second rather than every step, since scoring walks the whole map.
+  refreshLeader(dt) {
+    this.leaderT = (this.leaderT || 0) + dt;
+    if (this.leaderT < 1) return;
+    this.leaderT = 0;
+    let best = -1, idx = -1;
+    this.tribes.forEach(tr => { if (!tr.alive) return; const v = this.scoreOf(tr).total; if (v > best) { best = v; idx = tr.idx; } });
+    this.leaderIdx = idx; this.leaderScore = best;
+    // A runaway leader unites everyone else: the rivals ally against them.
+    const rivals = this.tribes.filter(x => x.alive && x.idx !== idx);
+    if (rivals.length >= 2 && best > 0) {
+      const second = Math.max(...rivals.map(r => this.scoreOf(r).total));
+      if (second < best * 0.72 && rivals.some(r => r.relations[rivals.find(o => o !== r).idx] !== "allied")) {
+        rivals.forEach(a => rivals.forEach(b => { if (a !== b) a.relations[b.idx] = "allied"; }));
+        if (!this.coalitionLogged) {
+          this.coalitionLogged = true;
+          const L = this.tribes[idx];
+          rivals.forEach(r => this.pushLog(r, t("evCoalition")(L.name), "aggro"));
+          this.pushLog(L, t("evCoalitionOn")(L.name), "aggro");
+          this.banner = { text: t("evCoalition")(L.name), color: "#fb7185", life: 2.6 };
+        }
+      }
+    }
+    const L = this.tribes[idx];
+    if (L) {
+      L.stats.leaderSecs += 1;
+      // Announce the pile-on once, when the leader is clearly in front.
+      const others = this.tribes.filter(x => x.alive && x.idx !== idx);
+      if (!this.gangLogged && others.length > 1 && this.simT >= CONQUEST_AT &&
+          others.every(o => this.scoreOf(o).total < best * 0.85)) {
+        this.gangLogged = true;
+        others.forEach(o => this.pushLog(o, t("evGangUp")(L.name), "aggro"));
+        this.pushLog(L, t("evGangUp")(L.name), "aggro");
+        this.banner = { text: t("evGangUp")(L.name), color: L.color, life: 2.4 };
+      }
+    }
+  },
   attack(tr, E) {
     const targets = [];
     for (let i = 0; i < this.owner.length; i++) {
@@ -1822,12 +1938,24 @@ const SIM = {
       }
     }
     if (!targets.length) return false;
-    const tile = targets[Math.floor(Math.random() * targets.length)];
+    // Gang up: if someone else is out in front, most attacks go their way.
+    const lead = this.leaderIdx;
+    let pool = targets;
+    if (lead !== undefined && lead !== -1 && lead !== tr.idx) {
+      const onLeader = targets.filter(i => this.owner[i] === lead);
+      if (onLeader.length && Math.random() < 0.75) pool = onLeader;
+    }
+    const tile = pool[Math.floor(Math.random() * pool.length)];
     const def = this.tribes[this.owner[tile]];
+    def.stats.attacksTaken++;
+    def.recentAtk = (def.recentAtk || []).filter(a => this.simT - a.t < 12);
+    if (!def.recentAtk.some(a => a.by === tr.idx)) def.recentAtk.push({ by: tr.idx, t: this.simT });
+    else def.recentAtk.find(a => a.by === tr.idx).t = this.simT;
+    const fronts = def.recentAtk.length;
     const metal = tr.known.has("metal") ? 1.3 : 1, army = tr.known.has("army") ? (this.countBuild(tr, 7) ? 1.6 : 1.12) : 1;
     const wall = this.build[tile] === 2 ? 1.5 : 1;
     const atk = tr.pop * cv("attack", tr.aggro) * 0.3 * tr.morale * E.strength * metal * army;
-    const dfn = def.pop * (0.35 + def.health * 0.18) * def.morale * wall * (def.known.has("walls") ? 1.15 : 1) * (def.allyDefence > 0 ? 1.3 : 1);
+    const dfn = def.pop * (0.35 + def.health * 0.18) * def.morale * wall * (def.known.has("walls") ? 1.15 : 1) * (def.allyDefence > 0 ? 1.3 : 1) * (fronts >= 2 ? 0.68 : 1);
     if (!tr.attackLogged || performance.now() - tr.attackLogged > 9000) {
       const why = tr.policy.id === "conquest" ? "expand territory" : tr.food < tr.pop * .7 ? "need food" : tr.known.has("army") ? "army is ready" : "protect the border";
       this.pushLog(tr, t("evAttack")(def.name)); this.pushLog(tr, t("evAttackWhy")(why)); tr.attackLogged = performance.now();
@@ -1842,15 +1970,40 @@ const SIM = {
     });
     if (attackWon) {
       this.owner[tile] = tr.idx; this.build[tile] = 0; tr.captures++;
-      def.morale = Math.max(0.35, def.morale - 0.05);
+      // Being everyone's target grinds morale down over time.
+      const pileOn = def.idx === this.leaderIdx ? 0.09 : 0.05;
+      def.morale = Math.max(0.28, def.morale - pileOn);
       def.pop = Math.max(0, def.pop - 0.35);
-      tr.pop = Math.max(0, tr.pop - 0.12);
+      tr.pop = Math.max(0, tr.pop - 0.22 * cv("attack", tr.aggro));
       if (!tr.capLogged || performance.now() - tr.capLogged > 7000) { this.pushLog(tr, t("evCapture")(def.name)); tr.capLogged = performance.now(); }
       if (this.speed <= 2) sfx.battle();
       return true;
     }
-    tr.pop = Math.max(0, tr.pop - 0.2);
+    // A failed assault costs real people, so constant aggression bleeds.
+    tr.pop = Math.max(0, tr.pop - 0.30 * cv("attack", tr.aggro));
+    tr.morale = Math.max(0.3, tr.morale - 0.02);
     return false;
+  },
+
+  /* One plain sentence per tribe explaining how it ended up where it did.
+     Checked in priority order so the most decisive cause is the one shown. */
+  storyFor(r, rank) {
+    const tr = r.tr, st = tr.stats;
+    if (rank === 0) return t("stTop")(tr.known.size, this.countBuild(tr, 1));
+    if (!tr.alive) {
+      const killer = this.tribes.find(o => o.defeated && o.defeated.includes(tr.name));
+      if (killer) return t("stConquered")(killer.name);
+      return st.famine >= 1 ? t("stStarved")(Math.round(st.famine)) : t("stOverrun");
+    }
+    if (st.famine > tr.pop * 0.5 && st.famine > 12) return t("stStarved")(Math.round(st.famine));
+    if (st.thirstySecs > 25) return t("stThirsty");
+    if (tr.elite > 1.2 && st.famine > 6) return t("stElite");
+    if (st.outOfWood && tr.known.has("huts")) return t("stNoWood");
+    if (st.outOfStone && tr.known.has("walls")) return t("stNoStone");
+    if (st.leaderSecs > 25 && st.attacksTaken > 12) return t("stGanged");
+    if (tr.known.size <= 3) return t("stIgnorant")(tr.known.size);
+    if (st.idleSecs > 40) return t("stIdle");
+    return t("stSteady");
   },
 
   finish() {
@@ -1907,6 +2060,11 @@ const SIM = {
         ${story.map(s => `<p>✓ ${s}</p>`).join("")}
         <p><strong>${lang === "bm" ? "Menawan semua puak?" : "Conquered every tribe?"}</strong> ${conquestResult}</p>
         <p><strong>${lang === "bm" ? "Penemuan penting:" : "Important discoveries:"}</strong> ${discoveries.slice(-10).join(" · ") || "—"}</p>
+      </div>
+      <div class="story-box">
+        <div class="story-title">${t("storyTitle")}</div>
+        ${ranked.map((r, i) => `<div class="story-row" style="--c:${r.tr.color}">
+          <b>${i + 1}. ${r.tr.name}</b> — ${this.storyFor(r, i)}</div>`).join("")}
       </div>
       <div class="why-box intelligence-box">
         <div class="why-title">🧠 ${t("reportTitle")}</div>
