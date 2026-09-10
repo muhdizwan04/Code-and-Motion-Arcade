@@ -3104,15 +3104,56 @@ const SIM = {
 };
 
 /* ---------------- boot ---------------- */
-if ("serviceWorker" in navigator && location.protocol !== "file:") {
-  navigator.serviceWorker.register("sw.js").then(reg => reg.update()).catch(() => {});
-  let refreshingForNewWorker = false;
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (refreshingForNewWorker) return;
-    refreshingForNewWorker = true;
-    location.reload();
-  });
-}
+/* Service workers are a production feature. A cache-first worker answers from
+   its own cache without ever consulting the dev server, so an edit to app.js
+   silently never appears until the cache version is bumped or site data is
+   cleared by hand. On localhost we therefore skip registration entirely AND
+   tear down whatever an earlier session left behind, so a plain reload always
+   shows the code currently on disk.
+
+   To exercise offline mode locally, load any page once with ?sw=on — a service
+   worker needs a secure context, so localhost is the only place offline can be
+   tested without deploying. ?sw=off returns to normal development behaviour.
+   The choice is remembered, so it survives navigating between the games. */
+(function registerServiceWorker() {
+  if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+
+  const DEV_HOSTS = ["localhost", "127.0.0.1", "[::1]", "::1", "0.0.0.0"];
+  const isDevHost = DEV_HOSTS.includes(location.hostname) || location.hostname.endsWith(".local");
+  let forced = false;
+  try {
+    const want = new URLSearchParams(location.search).get("sw");
+    if (want === "on") localStorage.setItem("pwa-force-sw", "1");
+    if (want === "off") localStorage.removeItem("pwa-force-sw");
+    forced = localStorage.getItem("pwa-force-sw") === "1";
+  } catch (e) { /* storage can throw in private mode; fall back to dev default */ }
+
+  if (!isDevHost || forced) {
+    navigator.serviceWorker.register("sw.js").then((reg) => reg.update()).catch(() => {});
+    let refreshingForNewWorker = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshingForNewWorker) return;
+      refreshingForNewWorker = true;
+      location.reload();
+    });
+    return;
+  }
+
+  // Development: unregister anything controlling this origin and drop its
+  // caches. If this page was itself served by one, reload once (guarded, so a
+  // failed teardown can never loop) to pick the files up straight from disk.
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.getRegistrations()
+    .then((list) => Promise.all(list.map((reg) => reg.unregister())))
+    .then(() => (window.caches ? caches.keys() : []))
+    .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+    .then(() => {
+      if (!hadController || sessionStorage.getItem("pwa-dev-reloaded")) return;
+      sessionStorage.setItem("pwa-dev-reloaded", "1");
+      location.reload();
+    })
+    .catch(() => {});
+})();
 window.__civ = { engine, SIM, CHOOSER, SPEC, CONFIRM, loadLearn, DISCOVERIES, TRAITS, ERAS, POLICIES,
   _confirm: (era, specs, policies = ["research", "food", "defend"], cb = () => {}) => { chosenEra = era; show(null); ui.classList.add("passthrough"); CONFIRM.open(specs, policies, cb); },
   _force: (era, specs, policies = ["research", "food", "defend"]) => { show(null); ui.classList.add("passthrough"); SIM.start(era, specs, policies); } };
