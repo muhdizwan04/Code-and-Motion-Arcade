@@ -71,6 +71,8 @@ const STR = {
     blastHow: "Hover over a block, PINCH 👌 to grab it. Drag onto the grid and release to place. Fill a row or column to clear it! 🧱",
     lines: "Lines",
     noMoves: "NO MOVES LEFT!",
+    timeUp: "TIME'S UP!",
+    blastAddTime: n => `+${n}s`,
     blastRanks: ["🧱 BLOCK MASTER", "⚡ LINE BREAKER", "🔰 STACKER"],
     pinchHint: "👌 PINCH to grab · release to place",
     pinchOpen: "OPEN",
@@ -93,6 +95,7 @@ const STR = {
     labCheatTitle: "All Combination Possibilities",
     labCamera: "ROBOT HAND · pinch to craft",
     labPossibilities: n => `${n} possible recipes`,
+    labNoReaction: "No reaction — try another pair",
   },
   bm: {
     langBtn: "EN",
@@ -148,6 +151,8 @@ const STR = {
     blastHow: "Tuding ke atas blok, CUBIT 👌 untuk mengambilnya. Seret ke grid dan lepaskan untuk meletakkan. Penuhkan baris atau lajur untuk mengosongkannya! 🧱",
     lines: "Baris",
     noMoves: "TIADA LANGKAH LAGI!",
+    timeUp: "MASA TAMAT!",
+    blastAddTime: n => `+${n}s`,
     blastRanks: ["🧱 TUAN BLOK", "⚡ PEMECAH BARIS", "🔰 PENYUSUN"],
     pinchHint: "👌 CUBIT untuk ambil · lepas untuk letak",
     pinchOpen: "BUKA",
@@ -170,6 +175,7 @@ const STR = {
     labCheatTitle: "Semua Kemungkinan Gabungan",
     labCamera: "TANGAN ROBOT · cubit untuk mencipta",
     labPossibilities: n => `${n} resipi yang mungkin`,
+    labNoReaction: "Tiada tindak balas — cuba pasangan lain",
   },
 };
 let lang = localStorage.getItem("ha-lang") || "en";
@@ -289,6 +295,8 @@ const engine = {
   velocity: [],
   hands: [], handsNorm: [],
   lastVideoTime: -1, frameUpdated: false, lastSeenAt: 0, frameAt: 0, frameDelta: 0,
+  speed: 0,          // peak landmark speed, normalized units/sec — drives the
+                     // prediction window and the hand-lost grace period below
   lastFrameOkAt: 0,  // last time a genuinely new video frame was processed —
                       // the camera-stall watchdog below watches this, separately
                       // from "hand visible", to catch a frozen/dead camera feed.
@@ -304,9 +312,14 @@ const engine = {
         numHands: 1,
         // Let a hand enter in normal indoor light, then rely on the temporal
         // filter below instead of rapidly dropping/reacquiring it.
+        // Acquisition stays strict so a face or background object cannot be
+        // mistaken for a hand, but once a hand IS being tracked the presence
+        // and tracking gates are deliberately loose: a fast swipe motion-blurs
+        // the fingers, and the old 0.45/0.42 gates dropped the hand mid-motion
+        // exactly when the student was moving quickest.
         minHandDetectionConfidence: 0.42,
-        minHandPresenceConfidence: 0.45,
-        minTrackingConfidence: 0.42,
+        minHandPresenceConfidence: 0.32,
+        minTrackingConfidence: 0.30,
       });
       try {
         this.landmarker = await HandLandmarker.createFromOptions(fileset, options("GPU"));
@@ -351,6 +364,7 @@ const engine = {
     this.lastSeenAt = 0;
     this.frameAt = 0;
     this.frameDelta = 0;
+    this.speed = 0;
     handStatus.classList.remove("seen");
   },
   detect() {
@@ -381,32 +395,46 @@ const engine = {
         // deliberate fast movement receives a high alpha so games stay direct.
         // Thumb and index receive a little more responsiveness for pinch games.
         const dt = this.frameDelta || 1 / 30;
+        let peak = 0;   // fastest landmark this frame: "still" vs "thrown"
         this.norm = raw.map((p, i) => {
           const prev = this.norm[i];
           const d = dist(p, prev);
+          if (d > peak) peak = d;
           const controlTip = i === 4 || i === 8;
-          const alpha = Math.min(controlTip ? 0.88 : 0.74,
-            (controlTip ? 0.24 : 0.18) + Math.min(0.56, d * (controlTip ? 9.5 : 7.2)));
+          // The responsive term used to be clamped at 0.56, so even a full-speed
+          // swipe kept ~20% of the old position on every camera frame and the
+          // cursor visibly trailed the hand. Alpha now runs all the way to ~1
+          // (no smoothing at all) once the hand is genuinely moving, while a
+          // resting hand keeps exactly the calm filtering it had before.
+          const alpha = Math.min(controlTip ? 0.97 : 0.94,
+            (controlTip ? 0.24 : 0.18) + d * (controlTip ? 11 : 9));
           const next = {
             x: prev.x + (p.x - prev.x) * alpha,
             y: prev.y + (p.y - prev.y) * alpha,
             z: prev.z + (p.z - prev.z) * alpha,
           };
-          const v = {
-            x: Math.max(-1.5, Math.min(1.5, (next.x - prev.x) / dt)),
-            y: Math.max(-1.5, Math.min(1.5, (next.y - prev.y) / dt)),
-            z: Math.max(-1.5, Math.min(1.5, (next.z - prev.z) / dt)),
+          // Velocity is measured from the RAW landmark, not the filtered one.
+          // Deriving it from the filtered position under-reports true speed
+          // precisely when the hand is fastest — which is when the between-frame
+          // prediction below depends on it most. Its own light smoothing keeps
+          // it from jittering on a still hand.
+          const prevV = this.velocity[i] || { x: 0, y: 0, z: 0 };
+          const clamp = (n) => Math.max(-3, Math.min(3, n));
+          this.velocity[i] = {
+            x: prevV.x + (clamp((p.x - prev.x) / dt) - prevV.x) * 0.5,
+            y: prevV.y + (clamp((p.y - prev.y) / dt) - prevV.y) * 0.5,
+            z: prevV.z + (clamp((p.z - prev.z) / dt) - prevV.z) * 0.5,
           };
-          this.velocity[i] = v;
           return next;
         });
+        this.speed = peak / dt;
       }
       const toScreen = hand => hand.map(p => ({ x: p.x * dw + ox, y: p.y * dh + oy, z: p.z }));
       this.handsNorm = rawHands;
       this.hands = rawHands.map(toScreen);
       this.updateRenderedHand(toScreen);
       this.lastSeenAt = performance.now();
-    } else if (performance.now() - this.lastSeenAt > 300) {
+    } else if (performance.now() - this.lastSeenAt > this.lostGraceMs()) {
       // Ignore a few dropped inference frames so the cursor/sign does not flicker.
       this.hand = null;
       this.norm = null;
@@ -418,13 +446,25 @@ const engine = {
     handStatus.classList.toggle("seen", !!this.hand);
     return true;
   },
+  // A hand that was moving fast is the one most likely to be lost to a single
+  // motion-blurred frame, so it earns a longer grace period before the games
+  // are told it has gone. A resting hand that disappears really has left.
+  lostGraceMs() {
+    return 300 + Math.min(320, (this.speed || 0) * 260);
+  },
   // Run on every animation frame, not just every camera frame. A capped
   // 24ms prediction bridges the gap between camera frames without making the
   // cursor drift when a hand stops. Gesture decisions still use `norm`, not
   // this presentation-only position, so a predicted frame cannot fake a pinch.
   advanceRender(now = performance.now()) {
     if (!this.norm || !this.camReady || !cam.videoWidth || !cam.videoHeight) return;
-    const ahead = Math.min(0.024, Math.max(0, (now - this.frameAt) / 1000));
+    // Between camera frames the rendered hand keeps travelling along its last
+    // measured velocity. The window is wider than one frame so that one or two
+    // dropped detections during a fast swipe cannot freeze the cursor, and the
+    // confidence fades to zero by ~140ms so it coasts to a stop rather than
+    // flying off when the hand really has left the frame.
+    const stale = Math.max(0, (now - this.frameAt) / 1000);
+    const ahead = Math.min(0.055, stale) * Math.max(0, 1 - stale / 0.14);
     const vw = cam.videoWidth, vh = cam.videoHeight;
     const scale = Math.max(innerWidth / vw, innerHeight / vh);
     const dw = vw * scale, dh = vh * scale;
@@ -1439,10 +1479,15 @@ const BLAST_SHAPES = [
 ];
 const BLAST_BAG_TOTAL = BLAST_SHAPES.reduce((sum, entry) => sum + entry.w, 0);
 const BLAST_COLORS = ["#22d3ee", "#a855f7", "#ec4899", "#a3e635", "#fbbf24"];
+/* Timed mode: a run starts at two minutes and every cleared line buys more.
+   Tuned so a typical booth visit finishes well inside five minutes — raise
+   BLAST_TIME_START or BLAST_TIME_PER_LINE to make runs longer. */
+const BLAST_TIME_START = 120, BLAST_TIME_PER_LINE = 6, BLAST_TIME_MAX = 240;
 const BLAST = {
   emoji: "🧱", titleKey: "blastTitle", howKey: "blastHow", bgToggle: true,
   board: [], pieces: [], score: 0, lines: 0, dragging: null,
   flashCells: [], flashT: 0, hud: null, resetBtn: null, running: false,
+  timeLeft: BLAST_TIME_START, bonusT: 0, bonusN: 0, endReason: "noMoves",
 
   cursorPos: null, dragPos: null, bg: null, bgKey: "",
   pinchLog: [], openSince: 0, handLostSince: 0,
@@ -1453,8 +1498,9 @@ const BLAST = {
     this.score = 0; this.lines = 0; this.dragging = null; this.flashCells = []; this.flashT = 0;
     this.cursorPos = null; this.dragPos = null; this.bg = null; this.bgKey = "";
     this.pinchLog = []; this.openSince = 0; this.handLostSince = 0;
+    this.timeLeft = BLAST_TIME_START; this.bonusT = 0; this.bonusN = 0; this.endReason = "noMoves";
     this.spawnPieces(); this.running = true;
-    this.hud = el(`<div class="hud"><div class="stat"><div class="lbl">${t("score")}</div><div class="num cyan" id="bScore">0</div></div><div class="stat"><div class="lbl">${t("lines")}</div><div class="num pink" id="bLines">0</div></div></div>`);
+    this.hud = el(`<div class="hud"><div class="stat"><div class="lbl">${t("time")}</div><div class="num" id="bTime">2:00</div></div><div class="stat"><div class="lbl">${t("score")}</div><div class="num cyan" id="bScore">0</div></div><div class="stat"><div class="lbl">${t("lines")}</div><div class="num pink" id="bLines">0</div></div></div>`);
     this.resetBtn = el(`<button class="reset-btn" type="button">↺ ${t("reset")}</button>`);
     this.resetBtn.onclick = () => { sfx.click(); this.start(); };
     document.body.append(this.hud, this.resetBtn);
@@ -1489,7 +1535,10 @@ const BLAST = {
     const availH = Math.max(220, innerHeight - topSafe - bottomSafe);
     const trayW = Math.round(Math.min(150, Math.max(92, innerWidth * .2)));
     const availW = Math.max(200, innerWidth - trayW - 26);
-    const cell = Math.max(15, Math.floor(Math.min(availW * .92, availH * .96, 336) / 8));
+    // A tighter Block Blast-sized board: cells top out near 30px instead of
+    // 42px, so the grid stays compact and the whole puzzle is easy to take in
+    // at a glance from a step back at the booth.
+    const cell = Math.max(15, Math.floor(Math.min(availW * .92, availH * .96, 240) / 8));
     const boardSize = cell * 8;
     const gx = Math.round(trayW + 18 + Math.max(0, (availW - boardSize) / 2));
     const gy = Math.round(topSafe + Math.max(0, (availH - boardSize) / 2));
@@ -1531,6 +1580,17 @@ const BLAST = {
     const score = this.hud?.querySelector("#bScore"), lines = this.hud?.querySelector("#bLines");
     if (score) { score.textContent = this.score; score.classList.remove("score-punch"); void score.offsetWidth; score.classList.add("score-punch"); }
     if (lines) lines.textContent = this.lines;
+    this.updateClock();
+  },
+  updateClock() {
+    const el_ = this.hud?.querySelector("#bTime");
+    if (!el_) return;
+    const secs = Math.max(0, Math.ceil(this.timeLeft));
+    el_.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+    // The last 15 seconds turn red so a student glancing at the board can see
+    // the run is nearly over without having to read the number.
+    el_.classList.toggle("cyan", this.timeLeft > 15);
+    el_.classList.toggle("danger", this.timeLeft <= 15);
   },
   place(index, layout, cursor) {
     const piece = this.pieces[index], { col, row } = this.dragCell(layout, cursor, piece);
@@ -1545,11 +1605,21 @@ const BLAST = {
     this.board.forEach((r, y) => { if (r.every(Boolean)) for (let x = 0; x < 8; x++) clear.push([x, y]); });
     for (let x = 0; x < 8; x++) if (this.board.every(r => r[x])) for (let y = 0; y < 8; y++) clear.push([x, y]);
     const unique = [...new Map(clear.map(p => [`${p[0]},${p[1]}`, p])).values()];
-    if (unique.length) { unique.forEach(([x, y]) => { this.board[y][x] = null; }); this.lines += Math.round(unique.length / 8); this.score += Math.round(unique.length / 8) * 100; this.flashCells = unique; this.flashT = .42; sfx.good(); }
+    if (unique.length) {
+      unique.forEach(([x, y]) => { this.board[y][x] = null; });
+      const cleared = Math.round(unique.length / 8);
+      this.lines += cleared; this.score += cleared * 100;
+      // Every cleared line buys time back. Capped so a strong run cannot bank
+      // an unbounded clock and hold up the queue behind them.
+      const bonus = cleared * BLAST_TIME_PER_LINE;
+      this.timeLeft = Math.min(BLAST_TIME_MAX, this.timeLeft + bonus);
+      this.bonusN = bonus; this.bonusT = 1.1;
+      this.flashCells = unique; this.flashT = .42; sfx.good();
+    }
     else sfx.slice();
     if (this.pieces.every(p => !p)) this.spawnPieces();
     this.updateHud();
-    if (!this.pieces.some(p => p && this.canFit(p.shape))) this.end();
+    if (!this.pieces.some(p => p && this.canFit(p.shape))) { this.endReason = "noMoves"; this.end(); }
   },
 
   /* Empty board frame + grid cached offscreen: it is identical every frame and
@@ -1654,6 +1724,10 @@ const BLAST = {
       pinching = pinch.pinch < .58;
     }
     this.flashT = Math.max(0, this.flashT - dt);
+    this.bonusT = Math.max(0, this.bonusT - dt);
+    this.timeLeft -= dt;
+    this.updateClock();
+    if (this.timeLeft <= 0) { this.timeLeft = 0; this.endReason = "timeUp"; this.end(); return; }
     if (this.dragging !== null && cursor) {
       const k = 1 - Math.pow(1e-11, dt); // the held block chases a touch faster
       if (!this.dragPos) this.dragPos = { x: cursor.x, y: cursor.y };
@@ -1717,6 +1791,15 @@ const BLAST = {
         ok ? piece.color : "#f43f5e", 18);
     }
 
+    if (this.bonusT > 0) {
+      const p = 1 - this.bonusT / 1.1;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, this.bonusT * 1.6);
+      ctx.font = "900 clamp(20px,4vw,32px) Orbitron, system-ui"; ctx.textAlign = "center";
+      ctx.fillStyle = "#4ade80"; ctx.shadowColor = "#4ade80"; ctx.shadowBlur = 18;
+      ctx.fillText(t("blastAddTime")(this.bonusN), layout.gx + layout.boardSize / 2, layout.gy - 16 - p * 26);
+      ctx.restore();
+    }
     ctx.font = "800 13px system-ui"; ctx.textAlign = "center"; ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,255,255,.9)";
     ctx.fillText(t("pinchHint"), innerWidth / 2, innerHeight - 22);
     if (pinch) {
@@ -1738,7 +1821,7 @@ const BLAST = {
     const score = this.score, rank = score >= 500 ? 0 : score >= 200 ? 1 : 2;
     const daily = setDailyBest("blast", score);
     this.cleanup(); sfx.bad(); ui.classList.remove("passthrough");
-    const node = el(`<div class="panel"><div class="big-emoji">🧱</div><h2>${t("noMoves")}</h2><div class="score-line">${score}</div><div class="result-rank">${t("blastRanks")[rank]}</div>${daily.isNew ? `<div class="desc" style="color:var(--cyan)">${t("newDailyBest")}</div>` : ""}<div class="best-line">${t("todaysBest")}: ${daily.best}</div><button class="btn" id="againBtn">${t("again")}</button><br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button></div>`);
+    const node = el(`<div class="panel"><div class="big-emoji">${this.endReason === "timeUp" ? "⏰" : "🧱"}</div><h2>${t(this.endReason)}</h2><div class="score-line">${score}</div><div class="result-rank">${t("blastRanks")[rank]}</div>${daily.isNew ? `<div class="desc" style="color:var(--cyan)">${t("newDailyBest")}</div>` : ""}<div class="best-line">${t("todaysBest")}: ${daily.best}</div><button class="btn" id="againBtn">${t("again")}</button><br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button></div>`);
     node.querySelector("#againBtn").onclick = () => { sfx.click(); show(null); ui.classList.add("passthrough"); this.start(); };
     node.querySelector("#menuBtn").onclick = () => { sfx.click(); menu(); };
     show(node);
@@ -1816,7 +1899,7 @@ const LAB_RECIPES = {
   "cloud+mountain": "storm", "cloud+wind": "storm", "cloud+electricity": "storm",
   "dust+wind": "sand", "dust+water": "mud", "dust+fire": "smoke",
   "sun+water": "steam", "earth+sun": "life", "plant+sun": "forest", "ocean+sun": "rain", "glass+sun": "rainbow",
-  "earth+ocean": "mud", "fire+ocean": "steam", "animal+ocean": "fish", "ocean+wind": "storm", "ocean+rain": "storm", "ocean+volcano": "obsidian", "fish+ocean": "fish",
+  "earth+ocean": "mud", "fire+ocean": "steam", "animal+ocean": "fish", "ocean+wind": "storm", "ocean+rain": "storm", "ocean+volcano": "obsidian", "fish+ocean": null,
   "life+mountain": "tree", "mountain+plant": "forest", "mountain+rain": "lake",
   "rain+wind": "storm", "sand+wind": "dust", "stone+wind": "sand",
   "fire+obsidian": "lava",
@@ -1824,7 +1907,10 @@ const LAB_RECIPES = {
   "earth+rain": "mud", "fire+rain": "steam",
   "plant+water": "tree",
   "sand+water": "mud",
-  "air+fish": "bird", "fish+water": "fish",
+  "air+fish": "bird",
+  // A fish put in water is still just a fish: these consumed both tags and
+  // produced nothing. Explicitly inert now, rather than silently eating one.
+  "fish+water": null,
   "human+metal": "robot", "metal+metal": "robot",
   "animal+idea": "human", "animal+water": "fish",
   "human+water": "boat", "human+stone": "brick", "human+tree": "boat", "human+human": "city",
@@ -1850,53 +1936,133 @@ const LAB_RECIPES = {
   "animal+animal": "human", "idea+idea": "robot", "smoke+smoke": "cloud", "volcano+volcano": "mountain",
   "stone+stone": "mountain", "lake+lake": "ocean", "tree+tree": "forest", "forest+forest": "life",
   "electricity+electricity": "computer", "boat+boat": "city", "bird+bird": "forest", "space+space": "idea",
+  /* ---- second curated pass -------------------------------------------
+     Added when the tag-based guesser was removed. These are the pairs a
+     student is most likely to actually try in the early game, so that
+     experimenting still pays off now that an unlisted pair simply does
+     not react. Each one is a plain physical statement, not a hash. */
+  "air+cloud": "wind",
+  "air+dust": "wind",
+  "air+energy": "electricity",
+  "air+mountain": "wind",
+  "air+ocean": "wind",
+  "air+rain": "cloud",
+  "air+sun": "wind",
+  "air+wind": "storm",
+  "animal+forest": "bird",
+  "animal+tree": "bird",
+  "mud+wind": "dust",    // (wind dries mud back to loose dust)
+  "water+wind": "cloud",
+  "cloud+lake": "rain",
+  "cloud+ocean": "rain",
+  "cloud+rain": "storm",
+  "dust+mountain": "sand",
+  "dust+stone": "sand",
+  "dust+earth": "sand",
+  "earth+life": "plant",
+  "earth+mountain": "stone",
+  "earth+obsidian": "stone",
+  "earth+stone": "mountain",
+  "earth+volcano": "stone",
+  "cloud+energy": "storm",
+  "energy+idea": "electricity",
+  "city+fire": "smoke",
+  "energy+fire": "sun",
+  "fire+lava": "volcano",
+  "fire+plant": "smoke",
+  "fire+sun": "energy",
+  "dust+lava": "stone",
+  "lava+rain": "obsidian",
+  "lava+wind": "obsidian",
+  "life+rain": "plant",
+  "life+sun": "plant",
+  "metal+steam": "electricity",
+  "metal+storm": "electricity",
+  "mountain+ocean": "lake",
+  "rain+sun": "rainbow",
+  "sand+sun": "glass",
+  "cloud+steam": "rain",
+  "dust+steam": "cloud",
+  "energy+steam": "electricity",
+  "mountain+steam": "cloud",
+  "ocean+steam": "cloud",
+  "rain+tree": "forest",
+  "sun+tree": "forest",
+  "tree+water": "forest",
 };
 const LAB_TOTAL = Object.keys(LAB_ELEMENTS).length;
-const LAB_FALLBACK_POOL = Object.keys(LAB_ELEMENTS).filter(id => !LAB_BASE.includes(id));
-// Every element gets a handful of category tags so an *unlisted* combo can
-// still land on something in the same neighbourhood (idea+idea should drift
-// toward other abstract/tech things, never toward "lava"). This is what the
-// old fallback lacked: it picked from ALL 36 elements with no notion of
-// "related", so any two inputs could land on anything.
-const LAB_TAGS = {
-  fire: ["hot", "elemental"], water: ["liquid", "elemental"], earth: ["solid", "elemental"], air: ["gas", "elemental"],
-  steam: ["gas", "hot", "elemental"], lava: ["hot", "liquid", "solid", "elemental"], energy: ["abstract", "tech", "power"],
-  mud: ["liquid", "solid", "elemental"], cloud: ["gas", "weather", "sky"], dust: ["solid", "gas", "weather"],
-  sun: ["hot", "sky", "elemental"], ocean: ["liquid", "life", "elemental"], mountain: ["solid", "sky", "elemental"],
-  wind: ["gas", "weather", "elemental"], obsidian: ["solid", "hot", "structure"], life: ["life", "abstract"],
-  rain: ["liquid", "weather", "sky"], rainbow: ["sky", "weather", "abstract"], brick: ["structure", "solid"],
-  storm: ["weather", "sky", "hot"], plant: ["life", "solid"], sand: ["solid", "elemental"], fish: ["life", "liquid"],
-  metal: ["structure", "solid", "hot"], glass: ["structure", "solid", "hot"], animal: ["life"], human: ["life", "tech"],
-  idea: ["abstract", "tech"], robot: ["tech", "structure"], smoke: ["gas", "hot", "weather"],
-  volcano: ["hot", "solid", "sky", "elemental"], stone: ["solid", "elemental"], lake: ["liquid", "elemental"],
-  tree: ["life", "solid"], forest: ["life", "solid"], electricity: ["tech", "abstract", "power"],
-  computer: ["tech", "structure", "abstract"], city: ["structure", "tech", "life"], boat: ["structure", "tech", "liquid"],
-  bird: ["life", "sky"], space: ["sky", "abstract", "tech"],
-};
+/* ---- how a pair is resolved -------------------------------------------
+   Version 1 gave every element a loose bag of tags and picked any element
+   sharing ANY tag with EITHER input. Because "elemental" sat on almost
+   everything primitive, nearly anything could reach nearly anything: 725 of
+   the 861 possible pairs were invented by a hash, and among them were
+   water+wind=lava, tree+boat=lava and animal+tree=lava.
+
+   Tightening the tags helped but could not fix it, because tags do not
+   encode chemistry: a "hot"+"solid" filter still happily produced
+   water+steam=lava and mud+cloud=volcano. Anything general enough to answer
+   861 pairs is general enough to be wrong in public, in front of a class.
+
+   So nothing is guessed any more. A pair resolves in exactly three ways:
+
+     1. LAB_RECIPES        — the curated table below (a null entry means
+                             "these explicitly do not react").
+     2. LAB_RULES          — a handful of named, physical transformations,
+                             each one written out and reviewable.
+     3. no reaction        — anything else.
+
+   "Nothing happens" is a real and honest answer in a science exhibit, and
+   it is a far better thing to show a student than a confident wrong one. */
+
+const HEAT = ["fire", "lava", "sun", "volcano", "energy", "electricity"];
+const LIQUID = ["water", "ocean", "lake", "rain"];
+const EARTHY = ["earth", "dust", "sand"];
+const WEATHER = ["cloud", "wind", "rain", "storm"];
+const GROWABLE = ["plant", "tree"];
+
+/* Each rule is a plain physical statement. `when` matches either ordering. */
+const LAB_RULES = [
+  // Heat applied to open water boils it away.
+  { when: [HEAT, LIQUID], result: "steam", why: "heat boils water into steam" },
+  // Dry ground plus water makes mud — the classic first experiment.
+  { when: [EARTHY, LIQUID], result: "mud", why: "dry ground plus water makes mud" },
+  // Moving air over loose ground lifts it.
+  { when: [["wind", "storm"], EARTHY], result: "dust", why: "moving air lifts loose ground" },
+  // Weather feeding weather intensifies it.
+  { when: [WEATHER, WEATHER], result: "storm", why: "weather feeding weather builds a storm" },
+  // Water and sunlight are what green things need.
+  { when: [GROWABLE, LIQUID], result: "tree", why: "plants given water grow" },
+  { when: [GROWABLE, ["sun"]], result: "forest", why: "plants given sunlight spread" },
+];
+
 function stableHash(key) {
   let hash = 2166136261;
   for (const char of key) { hash ^= char.charCodeAt(0); hash = Math.imul(hash, 16777619); }
   return hash >>> 0;
 }
+/* Returns { id, exact, key }. `id` is null when the pair does not react. */
 function labCombinationResult(idA, idB) {
   const key = [idA, idB].sort().join("+");
-  if (LAB_RECIPES[key]) return { id: LAB_RECIPES[key], exact: true, key };
-  // Infinite Craft nearly always rewards experimentation. The booth version
-  // stays offline, so unknown pairs use a stable fallback: the same two
-  // inputs always produce the same result on every device and session — and
-  // that result is picked only from elements sharing a tag with either
-  // input, so it stays thematically plausible instead of fully arbitrary.
-  const wantTags = new Set([...(LAB_TAGS[idA] || []), ...(LAB_TAGS[idB] || [])]);
-  const related = LAB_FALLBACK_POOL.filter(id => id !== idA && id !== idB && (LAB_TAGS[id] || []).some(tag => wantTags.has(tag)));
-  const pool = related.length ? related : LAB_FALLBACK_POOL;
-  return { id: pool[stableHash(key) % pool.length], exact: false, key };
+  // `in` rather than a truthiness test, so an explicit null entry below
+  // reads as "authored as inert" and not as "not written yet".
+  if (key in LAB_RECIPES) return { id: LAB_RECIPES[key], exact: true, key };
+  for (const rule of LAB_RULES) {
+    const [left, right] = rule.when;
+    const hit = (left.includes(idA) && right.includes(idB)) || (left.includes(idB) && right.includes(idA));
+    // A rule never returns one of its own inputs — Tree + Water must not
+    // simply hand back Tree.
+    if (hit && rule.result !== idA && rule.result !== idB) {
+      return { id: rule.result, exact: false, key, why: rule.why };
+    }
+  }
+  return { id: null, exact: false, key };
 }
 
 const LAB = {
   emoji: "🧪", titleKey: "labTitle", howKey: "labHow",
   found: new Set(), workspace: [], drag: null, cursorPos: null, pinchLog: [],
   openSince: 0, grabReadyAt: 0, dwellKey: "", dwellSince: 0, bookOpen: false,
-  history: new Map(), bookNode: null, recipeBtn: null, cheatBtn: null, running: false,
+  history: new Map(), bookNode: null, noReactNode: null, recipeBtn: null, cheatBtn: null, running: false,
 
   start() {
     this.cleanup();
@@ -1918,8 +2084,8 @@ const LAB = {
   },
 
   cleanup() {
-    this.recipeBtn?.remove(); this.cheatBtn?.remove(); this.bookNode?.remove();
-    this.recipeBtn = null; this.cheatBtn = null; this.bookNode = null; this.running = false;
+    this.recipeBtn?.remove(); this.cheatBtn?.remove(); this.bookNode?.remove(); this.noReactNode?.remove();
+    this.recipeBtn = null; this.cheatBtn = null; this.bookNode = null; this.noReactNode = null; this.running = false;
     cam.style.display = "";
   },
 
@@ -2037,7 +2203,7 @@ const LAB = {
       const ids = Object.keys(LAB_ELEMENTS);
       ids.forEach((idA, a) => ids.slice(a).forEach(idB => {
         const combination = labCombinationResult(idA, idB);
-        recipes.set(combination.key, combination.id);
+        if (combination.id) recipes.set(combination.key, combination.id);
       }));
     } else Object.entries(LAB_RECIPES).forEach(([key, result]) => {
       if (this.found.has(result)) recipes.set(key, result);
@@ -2054,6 +2220,9 @@ const LAB = {
   },
   combine(sourceId, targetId, targetPoint) {
     const combination = labCombinationResult(sourceId, targetId), resultId = combination.id;
+    // Not every pair reacts. Say so plainly and leave both tags on the bench,
+    // rather than inventing a product the way the old hash fallback did.
+    if (!resultId) { sfx.bad(); this.showNoReaction(); return null; }
     this.history.set(combination.key, resultId);
     const isNew = !this.found.has(resultId);
     this.found.add(resultId);
@@ -2063,6 +2232,13 @@ const LAB = {
     if (isNew) { sfx.win(); this.showReveal(resultId); }
     else sfx.good();
     return resultId;
+  },
+  showNoReaction() {
+    this.noReactNode?.remove();
+    this.noReactNode = el(`<div class="lab-no-react">💨 ${t("labNoReaction")}</div>`);
+    document.body.appendChild(this.noReactNode);
+    const node = this.noReactNode;
+    setTimeout(() => { node.remove(); if (this.noReactNode === node) this.noReactNode = null; }, 1500);
   },
   showReveal(resultId) {
     const info = LAB_ELEMENTS[resultId];
@@ -2085,6 +2261,12 @@ const LAB = {
         if (source.type === "workspace") this.workspace = this.workspace.filter((_, i) => i !== source.index && i !== targetIndex);
         else this.workspace.splice(targetIndex, 1);
         this.workspace.push({ id: result, x: target.x, y: target.y });
+      } else {
+        // Nothing happened: nudge the dragged tag clear of the target so both
+        // stay visible and the student can immediately try a different pair.
+        const spot = this.clampToWorkbench({ x: target.x + 70, y: target.y + 34 }, layout);
+        if (source.type === "workspace") this.workspace[source.index] = { id: source.id, ...spot };
+        else this.workspace.push({ id: source.id, ...spot });
       }
     } else if (source.type === "library") {
       this.workspace.push({ id: source.id, ...this.clampToWorkbench(point, layout) });

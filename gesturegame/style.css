@@ -515,6 +515,10 @@ h1.arcade {
 .stat .num.cyan { color: var(--cyan); text-shadow: 0 0 14px rgba(0, 240, 255, 0.6); }
 .stat .num.pink { color: var(--pink); text-shadow: 0 0 14px rgba(255, 60, 172, 0.6); }
 .stat .num.amber { color: var(--amber); text-shadow: 0 0 14px rgba(255, 200, 87, 0.6); }
+/* Hand Blast's clock in its last 15 seconds — the pulse is what a student
+   notices from a step back, before they have read the number. */
+.stat .num.danger { color: #ff4d6d; text-shadow: 0 0 16px rgba(255, 77, 109, 0.75); animation: clockPulse 1s ease-in-out infinite; }
+@keyframes clockPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
 .score-punch { animation: score-punch 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes score-punch {
   0% { transform: scale(1); }
@@ -739,3 +743,17 @@ h1.arcade {
   40%, 60% { transform: translate3d(7px, 0, 0); }
 }
 
+
+/* Hand Lab: shown when a pair simply does not react. Deliberately quieter
+   than the discovery card — it is information, not a failure state. */
+.lab-no-react {
+  position: fixed; left: 50%; bottom: 16%; transform: translateX(-50%);
+  z-index: 60; pointer-events: none;
+  padding: 11px 20px; border-radius: 999px;
+  background: rgba(11, 5, 24, 0.9); border: 1.5px solid rgba(148, 163, 184, 0.5);
+  color: #cbd5e1; font-weight: 700; font-size: 14px; white-space: nowrap;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
+  animation: noReactIn 0.18s ease-out, noReactOut 0.3s ease-in 1.2s forwards;
+}
+@keyframes noReactIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes noReactOut { to { opacity: 0; transform: translate(-50%, -8px); } }
