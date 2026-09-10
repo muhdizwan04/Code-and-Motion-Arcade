@@ -1,4 +1,4 @@
-const CACHE = "civsim-v8";
+const CACHE = "civsim-v9";
 const FILES = [
   ".",
   "index.html",
@@ -22,10 +22,16 @@ self.addEventListener("install", (e) => {
   self.skipWaiting();
 });
 
+/* CacheStorage belongs to the whole origin, not to one service worker. Deleting
+   every cache that is not the current one wiped the other two games' offline
+   caches, so only the most recently opened game still worked offline. */
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      Promise.all(
+        keys.filter((k) => k.startsWith("civsim-") && k !== CACHE)
+          .map((k) => caches.delete(k))
+      )
     )
   );
   self.clients.claim();
@@ -34,13 +40,20 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   if (!e.request.url.startsWith(self.location.origin)) return;
   if (e.request.method !== "GET") return;
+  // Cache-first, matching the other two games. Network-first meant that a
+  // flaky booth network or a captive portal could leave the map hanging on a
+  // request that never resolves, instead of starting instantly from cache.
   e.respondWith(
-    fetch(e.request).then((res) => {
-      if (res.ok) {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy));
-      }
-      return res;
-    }).catch(() => caches.match(e.request).then(hit => hit || caches.match("index.html")))
+    caches.match(e.request, { ignoreSearch: true }).then(
+      (hit) =>
+        hit ||
+        fetch(e.request).then((res) => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(e.request, copy));
+          }
+          return res;
+        }).catch(() => caches.match("index.html"))
+    )
   );
 });

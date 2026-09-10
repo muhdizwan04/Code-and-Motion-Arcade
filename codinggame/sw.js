@@ -1,4 +1,4 @@
-const CACHE = "cyber-heist-v7";
+const CACHE = "cyber-heist-v8";
 const FILES = [
   ".",
   "index.html",
@@ -16,10 +16,16 @@ self.addEventListener("install", (e) => {
   self.skipWaiting();
 });
 
+/* CacheStorage belongs to the whole origin, not to one service worker. Deleting
+   every cache that is not the current one wiped the other two games' offline
+   caches, so only the most recently opened game still worked offline. */
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      Promise.all(
+        keys.filter((k) => k.startsWith("cyber-heist-") && k !== CACHE)
+          .map((k) => caches.delete(k))
+      )
     )
   );
   self.clients.claim();

@@ -734,5 +734,19 @@
       requestAnimationFrame(tick);
     })();
   </script>
+
+  <script>
+    // Caches the hub itself, so the HOME button in each game still leads
+    // somewhere when the booth has no network.
+    if ("serviceWorker" in navigator && location.protocol !== "file:") {
+      navigator.serviceWorker.register("sw.js").then(reg => reg.update()).catch(() => {});
+      let refreshingForNewWorker = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (refreshingForNewWorker) return;
+        refreshingForNewWorker = true;
+        location.reload();
+      });
+    }
+  </script>
 </body>
 </html>
