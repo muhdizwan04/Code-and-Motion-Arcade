@@ -1535,23 +1535,26 @@ const BLAST = {
     const availH = Math.max(220, innerHeight - topSafe - bottomSafe);
     const trayW = Math.round(Math.min(150, Math.max(92, innerWidth * .2)));
     const availW = Math.max(200, innerWidth - trayW - 26);
-    // A tighter Block Blast-sized board: cells top out near 30px instead of
-    // 42px, so the grid stays compact and the whole puzzle is easy to take in
-    // at a glance from a step back at the booth.
-    const cell = Math.max(15, Math.floor(Math.min(availW * .92, availH * .96, 240) / 8));
+    const cell = Math.max(15, Math.floor(Math.min(availW * .92, availH * .96, 336) / 8));
     const boardSize = cell * 8;
     const gx = Math.round(trayW + 18 + Math.max(0, (availW - boardSize) / 2));
     const gy = Math.round(topSafe + Math.max(0, (availH - boardSize) / 2));
-    const trayCell = Math.max(11, Math.min(Math.round(cell * .7), Math.floor((trayW - 26) / 4)));
+    // The tray is sized from the tray column and the screen — deliberately NOT
+    // from the board's cell size. Capping the board to make the grid compact
+    // must not drag the pieces you pick up down with it; they stay easy to see
+    // and easy to grab with a fingertip whatever the grid is doing.
+    const trayCell = Math.max(11, Math.min(30, Math.floor((trayW - 26) / 4)));
+    const trayH = Math.round(Math.min(availH, Math.max(boardSize + 20, trayCell * 12)));
+    const trayY = Math.round(topSafe + Math.max(0, (availH - trayH) / 2));
     const trayX = Math.round(trayW / 2 + 6);
-    return { gx, gy, cell, boardSize, trayW, trayX, trayCell };
+    return { gx, gy, cell, boardSize, trayW, trayX, trayCell, trayH, trayY };
   },
   pieceOrigin(piece) {
     const maxX = Math.max(...piece.shape.map(p => p[0])), maxY = Math.max(...piece.shape.map(p => p[1]));
     return { w: maxX + 1, h: maxY + 1 };
   },
   trayPosition(index, layout) {
-    return { x: layout.trayX, y: layout.gy + layout.boardSize * ((index + .5) / 3) };
+    return { x: layout.trayX, y: layout.trayY + layout.trayH * ((index + .5) / 3) };
   },
   valid(shape, col, row) {
     return shape.every(([x, y]) => row + y >= 0 && row + y < 8 && col + x >= 0 && col + x < 8 && !this.board[row + y][col + x]);
@@ -1567,7 +1570,7 @@ const BLAST = {
       const p = this.trayPosition(index, layout), d = this.pieceOrigin(piece);
       const w = d.w * layout.trayCell, h = d.h * layout.trayCell;
       // Generous grab box: the fingertip never has to be pixel-accurate.
-      const padX = 34, padY = Math.max(24, layout.boardSize / 9);
+      const padX = 34, padY = Math.max(24, layout.trayH / 9);
       return cursor.x >= p.x - w / 2 - padX && cursor.x <= p.x + w / 2 + padX &&
              cursor.y >= p.y - h / 2 - padY && cursor.y <= p.y + h / 2 + padY;
     });
@@ -1761,7 +1764,7 @@ const BLAST = {
     const hover = this.hoveredPiece(layout, cursor);
     ctx.save();
     ctx.fillStyle = "rgba(11,5,24,.5)"; ctx.strokeStyle = "rgba(168,85,247,.35)"; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.roundRect(layout.trayX - layout.trayW / 2, layout.gy - 10, layout.trayW, layout.boardSize + 20, 18);
+    ctx.beginPath(); ctx.roundRect(layout.trayX - layout.trayW / 2, layout.trayY - 10, layout.trayW, layout.trayH + 20, 18);
     ctx.fill(); ctx.stroke();
     ctx.restore();
     this.pieces.forEach((piece, index) => {
