@@ -70,11 +70,19 @@ server.on("error", (error) => {
 });
 
 server.on("listening", () => {
-  const origin = `http://${host}:${port}`;
+  // Print "localhost", not the raw bind address. They are the same server but
+  // DIFFERENT browser origins, and a service worker registered against one is
+  // invisible to the other. Sending everyone to localhost keeps dev traffic on
+  // a single origin, and the in-page dev guard disables the worker there.
+  const shown = host === "127.0.0.1" || host === "0.0.0.0" ? "localhost" : host;
+  const origin = `http://${shown}:${port}`;
   console.log(`\nPWA Game Hub is ready:\n`);
-  console.log(`  Home:          ${origin}/`);
-  console.log(`  Gesture Games: ${origin}/gesturegame/`);
-  console.log(`  Cyber Heist:   ${origin}/codinggame/\n`);
+  console.log(`  Home:            ${origin}/`);
+  console.log(`  AI Civilization: ${origin}/civsim/`);
+  console.log(`  Gesture Games:   ${origin}/gesturegame/`);
+  console.log(`  Cyber Heist:     ${origin}/codinggame/\n`);
+  console.log("Service worker is disabled on localhost, so edits show up on reload.");
+  console.log("To test offline mode instead, add ?sw=on to any page.\n");
   console.log("Press Control+C to stop.\n");
 });
 
