@@ -55,8 +55,10 @@ const STR = {
     vsNinjaTitle: "Ninja Duel",
     vsNinjaDesc: "Two players, one camera — slice your own side!",
     vsNinjaHow: "Player 1 stands LEFT, player 2 stands RIGHT. Each of you shows ONE hand on your own side of the line. Slice the fruit in your half, dodge the bombs — 3 lives each. Highest score after 90 seconds wins! ⚔️",
-    p1: "P1", p2: "P2", twoPlayer: "2 PEMAIN", twoPlayer: "2 PLAYERS",
+    p1: "P1", p2: "P2",
     vsShowHand: "show your hand ✋",
+    modeSolo: "👤 1 PLAYER", modeSoloDesc: "Play on your own",
+    modeVersus: "👥 2 PLAYERS", modeVersusDesc: "Split screen — one hand each",
     vsSnakeTitle: "Snake Duel",
     vsSnakeDesc: "Two arenas, two snakes — who grows longest?",
     vsSnakeHow: "Player 1 takes the LEFT arena, player 2 the RIGHT. Point with one finger to steer your own snake. Eat to grow and score — hit your own tail and you lose a life and restart. Highest score after 90 seconds wins! 🐍",
@@ -156,6 +158,8 @@ const STR = {
     vsNinjaHow: "Pemain 1 di KIRI, pemain 2 di KANAN. Setiap seorang tunjuk SATU tangan di bahagian sendiri. Tetak buah di bahagian anda, elak bom — 3 nyawa setiap seorang. Skor tertinggi selepas 90 saat menang! ⚔️",
     p1: "P1", p2: "P2",
     vsShowHand: "tunjuk tangan ✋",
+    modeSolo: "👤 1 PEMAIN", modeSoloDesc: "Main seorang diri",
+    modeVersus: "👥 2 PEMAIN", modeVersusDesc: "Skrin terbahagi — satu tangan seorang",
     vsSnakeTitle: "Pertarungan Ular",
     vsSnakeDesc: "Dua arena, dua ular — siapa paling panjang?",
     vsSnakeHow: "Pemain 1 di arena KIRI, pemain 2 di KANAN. Tunjuk satu jari untuk kemudikan ular anda. Makan untuk membesar dan dapat mata — langgar ekor sendiri, hilang satu nyawa dan mula semula. Skor tertinggi selepas 90 saat menang! 🐍",
@@ -1050,18 +1054,6 @@ function menu() {
         <div class="emo">🧱</div>
         <div><h3>${t("blastTitle")} <span style="font-size:14px">🧩</span></h3><p>${t("blastDesc")}</p>${dailyBadge("blast")}</div>
       </div>
-      <div class="card vs" id="cNinjaVs">
-        <div class="emo">⚔️</div>
-        <div><h3>${t("vsNinjaTitle")} <span style="font-size:14px">👥</span></h3><p>${t("vsNinjaDesc")}</p><span class="card-badge vs-badge">${t("twoPlayer")}</span></div>
-      </div>
-      <div class="card vs" id="cSnakeVs">
-        <div class="emo">🐍</div>
-        <div><h3>${t("vsSnakeTitle")} <span style="font-size:14px">👥</span></h3><p>${t("vsSnakeDesc")}</p><span class="card-badge vs-badge">${t("twoPlayer")}</span></div>
-      </div>
-      <div class="card vs" id="cBlastVs">
-        <div class="emo">🧱</div>
-        <div><h3>${t("vsBlastTitle")} <span style="font-size:14px">👥</span></h3><p>${t("vsBlastDesc")}</p><span class="card-badge vs-badge">${t("twoPlayer")}</span></div>
-      </div>
       <div class="card lab" id="cLab">
         <div class="emo">🧪</div>
         <div><h3>${t("labTitle")} <span style="font-size:14px">🔬</span></h3><p>${t("labDesc")}</p></div>
@@ -1072,9 +1064,6 @@ function menu() {
   node.querySelector("#cNinja").onclick = () => { sfx.open(); intro(NINJA); };
   node.querySelector("#cSnake").onclick = () => { sfx.open(); intro(SNAKE); };
   node.querySelector("#cBlast").onclick = () => { sfx.open(); intro(BLAST); };
-  node.querySelector("#cNinjaVs").onclick = () => { sfx.open(); intro(NINJA_VS); };
-  node.querySelector("#cSnakeVs").onclick = () => { sfx.open(); intro(SNAKE_VS); };
-  node.querySelector("#cBlastVs").onclick = () => { sfx.open(); intro(BLAST_VS); };
   node.querySelector("#cLab").onclick = () => { sfx.open(); intro(LAB); };
   // Secret booth-operator gesture: 5 taps on the title within 3s opens the
   // play-count overlay, out of the way of normal kid usage.
@@ -1101,7 +1090,7 @@ async function intro(game) {
   const node = el(`<div class="panel">
     <div class="big-emoji">${game.emoji}</div>
     <h2>${t(game.titleKey)}</h2>
-    <div class="desc">${t(game.howKey)}</div>
+    <div class="desc" id="introHow">${t(game.howKey)}</div>
     ${modeHtml}
     <div id="loadArea"></div>
     <button class="btn" id="startBtn">${t("start")}</button>
@@ -1109,12 +1098,16 @@ async function intro(game) {
   </div>`);
   if (modes) {
     game.selectedMode = modes[0].id;
+    const howEl = node.querySelector("#introHow");
     node.querySelectorAll(".mode-btn").forEach(btn => {
       btn.onclick = () => {
         sfx.click();
         node.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
         game.selectedMode = btn.dataset.mode;
+        // The duel is played differently, so swap in its own instructions.
+        const duel = btn.dataset.mode === "versus" && game.duel;
+        if (howEl) howEl.innerHTML = t(duel ? game.duel.howKey : game.howKey);
       };
     });
   }
@@ -1141,10 +1134,11 @@ async function intro(game) {
     await calibrate();
     show(null);
     ui.classList.add("passthrough");
-    activeGame = game;
+    const target = (game.selectedMode === "versus" && game.duel) ? game.duel : game;
+    activeGame = target;
     bumpPlayCount(game.titleKey.replace("Title", ""));
-    music.start(game.track || "menu");
-    game.start();
+    music.start(target.track || "menu");
+    target.start();
   };
   show(node);
 }
@@ -1260,6 +1254,7 @@ const NINJA = {
     return [
       { id: "time", label: t("ninjaModeTime"), desc: t("ninjaModeTimeDesc") },
       { id: "life", label: t("ninjaModeLife"), desc: t("ninjaModeLifeDesc") },
+      { id: "versus", label: t("modeVersus"), desc: t("modeVersusDesc") },
     ];
   },
 
@@ -1993,6 +1988,12 @@ const SNAKE_FOODS = [
 ];
 const SNAKE = {
   track: "snake",
+  modes() {
+    return [
+      { id: "solo", label: t("modeSolo"), desc: t("modeSoloDesc") },
+      { id: "versus", label: t("modeVersus"), desc: t("modeVersusDesc") },
+    ];
+  },
   emoji: "🐍", titleKey: "snakeTitle", howKey: "snakeHow", bgToggle: true,
   head: null, dir: { x: 1, y: 0 }, path: [], budget: 0, thickness: 22,
   score: 0, food: null, tracking: false, field: null, bg: null,
@@ -2601,6 +2602,12 @@ const BLAST_POWERS = [
 ];
 const BLAST = {
   track: "blast",
+  modes() {
+    return [
+      { id: "solo", label: t("modeSolo"), desc: t("modeSoloDesc") },
+      { id: "versus", label: t("modeVersus"), desc: t("modeVersusDesc") },
+    ];
+  },
   emoji: "🧱", titleKey: "blastTitle", howKey: "blastHow", bgToggle: true,
   board: [], pieces: [], score: 0, lines: 0, dragging: null,
   flashCells: [], flashT: 0, hud: null, resetBtn: null, running: false,
@@ -3905,6 +3912,29 @@ const LAB = {
   },
 };
 
+/* ---------------- background pause ----------------
+   requestAnimationFrame already stops when the tab is hidden, but the music
+   scheduler is a setInterval and the camera stream keeps delivering frames,
+   so without this the app kept making noise and holding the camera open
+   after the user switched away — draining battery and warming the device. */
+let bgPausedTrack = null;
+function setBackgroundPaused(paused) {
+  if (paused) {
+    bgPausedTrack = music.name;
+    music.stop();
+  } else if (bgPausedTrack) {
+    music.start(bgPausedTrack);
+    bgPausedTrack = null;
+  }
+  // Disabling the track stops frames and the camera indicator without tearing
+  // the stream down, so coming back is instant and needs no new permission.
+  const stream = cam && cam.srcObject;
+  if (stream && stream.getVideoTracks) stream.getVideoTracks().forEach(tr => { tr.enabled = !paused; });
+  if (!paused && typeof engine !== "undefined") engine.lastFrameOkAt = performance.now();
+}
+document.addEventListener("visibilitychange", () => setBackgroundPaused(document.hidden));
+window.addEventListener("pagehide", () => setBackgroundPaused(true));
+
 /* ---------------- top bar ---------------- */
 document.getElementById("langBtn").onclick = () => {
   lang = lang === "en" ? "bm" : "en";
@@ -4008,6 +4038,10 @@ document.getElementById("soundBtn").textContent = soundOn ? "🔊" : "🔇";
 })();
 
 /* debug hook (harmless in production) */
+/* Each game owns its two-player variant, chosen from the mode buttons on the
+   intro screen rather than sitting on the menu as a separate game. */
+NINJA.duel = NINJA_VS; SNAKE.duel = SNAKE_VS; BLAST.duel = BLAST_VS;
+
 window.__ha = { calibrate, music, NINJA_VS, SNAKE_VS, BLAST_VS, pinchStateFor, TRACKS, NINJA_POWERS, SNAKE_FOODS, BLAST_POWERS, BLAST_GRID, t, engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60),
   _setActive: (g) => { activeGame = g; } };
 

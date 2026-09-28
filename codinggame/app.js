@@ -280,6 +280,22 @@ const music = {
   },
 };
 
+/* ---------------- background pause ----------------
+   The music scheduler is a setInterval, so without this the mission kept
+   playing after the user switched away. */
+let bgPausedTrack = null;
+function setBackgroundPaused(paused) {
+  if (paused) {
+    bgPausedTrack = music.name;
+    music.stop();
+  } else if (bgPausedTrack) {
+    music.start(bgPausedTrack);
+    bgPausedTrack = null;
+  }
+}
+document.addEventListener("visibilitychange", () => setBackgroundPaused(document.hidden));
+window.addEventListener("pagehide", () => setBackgroundPaused(true));
+
 /* ---------- state ---------- */
 const screen = document.getElementById("screen");
 const topbar = document.getElementById("topbar");

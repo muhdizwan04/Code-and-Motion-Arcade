@@ -1,4 +1,4 @@
-const CACHE = "cyber-heist-v9";
+const CACHE = "cyber-heist-v10";
 const FILES = [
   ".",
   "index.html",

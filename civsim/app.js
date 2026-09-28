@@ -869,6 +869,29 @@ function calibrate() {
   });
 }
 
+/* ---------------- background pause ----------------
+   requestAnimationFrame already stops when the tab is hidden, but the music
+   scheduler is a setInterval and the camera stream keeps delivering frames,
+   so without this the app kept making noise and holding the camera open
+   after the user switched away — draining battery and warming the device. */
+let bgPausedTrack = null;
+function setBackgroundPaused(paused) {
+  if (paused) {
+    bgPausedTrack = music.name;
+    music.stop();
+  } else if (bgPausedTrack) {
+    music.start(bgPausedTrack);
+    bgPausedTrack = null;
+  }
+  // Disabling the track stops frames and the camera indicator without tearing
+  // the stream down, so coming back is instant and needs no new permission.
+  const stream = cam && cam.srcObject;
+  if (stream && stream.getVideoTracks) stream.getVideoTracks().forEach(tr => { tr.enabled = !paused; });
+  if (!paused && typeof engine !== "undefined") engine.lastFrameOkAt = performance.now();
+}
+document.addEventListener("visibilitychange", () => setBackgroundPaused(document.hidden));
+window.addEventListener("pagehide", () => setBackgroundPaused(true));
+
 /* ---------------- topbar ---------------- */
 homeBtn.onclick = () => { sfx.click(); stopAll(); location.href = "../"; };
 function applyCamBg() { cam.style.display = camBgOn ? "" : "none"; camBtn.textContent = camBgOn ? "📷" : "🤖"; }
