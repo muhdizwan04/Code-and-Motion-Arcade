@@ -51,6 +51,8 @@ const STR = {
     debugged: "SYSTEM DEBUGGED!",
     newBest: "🎉 NEW HIGH SCORE!",
     ninjaRanks: ["🥷 FRUIT NINJA MASTER", "⚔️ BLADE WARRIOR", "🍃 ROOKIE SLICER"],
+    puSlow: "SLOW-MO!", puDouble: "DOUBLE POINTS!", puMagnet: "BIG BLADE!", puLife: "EXTRA LIFE!",
+    puGhost: "GHOST MODE!", puBonus: "BONUS!", puShrink: "SHRINK!", puPull: "MAGNET!",
     ninjaModeTime: "⏱ TIME ATTACK",
     ninjaModeTimeDesc: "60 seconds on the clock — score as much as you can!",
     ninjaModeLife: "❤️ SURVIVAL",
@@ -131,6 +133,8 @@ const STR = {
     debugged: "SISTEM DIBAIKI!",
     newBest: "🎉 REKOD BARU!",
     ninjaRanks: ["🥷 NINJA BUAH", "⚔️ PAHLAWAN PEDANG", "🍃 PEMULA"],
+    puSlow: "GERAK PERLAHAN!", puDouble: "MATA BERGANDA!", puMagnet: "BILAH BESAR!", puLife: "NYAWA TAMBAHAN!",
+    puGhost: "MOD HANTU!", puBonus: "BONUS!", puShrink: "MENGECUT!", puPull: "MAGNET!",
     ninjaModeTime: "⏱ SERANGAN MASA",
     ninjaModeTimeDesc: "60 saat di jam — kumpul skor sebanyak mungkin!",
     ninjaModeLife: "❤️ BERTAHAN",
@@ -241,6 +245,114 @@ const sfx = {
     setTimeout(() => chord([1047, 1319, 1568], 0.5, "triangle", 0.05), 520); // land on a full major chord, not just a lone top note
   },
   tick: () => beep(1200, 0.02, "sine", 0.02),
+};
+
+/* ---------------- background music ----------------
+   Written as procedural chiptune rather than audio files: the PWA stays
+   fully offline, adds no download weight, and carries no licensed music.
+   One scheduler drives every track; each game supplies a 16-step loop
+   whose tempo and mood match how that game actually plays. */
+const MUSIC_VOL = 0.055;          // sits under the sound effects
+const NOTE = (n) => 27.5 * Math.pow(2, (n + 3) / 12);   // n = semitones from A0
+
+// Patterns are 16 steps of a bar. null = rest. Numbers are semitones.
+const TRACKS = {
+  // Hub/menu: calm, curious, invites you in without nagging.
+  menu:  { bpm: 92,  wave: "triangle", lead: [40, null, 45, null, 47, null, 45, null, 43, null, 40, null, 38, null, null, null],
+           bass: [16, null, null, null, 23, null, null, null, 21, null, null, null, 19, null, null, null],
+           kick: [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0], hat: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0] },
+  // Air Ninja: fast, driving, a chase feel to match the slicing.
+  ninja: { bpm: 152, wave: "square",   lead: [52, 52, 55, 57, 59, 57, 55, 52, 50, 50, 52, 55, 57, 55, 52, 50],
+           bass: [28, 28, null, 28, 35, null, 28, null, 26, 26, null, 26, 33, null, 26, null],
+           kick: [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0], hat: [0,1,1,0, 1,1,0,1, 0,1,1,0, 1,1,0,1] },
+  // Hand Snake: bouncy and playful, steady pulse to move to.
+  snake: { bpm: 120, wave: "square",   lead: [47, null, 50, 52, null, 52, 50, null, 45, null, 47, 50, null, 50, 47, null],
+           bass: [23, null, 23, null, 30, null, 30, null, 21, null, 21, null, 28, null, 28, null],
+           kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0], hat: [0,0,1,0, 0,0,1,1, 0,0,1,0, 0,0,1,1] },
+  // Hand Blast: unhurried puzzle groove, nothing that rushes your thinking.
+  blast: { bpm: 104, wave: "triangle", lead: [45, null, null, 47, null, 50, null, null, 52, null, 50, null, 47, null, null, null],
+           bass: [21, null, null, null, 26, null, null, null, 28, null, null, null, 26, null, null, null],
+           kick: [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0], hat: [0,0,0,1, 0,0,0,1, 0,0,0,1, 0,0,0,1] },
+  // Hand Lab: soft and inquisitive, suits slow experimenting.
+  lab:   { bpm: 80,  wave: "sine",     lead: [52, null, null, null, 57, null, null, null, 59, null, 57, null, 55, null, null, null],
+           bass: [28, null, null, null, null, null, null, null, 26, null, null, null, null, null, null, null],
+           kick: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0], hat: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0] },
+};
+
+const music = {
+  timer: null, step: 0, nextTime: 0, name: null, track: null, master: null,
+
+  start(name) {
+    if (!TRACKS[name]) return;
+    if (this.name === name && this.timer) return;   // already playing this one
+    this.stop();
+    this.name = name;
+    if (!soundOn) return;                            // remembered, but silent
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === "suspended") actx.resume();
+      this.track = TRACKS[name]; this.step = 0;
+      this.master = actx.createGain();
+      this.master.gain.setValueAtTime(0.0001, actx.currentTime);
+      this.master.gain.linearRampToValueAtTime(MUSIC_VOL, actx.currentTime + 1.1);  // fade in
+      this.master.connect(actx.destination);
+      this.nextTime = actx.currentTime + 0.1;
+      this.timer = setInterval(() => this.schedule(), 40);
+    } catch (e) {}
+  },
+
+  stop() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    const m = this.master;
+    if (m && actx) {
+      try {
+        m.gain.cancelScheduledValues(actx.currentTime);
+        m.gain.setValueAtTime(m.gain.value, actx.currentTime);
+        m.gain.linearRampToValueAtTime(0.0001, actx.currentTime + 0.25);   // fade out
+        setTimeout(() => { try { m.disconnect(); } catch (e) {} }, 400);
+      } catch (e) {}
+    }
+    this.master = null; this.name = null; this.track = null;
+  },
+
+  // Notes are scheduled slightly ahead of time so the loop stays steady even
+  // when the render loop stutters.
+  schedule() {
+    if (!actx || !this.track || !this.master) return;
+    const spb = 60 / this.track.bpm / 4;            // one 16th step
+    while (this.nextTime < actx.currentTime + 0.22) {
+      this.playStep(this.step % 16, this.nextTime, spb);
+      this.nextTime += spb;
+      this.step++;
+    }
+  },
+
+  voice(freq, at, dur, type, vol) {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, at);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(vol, at + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(g).connect(this.master);
+    o.start(at); o.stop(at + dur + 0.02);
+  },
+
+  playStep(i, at, spb) {
+    const T = this.track;
+    if (T.lead[i] != null) this.voice(NOTE(T.lead[i]), at, spb * 1.7, T.wave, 0.5);
+    if (T.bass[i] != null) this.voice(NOTE(T.bass[i]), at, spb * 2.4, "triangle", 0.85);
+    if (T.kick[i]) {                                  // pitch-drop sine = kick
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(140, at);
+      o.frequency.exponentialRampToValueAtTime(45, at + 0.11);
+      g.gain.setValueAtTime(0.9, at);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.13);
+      o.connect(g).connect(this.master);
+      o.start(at); o.stop(at + 0.15);
+    }
+    if (T.hat[i]) this.voice(9000 + Math.random() * 1200, at, 0.022, "square", 0.10);
+  },
 };
 
 /* ---------------- DOM ---------------- */
@@ -622,6 +734,7 @@ function loop(now) {
 requestAnimationFrame(loop);
 
 function stopGame() {
+  music.stop();
   if (activeGame && activeGame.cleanup) activeGame.cleanup();
   activeGame = null;
   engine.stopCamera();
@@ -753,6 +866,7 @@ function showPlayStats() {
 function menu() {
   stopGame();
   atMenu = true;
+  music.start("menu");
   const dailyBadge = (key) => { const b = getDailyBest(key); return b > 0 ? `<span class="card-badge">${t("todayBadge")(b)}</span>` : ""; };
   const node = el(`<div style="margin:auto;width:100%">
     <h1 class="arcade" id="arcadeTitle">${t("title")}</h1>
@@ -848,6 +962,7 @@ async function intro(game) {
     ui.classList.add("passthrough");
     activeGame = game;
     bumpPlayCount(game.titleKey.replace("Title", ""));
+    music.start(game.track || "menu");
     game.start();
   };
   show(node);
@@ -916,11 +1031,21 @@ camBtn.onclick = () => {
    GAME 1 : AIR NINJA
 ================================================ */
 const FRUITS = ["🍎", "🍊", "🍋", "🍉", "🍇", "🍓", "🍑", "🥝", "🍍", "🍌"];
+/* Power-ups drop in among the fruit. Each one is a visible emoji you have to
+   actually slice, so picking one up is a skill moment rather than a freebie. */
+const NINJA_POWERS = [
+  { id: "slow",   emoji: "❄️", color: "#67e8f9", secs: 6, key: "puSlow" },
+  { id: "double", emoji: "⭐", color: "#fbbf24", secs: 8, key: "puDouble" },
+  { id: "magnet", emoji: "🧲", color: "#f472b6", secs: 7, key: "puMagnet" },
+  { id: "life",   emoji: "💖", color: "#fb7185", secs: 0, key: "puLife" },
+];
 const NINJA = {
+  track: "ninja",
   emoji: "🥷", titleKey: "ninjaTitle", howKey: "ninjaHow", bgToggle: true,
   objs: [], parts: [], trail: [], score: 0, combo: 0, comboT: 0, timeLeft: 60,
   spawnT: 0, running: false, hud: null, floaties: [], shake: 0, comboBanner: null,
   lastTipAt: 0, noHandSince: 0, mode: "time", selectedMode: "time", lives: 3,
+  powers: {}, powerBanner: null,
 
   // Offered on the intro screen: Time Attack (the original 60s clock) or
   // Survival (no clock, 3 lives, a bomb costs one instead of just points).
@@ -936,6 +1061,7 @@ const NINJA = {
     this.mode = this.selectedMode === "life" ? "life" : "time";
     this.score = 0; this.combo = 0; this.timeLeft = 60; this.lives = 3; this.spawnT = 0.5; this.shake = 0;
     this.lastTipAt = 0; this.noHandSince = 0; this.running = true;
+    this.powers = {}; this.powerBanner = null;
     const secondStat = this.mode === "life"
       ? `<div class="stat"><div class="lbl">${t("lives")}</div><div class="num pink" id="nLives">❤️❤️❤️</div></div>`
       : `<div class="stat"><div class="lbl">${t("time")}</div><div class="num amber" id="nTime">60</div></div>`;
@@ -963,11 +1089,14 @@ const NINJA = {
   },
 
   spawn() {
-    const isBomb = Math.random() < 0.16;
+    // An extra life is only worth dropping in Survival, where lives exist.
+    const pool = this.mode === "life" ? NINJA_POWERS : NINJA_POWERS.filter(p => p.id !== "life");
+    const power = Math.random() < 0.08 ? pool[Math.floor(Math.random() * pool.length)] : null;
+    const isBomb = !power && Math.random() < 0.16;
     const x = 60 + Math.random() * (innerWidth - 120);
     this.objs.push({
-      emoji: isBomb ? "💣" : FRUITS[Math.floor(Math.random() * FRUITS.length)],
-      bomb: isBomb,
+      emoji: power ? power.emoji : isBomb ? "💣" : FRUITS[Math.floor(Math.random() * FRUITS.length)],
+      bomb: isBomb, power,
       x, y: innerHeight + 60,
       vx: (innerWidth / 2 - x) * (0.3 + Math.random() * 0.5) / 100 * 60,
       vy: -(innerHeight * (0.95 + Math.random() * 0.35)),
@@ -985,6 +1114,12 @@ const NINJA = {
       if (this.timeLeft <= 0) return this.end();
       this.hud.querySelector("#nTime").textContent = Math.ceil(this.timeLeft);
     }
+    // active power-ups expire on their own clock
+    Object.keys(this.powers).forEach(k => {
+      this.powers[k] -= dt;
+      if (this.powers[k] <= 0) delete this.powers[k];
+    });
+    if (this.powerBanner) { this.powerBanner.life -= dt; if (this.powerBanner.life <= 0) this.powerBanner = null; }
     this.shake = Math.max(0, this.shake - dt * 34);
     ctx.save();
     if (this.shake > 0) ctx.translate((Math.random() - .5) * this.shake, (Math.random() - .5) * this.shake);
@@ -1039,8 +1174,11 @@ const NINJA = {
 
     /* physics + draw objects */
     ctx.font = "40px sans-serif";
+    const slowF = this.powers.slow > 0 ? 0.45 : 1;   // ❄️ slow-motion
     this.objs.forEach(o => {
-      o.age += dt; o.vy += G * dt; o.x += o.vx * dt; o.y += o.vy * dt; o.rot += o.vrot * dt;
+      o.age += dt;
+      o.vy += G * dt * slowF;
+      o.x += o.vx * dt * slowF; o.y += o.vy * dt * slowF; o.rot += o.vrot * dt * slowF;
       ctx.save();
       ctx.translate(o.x, o.y); ctx.rotate(o.rot * 0.15);
       const pulse = 1 + Math.sin(o.age * 8) * .045;
@@ -1048,6 +1186,13 @@ const NINJA = {
       ctx.font = `${o.r * 2}px sans-serif`;
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       if (o.bomb) { ctx.shadowColor = "#f43f5e"; ctx.shadowBlur = 18; }
+      if (o.power) {
+        ctx.shadowColor = o.power.color; ctx.shadowBlur = 26;
+        ctx.strokeStyle = o.power.color; ctx.lineWidth = 3;
+        ctx.globalAlpha = .55 + Math.sin(o.age * 7) * .35;
+        ctx.beginPath(); ctx.arc(0, 0, o.r * 1.15, 0, 7); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
       ctx.fillText(o.emoji, 0, 0);
       ctx.restore();
     });
@@ -1068,7 +1213,8 @@ const NINJA = {
           const px = a.x + u * dx, py = a.y + u * dy;
           // Generous fingertip halo compensates for camera latency without
           // letting the palm or other fingers trigger a hit.
-          if (Math.hypot(o.x - px, o.y - py) < o.r + 24) this.slice(o);
+          const halo = this.powers.magnet > 0 ? 74 : 24;   // 🧲 easier to connect
+          if (Math.hypot(o.x - px, o.y - py) < o.r + halo) this.slice(o);
         });
       }
     }
@@ -1108,6 +1254,37 @@ const NINJA = {
       ctx.shadowBlur = 0; ctx.globalAlpha = 1;
     });
     pruneInPlace(this.floaties, f => f.life > 0);
+
+    /* active power-ups: a chip per effect with its time draining away */
+    const live = NINJA_POWERS.filter(P => this.powers[P.id] > 0);
+    if (live.length) {
+      ctx.save();
+      live.forEach((P, i) => {
+        const w = 108, h = 30, x = 14, y = innerHeight - 52 - i * 38;
+        const frac = Math.max(0, this.powers[P.id] / P.secs);
+        ctx.fillStyle = "rgba(6,4,18,.82)";
+        ctx.strokeStyle = P.color; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, 15); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = P.color; ctx.globalAlpha = .28;
+        ctx.beginPath(); ctx.roundRect(x, y, w * frac, h, 15); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#fff"; ctx.font = "700 13px system-ui";
+        ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        ctx.fillText(`${P.emoji} ${t(P.key)}`, x + 9, y + h / 2);
+      });
+      ctx.restore();
+    }
+    /* big flash when one is collected */
+    if (this.powerBanner) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, this.powerBanner.life / 0.4);
+      ctx.font = "900 clamp(24px,7vw,46px) Orbitron, system-ui";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = this.powerBanner.color;
+      ctx.shadowColor = this.powerBanner.color; ctx.shadowBlur = 26;
+      ctx.fillText(this.powerBanner.text, innerWidth / 2, innerHeight * 0.3);
+      ctx.restore();
+    }
 
     /* draw trail (comet) */
     if (this.trail.length >= 2) {
@@ -1172,6 +1349,34 @@ const NINJA = {
 
   slice(o) {
     o.sliced = true;
+    if (o.power) {
+      const P = o.power;
+      sfx.win();
+      this.impact(P.color);
+      this.powerBanner = { text: t(P.key), color: P.color, life: 1.6 };
+      if (P.id === "life") {
+        // Survival only: a heart is worth points once you are already at full.
+        if (this.lives < 3) {
+          this.lives++;
+          const el2 = this.hud.querySelector("#nLives");
+          if (el2) el2.textContent = "❤️".repeat(this.lives) + "🤍".repeat(3 - this.lives);
+          this.floaties.push({ x: o.x, y: o.y, text: "+1 ❤️", color: P.color, life: 1.1 });
+        } else {
+          this.score += 50;
+          this.floaties.push({ x: o.x, y: o.y, text: "+50", color: P.color, life: 1.1 });
+          this.hud.querySelector("#nScore").textContent = this.score;
+        }
+      } else {
+        this.powers[P.id] = P.secs;
+        this.floaties.push({ x: o.x, y: o.y, text: t(P.key), color: P.color, life: 1.2 });
+      }
+      for (let i = 0; i < 16; i++) this.parts.push({
+        x: o.x, y: o.y, vx: -260 + Math.random() * 520, vy: -320 + Math.random() * 420,
+        size: 3 + Math.random() * 5, color: P.color, life: 0.45 + Math.random() * 0.35,
+      });
+      this.parts.push({ x: o.x, y: o.y, vx: 0, vy: 0, size: 14, ring: true, color: P.color, life: .5 });
+      return;
+    }
     if (o.bomb) {
       sfx.bomb();
       shakeScreen();
@@ -1198,7 +1403,7 @@ const NINJA = {
       sfx.slice();
       this.combo++; this.comboT = 1.1;
       const mult = Math.min(5, 1 + Math.floor(this.combo / 3));
-      const pts = 10 * mult;
+      const pts = 10 * mult * (this.powers.double > 0 ? 2 : 1);   // ⭐ double points
       this.score += pts;
       this.shake = Math.min(13, 3 + mult * 2);
       this.hud.querySelector("#nCombo").textContent = `x${mult} · ${this.combo}`;
@@ -1257,11 +1462,21 @@ const NINJA = {
    frame — there is no grid tick to fall behind on, so it can never "outrun"
    detection the way a fixed-speed grid step could. The body is a rope of
    recent head positions, trimmed to a length budget that grows on each food. */
+/* Most food is ordinary. Roughly one in five is a special pickup, which
+   gives a long run some variety and a way out of trouble. */
+const SNAKE_FOODS = [
+  { id: "ghost",  emoji: "👻", color: "#c4b5fd", secs: 6, key: "puGhost" },
+  { id: "bonus",  emoji: "⭐", color: "#fbbf24", secs: 0, key: "puBonus" },
+  { id: "shrink", emoji: "✂️", color: "#67e8f9", secs: 0, key: "puShrink" },
+  { id: "magnet", emoji: "🧲", color: "#f472b6", secs: 8, key: "puPull" },
+];
 const SNAKE = {
+  track: "snake",
   emoji: "🐍", titleKey: "snakeTitle", howKey: "snakeHow", bgToggle: true,
   head: null, dir: { x: 1, y: 0 }, path: [], budget: 0, thickness: 22,
   score: 0, food: null, tracking: false, field: null, bg: null,
   hud: null, resetBtn: null, running: false,
+  powers: {}, powerBanner: null,
 
   start() {
     this.cleanup();
@@ -1276,6 +1491,7 @@ const SNAKE = {
     this.dir = { x: 1, y: 0 };
     this.budget = this.segUnit * 3; // starts at "length 3" to match the old game's feel
     this.score = 0; this.tracking = false; this.running = true;
+    this.powers = {}; this.powerBanner = null;
     this.food = this.newFood();
     this.buildBackground();
     this.hud = el(`<div class="hud">
@@ -1319,9 +1535,12 @@ const SNAKE = {
         x: this.field.x + margin + Math.random() * (this.field.width - margin * 2),
         y: this.field.y + margin + Math.random() * (this.field.height - margin * 2),
       };
-      if (!this.head || Math.hypot(p.x - this.head.x, p.y - this.head.y) > this.thickness * 4) return p;
+      if (!this.head || Math.hypot(p.x - this.head.x, p.y - this.head.y) > this.thickness * 4) {
+        p.kind = Math.random() < 0.2 ? SNAKE_FOODS[Math.floor(Math.random() * SNAKE_FOODS.length)] : null;
+        return p;
+      }
     }
-    return { x: this.field.x + this.field.width / 2, y: this.field.y + this.field.height / 2 };
+    return { x: this.field.x + this.field.width / 2, y: this.field.y + this.field.height / 2, kind: null };
   },
 
   /* Keep only as much trailing path as the current length budget allows —
@@ -1364,7 +1583,20 @@ const SNAKE = {
 
         /* food */
         if (dist(this.head, this.food) < this.thickness * .85) {
-          this.score += 10; this.budget += this.segUnit; sfx.good();
+          const K = this.food.kind;
+          if (K) {
+            sfx.win();
+            this.powerBanner = { text: t(K.key), color: K.color, life: 1.5 };
+            if (K.id === "bonus") { this.score += 50; this.budget += this.segUnit; }
+            else if (K.id === "shrink") {
+              // A deliberate escape hatch once the tail gets unmanageable.
+              this.budget = Math.max(this.segUnit * 3, this.budget * 0.6);
+              this.score += 10;
+              this.trimPath();
+            } else { this.powers[K.id] = K.secs; this.score += 10; this.budget += this.segUnit; }
+          } else {
+            this.score += 10; this.budget += this.segUnit; sfx.good();
+          }
           this.food = this.newFood();
           const score = this.hud?.querySelector("#sScore"), length = this.hud?.querySelector("#sLength");
           if (score) { score.textContent = this.score; score.classList.remove("score-punch"); void score.offsetWidth; score.classList.add("score-punch"); }
@@ -1373,6 +1605,8 @@ const SNAKE = {
 
         /* self-collision: skip a short arc right behind the head (that's
            just the neck, always close) then check the rest of the trail. */
+        if (this.powers.ghost > 0) { /* 👻 pass straight through your own tail */ }
+        else {
         const skipArc = this.thickness * 3.6, hitR = this.thickness * .5;
         let acc = 0, cut = 0;
         for (let i = this.path.length - 1; i > 0; i--) {
@@ -1385,6 +1619,7 @@ const SNAKE = {
             this.end();
             return;
           }
+        }
         }
       }
     } else {
@@ -1401,15 +1636,43 @@ const SNAKE = {
     }
     if (this.bg) ctx.drawImage(this.bg.canvas, field.x - this.bg.pad, field.y - this.bg.pad, this.bg.w, this.bg.h);
 
-    /* food */
-    ctx.shadowColor = "#ec4899"; ctx.shadowBlur = 22; ctx.fillStyle = "#f9a8d4";
-    ctx.beginPath(); ctx.arc(this.food.x, this.food.y, this.thickness * (.42 + Math.sin(now / 260) * .05), 0, 7); ctx.fill();
+    /* power-up timers */
+    Object.keys(this.powers).forEach(k => { this.powers[k] -= dt; if (this.powers[k] <= 0) delete this.powers[k]; });
+    if (this.powerBanner) { this.powerBanner.life -= dt; if (this.powerBanner.life <= 0) this.powerBanner = null; }
+
+    /* 🧲 magnet: the food drifts toward the head instead of sitting still */
+    if (this.powers.magnet > 0 && this.head) {
+      const dx = this.head.x - this.food.x, dy = this.head.y - this.food.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const pull = Math.min(d, this.thickness * 5 * dt);
+      this.food.x += dx / d * pull; this.food.y += dy / d * pull;
+    }
+
+    /* food — special pickups show their emoji and a pulsing halo */
+    const FK = this.food.kind;
+    if (FK) {
+      ctx.save();
+      ctx.shadowColor = FK.color; ctx.shadowBlur = 26;
+      ctx.strokeStyle = FK.color; ctx.lineWidth = 3;
+      ctx.globalAlpha = .5 + Math.sin(now / 180) * .4;
+      ctx.beginPath(); ctx.arc(this.food.x, this.food.y, this.thickness * .85, 0, 7); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.font = `${this.thickness * 1.25}px sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(FK.emoji, this.food.x, this.food.y);
+      ctx.restore();
+    } else {
+      ctx.shadowColor = "#ec4899"; ctx.shadowBlur = 22; ctx.fillStyle = "#f9a8d4";
+      ctx.beginPath(); ctx.arc(this.food.x, this.food.y, this.thickness * (.42 + Math.sin(now / 260) * .05), 0, 7); ctx.fill();
+    }
+    ctx.shadowBlur = 0;
 
     /* body as one continuous rounded ribbon */
     const width = this.thickness;
+    const ghosting = this.powers.ghost > 0;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.shadowColor = "#a855f7"; ctx.shadowBlur = 14;
-    ctx.strokeStyle = "rgba(168,85,247,.92)";
+    ctx.shadowColor = ghosting ? "#c4b5fd" : "#a855f7"; ctx.shadowBlur = ghosting ? 22 : 14;
+    ctx.strokeStyle = ghosting ? "rgba(196,181,253,.55)" : "rgba(168,85,247,.92)";
     ctx.lineWidth = width;
     if (this.path.length > 1) {
       ctx.beginPath();
@@ -1429,6 +1692,36 @@ const SNAKE = {
     ctx.font = "800 12px system-ui"; ctx.textAlign = "center"; ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,255,255,.88)";
     ctx.fillText(t("snakePointer"), innerWidth / 2, Math.min(innerHeight - 14, field.y + field.height + 42));
     ctx.restore();
+
+    /* active power-ups, same chip style as Air Ninja */
+    const liveS = SNAKE_FOODS.filter(P => this.powers[P.id] > 0);
+    if (liveS.length) {
+      ctx.save();
+      liveS.forEach((P, i) => {
+        const w = 108, h = 30, x = 14, y = innerHeight - 52 - i * 38;
+        const frac = Math.max(0, this.powers[P.id] / P.secs);
+        ctx.fillStyle = "rgba(6,4,18,.82)";
+        ctx.strokeStyle = P.color; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, 15); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = P.color; ctx.globalAlpha = .28;
+        ctx.beginPath(); ctx.roundRect(x, y, w * frac, h, 15); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#fff"; ctx.font = "700 13px system-ui";
+        ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        ctx.fillText(`${P.emoji} ${t(P.key)}`, x + 9, y + h / 2);
+      });
+      ctx.restore();
+    }
+    if (this.powerBanner) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, this.powerBanner.life / 0.4);
+      ctx.font = "900 clamp(22px,6vw,40px) Orbitron, system-ui";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = this.powerBanner.color;
+      ctx.shadowColor = this.powerBanner.color; ctx.shadowBlur = 24;
+      ctx.fillText(this.powerBanner.text, innerWidth / 2, field.y + field.height * 0.25);
+      ctx.restore();
+    }
   },
 
   end() {
@@ -1508,6 +1801,7 @@ const BLAST_COLORS = ["#22d3ee", "#a855f7", "#ec4899", "#a3e635", "#fbbf24"];
    BLAST_TIME_START or BLAST_TIME_PER_LINE to make runs longer. */
 const BLAST_TIME_START = 120, BLAST_TIME_PER_LINE = 6, BLAST_TIME_MAX = 240;
 const BLAST = {
+  track: "blast",
   emoji: "🧱", titleKey: "blastTitle", howKey: "blastHow", bgToggle: true,
   board: [], pieces: [], score: 0, lines: 0, dragging: null,
   flashCells: [], flashT: 0, hud: null, resetBtn: null, running: false,
@@ -2087,6 +2381,7 @@ function labCombinationResult(idA, idB) {
 }
 
 const LAB = {
+  track: "lab",
   emoji: "🧪", titleKey: "labTitle", howKey: "labHow",
   found: new Set(), workspace: [], drag: null, cursorPos: null, pinchLog: [],
   openSince: 0, grabReadyAt: 0, dwellKey: "", dwellSince: 0, bookOpen: false,
@@ -2410,7 +2705,10 @@ document.getElementById("soundBtn").onclick = () => {
   soundOn = !soundOn;
   localStorage.setItem("ha-sound", soundOn ? "on" : "off");
   document.getElementById("soundBtn").textContent = soundOn ? "🔊" : "🔇";
-  if (soundOn) sfx.click();
+  // Muting stops the music too; unmuting resumes whatever screen we are on.
+  const wanted = music.name || (activeGame && activeGame.track) || "menu";
+  if (soundOn) { sfx.click(); music.name = null; music.start(wanted); }
+  else music.stop();
 };
 document.getElementById("langBtn").textContent = t("langBtn");
 document.getElementById("soundBtn").textContent = soundOn ? "🔊" : "🔇";
@@ -2498,6 +2796,7 @@ document.getElementById("soundBtn").textContent = soundOn ? "🔊" : "🔇";
 })();
 
 /* debug hook (harmless in production) */
-window.__ha = { engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60) };
+window.__ha = { music, TRACKS, NINJA_POWERS, SNAKE_FOODS, t, engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60),
+  _setActive: (g) => { activeGame = g; } };
 
 menu();
