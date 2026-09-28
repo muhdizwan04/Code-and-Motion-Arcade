@@ -258,13 +258,16 @@ let camBgOn = localStorage.getItem("ha-cambg") !== "off";
 /* ---------------- sound ---------------- */
 let soundOn = localStorage.getItem("ha-sound") !== "off";
 let actx = null;
+/* The music bed is deliberately loud, so effects are lifted by the same
+   amount to stay on top of it — the relative mix between them is kept. */
+const SFX_GAIN = 3.4;
 function beep(freq = 660, dur = 0.08, type = "square", vol = 0.05) {
   if (!soundOn) return;
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     const o = actx.createOscillator(), g = actx.createGain();
     o.type = type; o.frequency.value = freq;
-    g.gain.setValueAtTime(vol, actx.currentTime);
+    g.gain.setValueAtTime(Math.min(0.5, vol * SFX_GAIN), actx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
     o.connect(g).connect(actx.destination);
     o.start(); o.stop(actx.currentTime + dur);
@@ -281,6 +284,178 @@ const sfx = {
   win: () => {
     [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.16, "triangle", 0.08), i * 130));
     setTimeout(() => chord([1047, 1319, 1568], 0.5, "triangle", 0.05), 520);
+  },
+};
+
+
+/* ---------------- background music ----------------
+   Procedural chiptune, same approach as the arcade: nothing to download and
+   no licensed audio, so the PWA stays offline. Four 32-step loops follow the
+   run itself — thinking over the setup sheets, a warm pastoral bed while the
+   tribes explore and build, drums when the conquest starts, and a short
+   fanfare over the results. The whole mix runs through a compressor so it
+   can sit loud without clipping. */
+const MUSIC_VOL = 0.30;
+const NOTE = (n) => 27.5 * Math.pow(2, (n + 3) / 12);   // n = 45 is A4 (440Hz)
+const R = null;
+
+const TRACKS = {
+  // Setting up the tribes: unhurried and a little mysterious — you are meant
+  // to be weighing choices here, not hurrying.
+  setup: {
+    bpm: 94, wave: "triangle", swing: 0.18,
+    lead: [45, R, R, R, 48, R, 50, R, 52, R, R, 50, 48, R, R, R,
+           43, R, R, R, 45, R, 48, R, 50, R, R, 48, 45, R, R, R],
+    harm: [40, R, R, R, 43, R, 45, R, 45, R, R, 45, 43, R, R, R,
+           36, R, R, R, 40, R, 43, R, 43, R, R, 43, 40, R, R, R],
+    bass: [21, R, R, R, 21, R, 33, R, 17, R, R, R, 17, R, 29, R,
+           19, R, R, R, 19, R, 31, R, 16, R, R, R, 16, R, 28, R],
+    kick: [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,  1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    snare:[0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0,  0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    hat:  [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0,  0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,1,0],
+  },
+  // Explore and grow: warm and pastoral, the sound of a settlement working.
+  grow: {
+    bpm: 112, wave: "triangle", swing: 0.16,
+    lead: [50, R, 52, 54, R, 52, 50, R, 47, R, 50, 52, R, 50, R, R,
+           54, R, 52, 50, R, 52, 54, R, 57, R, 54, 52, R, 50, R, R],
+    harm: [45, R, 47, 50, R, 47, 45, R, 42, R, 45, 47, R, 45, R, R,
+           50, R, 47, 45, R, 47, 50, R, 50, R, 50, 47, R, 45, R, R],
+    bass: [26, R, 38, R, 26, R, 38, R, 19, R, 31, R, 19, R, 31, R,
+           21, R, 33, R, 21, R, 33, R, 23, R, 35, R, 23, R, 35, 35],
+    kick: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0,  1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0,  0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hat:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,1,  0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,1],
+  },
+  // Conquest: same key a fifth down, heavy drums, marching bass.
+  war: {
+    bpm: 142, wave: "square", swing: 0.03,
+    lead: [50, R, 50, 51, 50, R, 47, R, 45, R, 47, 50, R, R, 50, 51,
+           53, R, 53, 51, 50, R, 47, R, 45, 45, 47, 45, 43, R, R, R],
+    harm: [38, R, 38, 39, 38, R, 35, R, 33, R, 35, 38, R, R, 38, 39,
+           41, R, 41, 39, 38, R, 35, R, 33, 33, 35, 33, 31, R, R, R],
+    bass: [26,26,38,26, 26,26,38,26, 21,21,33,21, 21,21,33,21,
+           24,24,36,24, 24,24,36,24, 19,19,31,19, 19,19,31,31],
+    kick: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0,  1,0,1,0, 1,0,1,0, 1,0,1,0, 1,1,1,1],
+    snare:[0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0,  0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,1,1],
+    hat:  [1,1,0,1, 1,1,0,1, 1,1,0,1, 1,1,0,1,  1,1,0,1, 1,1,0,1, 1,1,0,1, 1,1,1,1],
+  },
+  // Results: a short bright fanfare to sit under the trophy panel.
+  result: {
+    bpm: 104, wave: "triangle", swing: 0.10,
+    lead: [48, R, 52, R, 55, R, 60, R, 57, R, 55, R, 52, R, R, R,
+           50, R, 53, R, 57, R, 62, R, 60, R, 57, R, 55, R, R, R],
+    harm: [40, R, 45, R, 48, R, 52, R, 52, R, 48, R, 45, R, R, R,
+           41, R, 45, R, 50, R, 53, R, 53, R, 50, R, 48, R, R, R],
+    bass: [24, R, 36, R, 24, R, 36, R, 19, R, 31, R, 19, R, 31, R,
+           26, R, 38, R, 26, R, 38, R, 24, R, 36, R, 24, R, 36, 36],
+    kick: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0,  1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1,  0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hat:  [0,0,1,0, 0,1,1,0, 0,0,1,0, 0,1,1,1,  0,0,1,0, 0,1,1,0, 0,0,1,0, 0,1,1,1],
+  },
+};
+
+const music = {
+  timer: null, step: 0, nextTime: 0, name: null, track: null, master: null, comp: null, noiseBuf: null,
+
+  start(name) {
+    if (!TRACKS[name]) return;
+    if (this.name === name && this.timer) return;
+    this.stop();
+    this.name = name;
+    if (!soundOn) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === "suspended") actx.resume();
+      this.track = TRACKS[name]; this.step = 0;
+      const comp = actx.createDynamicsCompressor();
+      comp.threshold.value = -18; comp.knee.value = 24;
+      comp.ratio.value = 8; comp.attack.value = 0.004; comp.release.value = 0.2;
+      this.master = actx.createGain();
+      this.master.gain.setValueAtTime(0.0001, actx.currentTime);
+      this.master.gain.linearRampToValueAtTime(MUSIC_VOL, actx.currentTime + 0.9);
+      this.master.connect(comp).connect(actx.destination);
+      this.comp = comp;
+      this.nextTime = actx.currentTime + 0.1;
+      this.timer = setInterval(() => this.schedule(), 40);
+    } catch (e) {}
+  },
+
+  stop() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    const m = this.master, c = this.comp;
+    if (m && actx) {
+      try {
+        m.gain.cancelScheduledValues(actx.currentTime);
+        m.gain.setValueAtTime(m.gain.value, actx.currentTime);
+        m.gain.linearRampToValueAtTime(0.0001, actx.currentTime + 0.25);
+        setTimeout(() => { try { m.disconnect(); c && c.disconnect(); } catch (e) {} }, 400);
+      } catch (e) {}
+    }
+    this.master = null; this.comp = null; this.name = null; this.track = null;
+  },
+
+  schedule() {
+    if (!actx || !this.track || !this.master) return;
+    const spb = 60 / this.track.bpm / 4;
+    while (this.nextTime < actx.currentTime + 0.22) {
+      const i = this.step % 32;
+      const at = this.nextTime + (i % 2 ? (this.track.swing || 0) * spb : 0);
+      this.playStep(i, at, spb);
+      this.nextTime += spb;
+      this.step++;
+    }
+  },
+
+  voice(freq, at, dur, type, vol, detune = 0) {
+    for (const d of (detune ? [-detune, detune] : [0])) {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, at);
+      o.detune.setValueAtTime(d, at);
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(vol / (detune ? 2 : 1), at + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      o.connect(g).connect(this.master);
+      o.start(at); o.stop(at + dur + 0.02);
+    }
+  },
+
+  noise() {
+    if (this.noiseBuf) return this.noiseBuf;
+    const n = actx.sampleRate * 0.2, b = actx.createBuffer(1, n, actx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    this.noiseBuf = b;
+    return b;
+  },
+
+  hit(at, dur, freq, vol, q = 1) {
+    const src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+    src.buffer = this.noise();
+    f.type = "bandpass"; f.frequency.value = freq; f.Q.value = q;
+    g.gain.setValueAtTime(vol, at);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    src.connect(f).connect(g).connect(this.master);
+    src.start(at); src.stop(at + dur + 0.02);
+  },
+
+  playStep(i, at, spb) {
+    const T = this.track;
+    if (T.lead[i] != null) this.voice(NOTE(T.lead[i]), at, spb * 1.8, T.wave, 0.44, 9);
+    if (T.harm && T.harm[i] != null) this.voice(NOTE(T.harm[i]), at, spb * 1.5, "triangle", 0.20);
+    if (T.bass[i] != null) this.voice(NOTE(T.bass[i]), at, spb * 2.2, "triangle", 0.80);
+    if (T.kick[i]) {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(150, at);
+      o.frequency.exponentialRampToValueAtTime(44, at + 0.12);
+      g.gain.setValueAtTime(1.0, at);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+      o.connect(g).connect(this.master);
+      o.start(at); o.stop(at + 0.18);
+    }
+    if (T.snare && T.snare[i]) this.hit(at, 0.13, 1900, 0.42, 0.7);
+    if (T.hat[i]) this.hit(at, 0.03, 9000, 0.16, 1.4);
   },
 };
 
@@ -586,6 +761,7 @@ function loop(now) {
 requestAnimationFrame(loop);
 
 function stopAll() {
+  music.stop();
   if (activeScreen && activeScreen.cleanup) activeScreen.cleanup();
   activeScreen = null;
   pointerInput.inside = false;
@@ -663,13 +839,22 @@ function calibrate() {
 homeBtn.onclick = () => { sfx.click(); stopAll(); location.href = "../"; };
 function applyCamBg() { cam.style.display = camBgOn ? "" : "none"; camBtn.textContent = camBgOn ? "📷" : "🤖"; }
 camBtn.onclick = () => { sfx.click(); camBgOn = !camBgOn; localStorage.setItem("ha-cambg", camBgOn ? "on" : "off"); applyCamBg(); };
-soundBtn.onclick = () => { soundOn = !soundOn; localStorage.setItem("ha-sound", soundOn ? "on" : "off"); soundBtn.textContent = soundOn ? "🔊" : "🔇"; if (soundOn) sfx.click(); };
+soundBtn.onclick = () => {
+  soundOn = !soundOn;
+  localStorage.setItem("ha-sound", soundOn ? "on" : "off");
+  soundBtn.textContent = soundOn ? "🔊" : "🔇";
+  // Muting silences the bed; unmuting resumes whatever stage we are at.
+  const wanted = music.name || "setup";
+  if (soundOn) { sfx.click(); music.name = null; music.start(wanted); }
+  else music.stop();
+};
 langBtn.onclick = () => { sfx.click(); lang = lang === "en" ? "bm" : "en"; localStorage.setItem("ha-lang", lang); langBtn.textContent = t("langBtn"); if (!document.body.classList.contains("playing")) showIntro(); };
 langBtn.textContent = t("langBtn");
 soundBtn.textContent = soundOn ? "🔊" : "🔇";
 
 /* ---------------- intro ---------------- */
 function showIntro() {
+  music.start("setup");
   stopAll();
   const learned = bestLearned(), rec = loadLearn();
   const learnHtml = learned.length
@@ -1057,6 +1242,7 @@ function startSetup() {
   SIM.cleanup(); SIM.exitReview();
   document.querySelectorAll(".speed-bar,.civ-log,.review-chip").forEach(n => n.remove());
   chosenEra = "forest"; chosenSpecs.length = 0; chosenPolicies.length = 0;
+  music.start("setup");
   canvas.style.cursor = "pointer";
   if (setupUsesCamera && !engine.camReady) engine.startVideoStream().then(applyCamBg).catch(() => {});
   nextSpec(0);
@@ -1085,6 +1271,7 @@ const SIM = {
   era: null, ended: false, battles: [], terrainCache: null, logNode: null, speedBar: null,
 
   start(era, specs, policies = []) {
+    music.start("grow");
     this.era = era; this.simT = 0; this.speed = 1; this.running = true; this.ended = false;
     this.battles = []; this.effects = []; this.terrainCache = null; this.toasts = []; this.banner = null; this.warAnnounced = false; this.timeline = []; this.announcedDiscoveries = new Set(); this.announcementQueue = []; this.momentQueue = []; this.currentMoment = null;
     // Hand input is only needed for setup. Closing the stream here reduces
@@ -1962,6 +2149,7 @@ const SIM = {
     });
     if (war && !this.warAnnounced) {
       this.warAnnounced = true;
+      music.start("war");            // the bed turns martial as the fighting starts
       this.banner = { text: t("warBegins"), color: "#ff6b6b", life: 2.6 };
       sfx.bad();
     }
@@ -2150,6 +2338,7 @@ const SIM = {
     // the final state; only the speed control is retired.
     this.speedBar?.remove(); this.speedBar = null;
     ui.classList.remove("passthrough");
+    music.start("result");
     sfx.win();
     const rec = loadLearn();
     const runner = ranked[1];
@@ -3154,7 +3343,7 @@ const SIM = {
     })
     .catch(() => {});
 })();
-window.__civ = { engine, SIM, CHOOSER, SPEC, CONFIRM, loadLearn, DISCOVERIES, TRAITS, ERAS, POLICIES,
+window.__civ = { music, TRACKS, engine, SIM, CHOOSER, SPEC, CONFIRM, loadLearn, DISCOVERIES, TRAITS, ERAS, POLICIES,
   _confirm: (era, specs, policies = ["research", "food", "defend"], cb = () => {}) => { chosenEra = era; show(null); ui.classList.add("passthrough"); CONFIRM.open(specs, policies, cb); },
   _force: (era, specs, policies = ["research", "food", "defend"]) => { show(null); ui.classList.add("passthrough"); SIM.start(era, specs, policies); } };
 showIntro();
