@@ -218,13 +218,16 @@ function setDailyBest(gameKey, score) {
 /* ---------------- sound ---------------- */
 let soundOn = localStorage.getItem("ha-sound") !== "off";
 let actx = null;
+/* The music bed is deliberately loud, so the effects are lifted by the same
+   amount to stay on top of it — the relative mix between effects is kept. */
+const SFX_GAIN = 3.4;
 function beep(freq = 660, dur = 0.08, type = "square", vol = 0.05) {
   if (!soundOn) return;
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     const o = actx.createOscillator(), g = actx.createGain();
     o.type = type; o.frequency.value = freq;
-    g.gain.setValueAtTime(vol, actx.currentTime);
+    g.gain.setValueAtTime(Math.min(0.5, vol * SFX_GAIN), actx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
     o.connect(g).connect(actx.destination);
     o.start(); o.stop(actx.currentTime + dur);
@@ -250,39 +253,88 @@ const sfx = {
 };
 
 /* ---------------- background music ----------------
-   Written as procedural chiptune rather than audio files: the PWA stays
-   fully offline, adds no download weight, and carries no licensed music.
-   One scheduler drives every track; each game supplies a 16-step loop
-   whose tempo and mood match how that game actually plays. */
-const MUSIC_VOL = 0.055;          // sits under the sound effects
-const NOTE = (n) => 27.5 * Math.pow(2, (n + 3) / 12);   // n = semitones from A0
+   Procedural chiptune rather than audio files: the PWA stays fully offline,
+   adds no download weight and carries no licensed audio.
 
-// Patterns are 16 steps of a bar. null = rest. Numbers are semitones.
+   Each track is a 32-step (two bar) loop with four voices — a detuned lead,
+   a harmony line, an octave-jumping bass and a drum kit — which is what
+   keeps a loop from wearing thin after the third play at a booth. A little
+   swing stops it sounding like a metronome, and the whole mix runs through a
+   compressor so it can be genuinely loud without clipping. */
+const MUSIC_VOL = 0.30;           // loud and present, still under the sfx
+const NOTE = (n) => 27.5 * Math.pow(2, (n + 3) / 12);   // n = 45 is A4 (440Hz)
+const R = null;                   // rest — keeps the patterns readable
+
 const TRACKS = {
-  // Hub/menu: calm, curious, invites you in without nagging.
-  menu:  { bpm: 92,  wave: "triangle", lead: [40, null, 45, null, 47, null, 45, null, 43, null, 40, null, 38, null, null, null],
-           bass: [16, null, null, null, 23, null, null, null, 21, null, null, null, 19, null, null, null],
-           kick: [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0], hat: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0] },
-  // Air Ninja: fast, driving, a chase feel to match the slicing.
-  ninja: { bpm: 152, wave: "square",   lead: [52, 52, 55, 57, 59, 57, 55, 52, 50, 50, 52, 55, 57, 55, 52, 50],
-           bass: [28, 28, null, 28, 35, null, 28, null, 26, 26, null, 26, 33, null, 26, null],
-           kick: [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0], hat: [0,1,1,0, 1,1,0,1, 0,1,1,0, 1,1,0,1] },
-  // Hand Snake: bouncy and playful, steady pulse to move to.
-  snake: { bpm: 120, wave: "square",   lead: [47, null, 50, 52, null, 52, 50, null, 45, null, 47, 50, null, 50, 47, null],
-           bass: [23, null, 23, null, 30, null, 30, null, 21, null, 21, null, 28, null, 28, null],
-           kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0], hat: [0,0,1,0, 0,0,1,1, 0,0,1,0, 0,0,1,1] },
-  // Hand Blast: unhurried puzzle groove, nothing that rushes your thinking.
-  blast: { bpm: 104, wave: "triangle", lead: [45, null, null, 47, null, 50, null, null, 52, null, 50, null, 47, null, null, null],
-           bass: [21, null, null, null, 26, null, null, null, 28, null, null, null, 26, null, null, null],
-           kick: [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0], hat: [0,0,0,1, 0,0,0,1, 0,0,0,1, 0,0,0,1] },
-  // Hand Lab: soft and inquisitive, suits slow experimenting.
-  lab:   { bpm: 80,  wave: "sine",     lead: [52, null, null, null, 57, null, null, null, 59, null, 57, null, 55, null, null, null],
-           bass: [28, null, null, null, null, null, null, null, 26, null, null, null, null, null, null, null],
-           kick: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0], hat: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0] },
+  // Hub: warm and inviting, with a hook that pulls you toward a card.
+  menu: {
+    bpm: 108, wave: "triangle", swing: 0.14,
+    lead: [57, R, 55, 57, 60, R, 57, R, 55, R, 52, 55, 57, R, R, R,
+           55, R, 52, 55, 57, R, 60, R, 62, R, 60, 57, 55, R, R, R],
+    harm: [52, R, 50, 52, 55, R, 52, R, 50, R, 48, 50, 52, R, R, R,
+           50, R, 48, 50, 52, R, 55, R, 57, R, 55, 52, 50, R, R, R],
+    bass: [21, R, 33, R, 21, R, 33, R, 17, R, 29, R, 17, R, 29, R,
+           19, R, 31, R, 19, R, 31, R, 16, R, 28, R, 16, R, 28, R],
+    kick: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0,  1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0,  0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hat:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,1,  0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,1],
+  },
+  // Air Ninja: relentless 16ths, minor key, built to make you swipe faster.
+  ninja: {
+    bpm: 158, wave: "square", swing: 0.04,
+    lead: [57, R, 55, 57, 52, R, 55, R, 53, R, 52, 50, 52, R, 55, R,
+           57, R, 60, 57, 55, R, 52, R, 50, 50, 52, 55, 57, R, 57, 59],
+    harm: [45, R, 43, 45, 40, R, 43, R, 41, R, 40, 38, 40, R, 43, R,
+           45, R, 48, 45, 43, R, 40, R, 38, 38, 40, 43, 45, R, 45, 47],
+    bass: [21,21,33,21, 21,21,33,21, 29,29,41,29, 29,29,41,29,
+           26,26,38,26, 26,26,38,26, 28,28,40,28, 28,28,40,40],
+    kick: [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0,  1,0,0,1, 0,0,1,0, 1,0,0,1, 0,1,0,1],
+    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0,  0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,1,0],
+    hat:  [1,1,0,1, 1,1,0,1, 1,1,0,1, 1,1,0,1,  1,1,0,1, 1,1,0,1, 1,1,0,1, 1,1,1,1],
+  },
+  // Hand Snake: bright major bounce, playful and easy to move to.
+  snake: {
+    bpm: 126, wave: "square", swing: 0.16,
+    lead: [55, R, 55, 57, R, 55, 52, R, 50, R, 52, 55, R, 52, R, R,
+           57, R, 57, 60, R, 57, 55, R, 52, R, 55, 57, R, 55, 52, R],
+    harm: [48, R, 48, 52, R, 48, 45, R, 43, R, 45, 48, R, 45, R, R,
+           52, R, 52, 55, R, 52, 48, R, 45, R, 48, 52, R, 48, 45, R],
+    bass: [24, R, 36, 24, 24, R, 36, R, 19, R, 31, 19, 19, R, 31, R,
+           21, R, 33, 21, 21, R, 33, R, 26, R, 38, 26, 26, R, 38, 38],
+    kick: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0,  1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1,  0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hat:  [0,0,1,0, 0,1,1,0, 0,0,1,0, 0,1,1,1,  0,0,1,0, 0,1,1,0, 0,0,1,0, 0,1,1,1],
+  },
+  // Hand Blast: a groove with room to think — never rushes a puzzle.
+  blast: {
+    bpm: 112, wave: "triangle", swing: 0.18,
+    lead: [52, R, R, 55, R, 57, R, R, 60, R, 57, R, 55, R, R, R,
+           50, R, R, 52, R, 55, R, R, 57, R, 55, R, 52, R, R, R],
+    harm: [45, R, R, 48, R, 50, R, R, 52, R, 50, R, 48, R, R, R,
+           43, R, R, 45, R, 48, R, R, 50, R, 48, R, 45, R, R, R],
+    bass: [16, R, 28, R, 16, R, 28, R, 21, R, 33, R, 21, R, 33, R,
+           19, R, 31, R, 19, R, 31, R, 14, R, 26, R, 14, R, 26, R],
+    kick: [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0,  1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0],
+    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0,  0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hat:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0,  0,0,1,0, 0,0,1,1, 0,0,1,0, 0,0,1,0],
+  },
+  // Hand Lab: dreamy and curious, but with enough pulse to feel alive.
+  lab: {
+    bpm: 96, wave: "sine", swing: 0.20,
+    lead: [57, R, R, R, 60, R, 62, R, 64, R, 62, R, 60, R, R, R,
+           55, R, R, R, 57, R, 60, R, 62, R, 60, R, 57, R, R, R],
+    harm: [52, R, R, R, 55, R, 57, R, 57, R, 57, R, 55, R, R, R,
+           50, R, R, R, 52, R, 55, R, 55, R, 55, R, 52, R, R, R],
+    bass: [21, R, R, R, 21, R, 33, R, 17, R, R, R, 17, R, 29, R,
+           19, R, R, R, 19, R, 31, R, 16, R, R, R, 16, R, 28, R],
+    kick: [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,  1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    snare:[0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0,  0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    hat:  [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0,  0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,1,0],
+  },
 };
 
 const music = {
-  timer: null, step: 0, nextTime: 0, name: null, track: null, master: null,
+  timer: null, step: 0, nextTime: 0, name: null, track: null, master: null, noiseBuf: null,
 
   start(name) {
     if (!TRACKS[name]) return;
@@ -294,10 +346,16 @@ const music = {
       actx = actx || new (window.AudioContext || window.webkitAudioContext)();
       if (actx.state === "suspended") actx.resume();
       this.track = TRACKS[name]; this.step = 0;
+      // Compressor lets the mix sit genuinely loud without clipping when the
+      // kick, bass and lead all land on the same step.
+      const comp = actx.createDynamicsCompressor();
+      comp.threshold.value = -18; comp.knee.value = 24;
+      comp.ratio.value = 8; comp.attack.value = 0.004; comp.release.value = 0.2;
       this.master = actx.createGain();
       this.master.gain.setValueAtTime(0.0001, actx.currentTime);
-      this.master.gain.linearRampToValueAtTime(MUSIC_VOL, actx.currentTime + 1.1);  // fade in
-      this.master.connect(actx.destination);
+      this.master.gain.linearRampToValueAtTime(MUSIC_VOL, actx.currentTime + 0.9);
+      this.master.connect(comp).connect(actx.destination);
+      this.comp = comp;
       this.nextTime = actx.currentTime + 0.1;
       this.timer = setInterval(() => this.schedule(), 40);
     } catch (e) {}
@@ -305,55 +363,83 @@ const music = {
 
   stop() {
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
-    const m = this.master;
+    const m = this.master, c = this.comp;
     if (m && actx) {
       try {
         m.gain.cancelScheduledValues(actx.currentTime);
         m.gain.setValueAtTime(m.gain.value, actx.currentTime);
         m.gain.linearRampToValueAtTime(0.0001, actx.currentTime + 0.25);   // fade out
-        setTimeout(() => { try { m.disconnect(); } catch (e) {} }, 400);
+        setTimeout(() => { try { m.disconnect(); c && c.disconnect(); } catch (e) {} }, 400);
       } catch (e) {}
     }
-    this.master = null; this.name = null; this.track = null;
+    this.master = null; this.comp = null; this.name = null; this.track = null;
   },
 
-  // Notes are scheduled slightly ahead of time so the loop stays steady even
-  // when the render loop stutters.
+  // Notes are scheduled ahead of time so the groove holds steady even when
+  // the render loop stutters.
   schedule() {
     if (!actx || !this.track || !this.master) return;
     const spb = 60 / this.track.bpm / 4;            // one 16th step
     while (this.nextTime < actx.currentTime + 0.22) {
-      this.playStep(this.step % 16, this.nextTime, spb);
+      const i = this.step % 32;
+      // Swing: push the off-beats late so it grooves instead of marching.
+      const at = this.nextTime + (i % 2 ? (this.track.swing || 0) * spb : 0);
+      this.playStep(i, at, spb);
       this.nextTime += spb;
       this.step++;
     }
   },
 
-  voice(freq, at, dur, type, vol) {
-    const o = actx.createOscillator(), g = actx.createGain();
-    o.type = type; o.frequency.setValueAtTime(freq, at);
-    g.gain.setValueAtTime(0.0001, at);
-    g.gain.exponentialRampToValueAtTime(vol, at + 0.012);
+  // Two oscillators a few cents apart read as one fat chiptune voice.
+  voice(freq, at, dur, type, vol, detune = 0) {
+    for (const d of (detune ? [-detune, detune] : [0])) {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, at);
+      o.detune.setValueAtTime(d, at);
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(vol / (detune ? 2 : 1), at + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      o.connect(g).connect(this.master);
+      o.start(at); o.stop(at + dur + 0.02);
+    }
+  },
+
+  noise() {
+    if (this.noiseBuf) return this.noiseBuf;
+    const n = actx.sampleRate * 0.2, b = actx.createBuffer(1, n, actx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    this.noiseBuf = b;
+    return b;
+  },
+
+  hit(at, dur, freq, vol, q = 1) {
+    const src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+    src.buffer = this.noise();
+    f.type = "bandpass"; f.frequency.value = freq; f.Q.value = q;
+    g.gain.setValueAtTime(vol, at);
     g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-    o.connect(g).connect(this.master);
-    o.start(at); o.stop(at + dur + 0.02);
+    src.connect(f).connect(g).connect(this.master);
+    src.start(at); src.stop(at + dur + 0.02);
   },
 
   playStep(i, at, spb) {
     const T = this.track;
-    if (T.lead[i] != null) this.voice(NOTE(T.lead[i]), at, spb * 1.7, T.wave, 0.5);
-    if (T.bass[i] != null) this.voice(NOTE(T.bass[i]), at, spb * 2.4, "triangle", 0.85);
+    if (T.lead[i] != null) this.voice(NOTE(T.lead[i]), at, spb * 1.8, T.wave, 0.44, 9);
+    if (T.harm && T.harm[i] != null) this.voice(NOTE(T.harm[i]), at, spb * 1.5, "triangle", 0.20);
+    if (T.bass[i] != null) this.voice(NOTE(T.bass[i]), at, spb * 2.2, "triangle", 0.80);
     if (T.kick[i]) {                                  // pitch-drop sine = kick
       const o = actx.createOscillator(), g = actx.createGain();
       o.type = "sine";
-      o.frequency.setValueAtTime(140, at);
-      o.frequency.exponentialRampToValueAtTime(45, at + 0.11);
-      g.gain.setValueAtTime(0.9, at);
-      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.13);
+      o.frequency.setValueAtTime(150, at);
+      o.frequency.exponentialRampToValueAtTime(44, at + 0.12);
+      g.gain.setValueAtTime(1.0, at);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
       o.connect(g).connect(this.master);
-      o.start(at); o.stop(at + 0.15);
+      o.start(at); o.stop(at + 0.18);
     }
-    if (T.hat[i]) this.voice(9000 + Math.random() * 1200, at, 0.022, "square", 0.10);
+    if (T.snare && T.snare[i]) this.hit(at, 0.13, 1900, 0.42, 0.7);
+    if (T.hat[i]) this.hit(at, 0.03, 9000, 0.16, 1.4);
   },
 };
 
