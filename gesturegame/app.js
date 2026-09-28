@@ -57,6 +57,14 @@ const STR = {
     vsNinjaHow: "Player 1 stands LEFT, player 2 stands RIGHT. Each of you shows ONE hand on your own side of the line. Slice the fruit in your half, dodge the bombs — 3 lives each. Highest score after 90 seconds wins! ⚔️",
     p1: "P1", p2: "P2", twoPlayer: "2 PEMAIN", twoPlayer: "2 PLAYERS",
     vsShowHand: "show your hand ✋",
+    vsSnakeTitle: "Snake Duel",
+    vsSnakeDesc: "Two arenas, two snakes — who grows longest?",
+    vsSnakeHow: "Player 1 takes the LEFT arena, player 2 the RIGHT. Point with one finger to steer your own snake. Eat to grow and score — hit your own tail and you lose a life and restart. Highest score after 90 seconds wins! 🐍",
+    vsCrash: "CRASHED!",
+    vsBlastTitle: "Blast Duel",
+    vsBlastDesc: "A board each — clear the most lines!",
+    vsBlastHow: "Player 1 takes the LEFT board, player 2 the RIGHT. PINCH 👌 a block from your own tray, drag it onto your board and release. Clear rows and columns to score. Highest score after 90 seconds wins! 🧱",
+    vsJammed: "NO MOVES LEFT!",
     vsWinner: (n) => `PLAYER ${n} WINS!`,
     vsDraw: "IT'S A DRAW!",
     puSlow: "SLOW-MO!", puDouble: "DOUBLE POINTS!", puMagnet: "BIG BLADE!", puLife: "EXTRA LIFE!",
@@ -148,6 +156,14 @@ const STR = {
     vsNinjaHow: "Pemain 1 di KIRI, pemain 2 di KANAN. Setiap seorang tunjuk SATU tangan di bahagian sendiri. Tetak buah di bahagian anda, elak bom — 3 nyawa setiap seorang. Skor tertinggi selepas 90 saat menang! ⚔️",
     p1: "P1", p2: "P2",
     vsShowHand: "tunjuk tangan ✋",
+    vsSnakeTitle: "Pertarungan Ular",
+    vsSnakeDesc: "Dua arena, dua ular — siapa paling panjang?",
+    vsSnakeHow: "Pemain 1 di arena KIRI, pemain 2 di KANAN. Tunjuk satu jari untuk kemudikan ular anda. Makan untuk membesar dan dapat mata — langgar ekor sendiri, hilang satu nyawa dan mula semula. Skor tertinggi selepas 90 saat menang! 🐍",
+    vsCrash: "TERLANGGAR!",
+    vsBlastTitle: "Pertarungan Blast",
+    vsBlastDesc: "Satu papan seorang — siapa kosongkan paling banyak?",
+    vsBlastHow: "Pemain 1 papan KIRI, pemain 2 papan KANAN. CUBIT 👌 blok dari dulang sendiri, seret ke papan anda dan lepaskan. Kosongkan baris dan lajur untuk mata. Skor tertinggi selepas 90 saat menang! 🧱",
+    vsJammed: "TIADA LANGKAH!",
     vsWinner: (n) => `PEMAIN ${n} MENANG!`,
     vsDraw: "SERI!",
     puSlow: "GERAK PERLAHAN!", puDouble: "MATA BERGANDA!", puMagnet: "BILAH BESAR!", puLife: "NYAWA TAMBAHAN!",
@@ -1038,6 +1054,14 @@ function menu() {
         <div class="emo">⚔️</div>
         <div><h3>${t("vsNinjaTitle")} <span style="font-size:14px">👥</span></h3><p>${t("vsNinjaDesc")}</p><span class="card-badge vs-badge">${t("twoPlayer")}</span></div>
       </div>
+      <div class="card vs" id="cSnakeVs">
+        <div class="emo">🐍</div>
+        <div><h3>${t("vsSnakeTitle")} <span style="font-size:14px">👥</span></h3><p>${t("vsSnakeDesc")}</p><span class="card-badge vs-badge">${t("twoPlayer")}</span></div>
+      </div>
+      <div class="card vs" id="cBlastVs">
+        <div class="emo">🧱</div>
+        <div><h3>${t("vsBlastTitle")} <span style="font-size:14px">👥</span></h3><p>${t("vsBlastDesc")}</p><span class="card-badge vs-badge">${t("twoPlayer")}</span></div>
+      </div>
       <div class="card lab" id="cLab">
         <div class="emo">🧪</div>
         <div><h3>${t("labTitle")} <span style="font-size:14px">🔬</span></h3><p>${t("labDesc")}</p></div>
@@ -1049,6 +1073,8 @@ function menu() {
   node.querySelector("#cSnake").onclick = () => { sfx.open(); intro(SNAKE); };
   node.querySelector("#cBlast").onclick = () => { sfx.open(); intro(BLAST); };
   node.querySelector("#cNinjaVs").onclick = () => { sfx.open(); intro(NINJA_VS); };
+  node.querySelector("#cSnakeVs").onclick = () => { sfx.open(); intro(SNAKE_VS); };
+  node.querySelector("#cBlastVs").onclick = () => { sfx.open(); intro(BLAST_VS); };
   node.querySelector("#cLab").onclick = () => { sfx.open(); intro(LAB); };
   // Secret booth-operator gesture: 5 taps on the title within 3s opens the
   // play-count overlay, out of the way of normal kid usage.
@@ -2231,6 +2257,276 @@ const SNAKE = {
   },
 };
 
+
+/* ================================================
+   VERSUS : HAND SNAKE — one arena each
+   Two arenas side by side, one per player. Crashing into your own tail does
+   not end the match, it costs a life and restarts that player's snake, so a
+   single early mistake does not leave one child watching the other play.
+================================================ */
+const SNAKE_VS = {
+  track: "snake",
+  emoji: "🐍", titleKey: "vsSnakeTitle", howKey: "vsSnakeHow", bgToggle: true, versus: true,
+  sides: [], timeLeft: VS_DURATION, running: false, hud: null,
+
+  makeSide(i, field) {
+    const thickness = Math.max(13, Math.min(24, Math.min(field.width, field.height) / 15));
+    return {
+      i, color: VS_COLORS[i], field, thickness, segUnit: thickness * 2.6,
+      head: { x: field.x + field.width / 2, y: field.y + field.height / 2 },
+      path: [], dir: { x: 1, y: 0 }, budget: thickness * 2.6 * 3,
+      score: 0, lives: VS_LIVES, food: null, tracking: false,
+      powers: {}, banner: null, deadFor: 0,
+    };
+  },
+  layoutFields() {
+    const topSafe = 132, bottomSafe = 60, gap = 14;
+    const halfW = (innerWidth - gap * 3) / 2;
+    const w = Math.max(180, Math.min(520, halfW));
+    const h = Math.max(200, Math.min(560, innerHeight - topSafe - bottomSafe));
+    const y = Math.round(topSafe + Math.max(0, (innerHeight - topSafe - bottomSafe - h) / 2));
+    const leftX = Math.round(innerWidth / 2 - gap / 2 - w);
+    const rightX = Math.round(innerWidth / 2 + gap / 2);
+    return [{ x: leftX, y, width: w, height: h }, { x: rightX, y, width: w, height: h }];
+  },
+
+  start() {
+    this.cleanup();
+    const fields = this.layoutFields();
+    this.sides = [this.makeSide(0, fields[0]), this.makeSide(1, fields[1])];
+    this.sides.forEach(s => { s.path = [{ ...s.head }]; s.food = this.newFood(s); });
+    this.timeLeft = VS_DURATION; this.running = true;
+    this.hud = el(`<div class="hud vs-hud">
+      <div class="stat vs-p1"><div class="lbl">${t("p1")}</div><div class="num cyan" id="vnS0">0</div><div class="vs-lives" id="vnL0">❤️❤️❤️</div></div>
+      <div class="stat"><div class="lbl">${t("time")}</div><div class="num amber" id="vnTime">${VS_DURATION}</div></div>
+      <div class="stat vs-p2"><div class="lbl">${t("p2")}</div><div class="num pink" id="vnS1">0</div><div class="vs-lives" id="vnL1">❤️❤️❤️</div></div>
+    </div>`);
+    document.body.append(this.hud);
+    engine.setHandCount(2);
+  },
+
+  cleanup() {
+    this.hud?.remove(); this.hud = null; this.running = false;
+    engine.setHandCount(1);
+  },
+
+  newFood(s) {
+    const m = s.thickness * 1.6;
+    for (let a = 0; a < 20; a++) {
+      const p = {
+        x: s.field.x + m + Math.random() * (s.field.width - m * 2),
+        y: s.field.y + m + Math.random() * (s.field.height - m * 2),
+      };
+      if (!s.head || Math.hypot(p.x - s.head.x, p.y - s.head.y) > s.thickness * 4) {
+        p.kind = Math.random() < 0.2 ? SNAKE_FOODS[Math.floor(Math.random() * SNAKE_FOODS.length)] : null;
+        return p;
+      }
+    }
+    return { x: s.field.x + s.field.width / 2, y: s.field.y + s.field.height / 2, kind: null };
+  },
+  trimPath(s) {
+    let total = 0;
+    for (let i = s.path.length - 1; i > 0; i--) {
+      total += dist(s.path[i], s.path[i - 1]);
+      if (total > s.budget) { s.path.splice(0, i - 1); return; }
+    }
+  },
+  // A crash costs a life and respawns that player only; the match continues.
+  respawn(s) {
+    s.lives = Math.max(0, s.lives - 1);
+    s.head = { x: s.field.x + s.field.width / 2, y: s.field.y + s.field.height / 2 };
+    s.path = [{ ...s.head }];
+    s.budget = s.segUnit * 3;
+    s.powers = {}; s.tracking = false; s.deadFor = 1.1;
+    s.banner = { text: t("vsCrash"), color: "#f43f5e", life: 1.2 };
+    sfx.bad(); shakeScreen();
+    this.refreshHud();
+    if (s.lives <= 0) this.end();
+  },
+  refreshHud() {
+    if (!this.hud) return;
+    this.sides.forEach((s, i) => {
+      const sc = this.hud.querySelector(`#vnS${i}`), lv = this.hud.querySelector(`#vnL${i}`);
+      if (sc) sc.textContent = s.score;
+      if (lv) lv.textContent = "❤️".repeat(s.lives) + "🤍".repeat(VS_LIVES - s.lives);
+    });
+  },
+
+  onFrame(dt) {
+    if (!this.running) return;
+    this.timeLeft -= dt;
+    if (this.timeLeft <= 0) return this.end();
+    const tEl = this.hud?.querySelector("#vnTime");
+    if (tEl) tEl.textContent = Math.ceil(this.timeLeft);
+
+    if (!camBgOn) { ctx.fillStyle = "#0b0518"; ctx.fillRect(0, 0, innerWidth, innerHeight); }
+    else { ctx.fillStyle = "rgba(5,8,28,.22)"; ctx.fillRect(0, 0, innerWidth, innerHeight); }
+    const now = performance.now();
+
+    this.sides.forEach(s => {
+      const f = s.field;
+      Object.keys(s.powers).forEach(k => { s.powers[k] -= dt; if (s.powers[k] <= 0) delete s.powers[k]; });
+      if (s.banner) { s.banner.life -= dt; if (s.banner.life <= 0) s.banner = null; }
+      if (s.deadFor > 0) s.deadFor -= dt;
+
+      /* arena frame */
+      ctx.save();
+      ctx.strokeStyle = s.color; ctx.lineWidth = 2.5;
+      ctx.shadowColor = s.color; ctx.shadowBlur = 14;
+      ctx.fillStyle = "rgba(10,6,26,.5)";
+      ctx.beginPath(); ctx.roundRect(f.x - 8, f.y - 8, f.width + 16, f.height + 16, 18);
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
+
+      const raw = engine.multi[s.i];
+      if (raw && s.deadFor <= 0) {
+        const m = s.thickness / 2;
+        const tx = Math.max(f.x + m, Math.min(f.x + f.width - m, raw[8].x));
+        const ty = Math.max(f.y + m, Math.min(f.y + f.height - m, raw[8].y));
+        const k = 1 - Math.pow(1e-7, dt);
+        if (!s.tracking) s.head = { x: tx, y: ty };
+        else { s.head.x += (tx - s.head.x) * k; s.head.y += (ty - s.head.y) * k; }
+        s.tracking = true;
+
+        const last = s.path[s.path.length - 1];
+        if (!last || dist(s.head, last) > 3) {
+          if (last) {
+            const dx = s.head.x - last.x, dy = s.head.y - last.y;
+            const len = Math.hypot(dx, dy) || 1;
+            s.dir = { x: dx / len, y: dy / len };
+          }
+          s.path.push({ x: s.head.x, y: s.head.y });
+          this.trimPath(s);
+
+          if (dist(s.head, s.food) < s.thickness * .85) {
+            const K = s.food.kind;
+            if (K) {
+              sfx.win();
+              s.banner = { text: t(K.key), color: K.color, life: 1.3 };
+              if (K.id === "bonus") { s.score += 50; s.budget += s.segUnit; }
+              else if (K.id === "shrink") { s.budget = Math.max(s.segUnit * 3, s.budget * .6); s.score += 10; this.trimPath(s); }
+              else { s.powers[K.id] = K.secs; s.score += 10; s.budget += s.segUnit; }
+            } else { s.score += 10; s.budget += s.segUnit; sfx.good(); }
+            s.food = this.newFood(s);
+            this.refreshHud();
+          }
+
+          if (s.powers.ghost > 0) { /* pass through your own tail */ }
+          else {
+            const skipArc = s.thickness * 3.6, hitR = s.thickness * .5;
+            let acc = 0, cut = 0;
+            for (let i = s.path.length - 1; i > 0; i--) {
+              acc += dist(s.path[i], s.path[i - 1]);
+              if (acc > skipArc) { cut = i; break; }
+            }
+            for (let j = 0; j < cut; j++) {
+              if (dist(s.head, s.path[j]) < hitR) { this.respawn(s); return; }
+            }
+          }
+        }
+      } else if (!raw) s.tracking = false;
+
+      /* magnet pulls the food in */
+      if (s.powers.magnet > 0) {
+        const dx = s.head.x - s.food.x, dy = s.head.y - s.food.y;
+        const d = Math.hypot(dx, dy) || 1, pull = Math.min(d, s.thickness * 5 * dt);
+        s.food.x += dx / d * pull; s.food.y += dy / d * pull;
+      }
+
+      /* food */
+      const FK = s.food.kind;
+      ctx.save();
+      if (FK) {
+        ctx.shadowColor = FK.color; ctx.shadowBlur = 22;
+        ctx.strokeStyle = FK.color; ctx.lineWidth = 2.5;
+        ctx.globalAlpha = .5 + Math.sin(now / 180) * .4;
+        ctx.beginPath(); ctx.arc(s.food.x, s.food.y, s.thickness * .85, 0, 7); ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.font = `${s.thickness * 1.2}px sans-serif`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(FK.emoji, s.food.x, s.food.y);
+      } else {
+        ctx.shadowColor = "#ec4899"; ctx.shadowBlur = 20; ctx.fillStyle = "#f9a8d4";
+        ctx.beginPath(); ctx.arc(s.food.x, s.food.y, s.thickness * (.42 + Math.sin(now / 260) * .05), 0, 7); ctx.fill();
+      }
+      ctx.restore();
+
+      /* body */
+      if (s.path.length >= 2) {
+        const ghosting = s.powers.ghost > 0;
+        ctx.save();
+        ctx.lineCap = "round"; ctx.lineJoin = "round";
+        ctx.shadowColor = ghosting ? "#c4b5fd" : s.color; ctx.shadowBlur = ghosting ? 20 : 12;
+        ctx.strokeStyle = ghosting ? "rgba(196,181,253,.55)" : s.color;
+        ctx.globalAlpha = s.deadFor > 0 ? .3 : 1;
+        ctx.lineWidth = s.thickness;
+        ctx.beginPath();
+        ctx.moveTo(s.path[0].x, s.path[0].y);
+        for (let i = 1; i < s.path.length; i++) ctx.lineTo(s.path[i].x, s.path[i].y);
+        ctx.stroke();
+        ctx.restore();
+      }
+      /* head */
+      ctx.save();
+      ctx.globalAlpha = s.deadFor > 0 ? .3 : 1;
+      ctx.shadowColor = s.color; ctx.shadowBlur = 14; ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.arc(s.head.x, s.head.y, s.thickness * .62, 0, 7); ctx.fill();
+      ctx.restore();
+
+      /* labels and prompts */
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.font = "900 12px Orbitron, system-ui"; ctx.fillStyle = s.color;
+      ctx.fillText(t(s.i === 0 ? "p1" : "p2"), f.x + f.width / 2, f.y - 16);
+      if (!raw) {
+        ctx.globalAlpha = .5 + Math.sin(now / 300) * .3;
+        ctx.font = "800 14px system-ui";
+        ctx.fillText(t("vsShowHand"), f.x + f.width / 2, f.y + f.height / 2);
+      }
+      ctx.restore();
+
+      if (s.banner) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, s.banner.life / .4);
+        ctx.font = "900 clamp(14px,2.4vw,22px) Orbitron, system-ui";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillStyle = s.banner.color;
+        ctx.shadowColor = s.banner.color; ctx.shadowBlur = 18;
+        ctx.fillText(s.banner.text, f.x + f.width / 2, f.y + 34);
+        ctx.restore();
+      }
+    });
+  },
+
+  end() {
+    if (!this.running) return;
+    this.running = false;
+    sfx.win();
+    const [a, b] = this.sides;
+    let win;
+    if (a.lives <= 0 && b.lives > 0) win = 1;
+    else if (b.lives <= 0 && a.lives > 0) win = 0;
+    else win = a.score === b.score ? -1 : (a.score > b.score ? 0 : 1);
+    this.winner = win;
+    this.hud?.remove(); this.hud = null;
+    engine.setHandCount(1);
+    ui.classList.remove("passthrough");
+    const node = el(`<div class="panel">
+      <div class="big-emoji">${win === -1 ? "🤝" : "🏆"}</div>
+      <h2>${win === -1 ? t("vsDraw") : t("vsWinner")(win + 1)}</h2>
+      <div class="vs-result">
+        <div class="vs-col" style="--c:${VS_COLORS[0]}"><b>${t("p1")}</b><span>${a.score}</span><i>${"❤️".repeat(a.lives) || "💀"}</i></div>
+        <div class="vs-col" style="--c:${VS_COLORS[1]}"><b>${t("p2")}</b><span>${b.score}</span><i>${"❤️".repeat(b.lives) || "💀"}</i></div>
+      </div>
+      <button class="btn" id="againBtn">${t("again")}</button>
+      <br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button>
+    </div>`);
+    node.querySelector("#againBtn").onclick = () => { sfx.click(); show(null); ui.classList.add("passthrough"); this.start(); };
+    node.querySelector("#menuBtn").onclick = () => { sfx.click(); menu(); };
+    show(node);
+  },
+};
+
 /* ================================================
    GAME 3 : HAND BLAST
 ================================================ */
@@ -2734,6 +3030,332 @@ const BLAST = {
     const daily = setDailyBest("blast", score);
     this.cleanup(); sfx.bad(); ui.classList.remove("passthrough");
     const node = el(`<div class="panel"><div class="big-emoji">${this.endReason === "timeUp" ? "⏰" : "🧱"}</div><h2>${t(this.endReason)}</h2><div class="score-line">${score}</div><div class="result-rank">${t("blastRanks")[rank]}</div>${daily.isNew ? `<div class="desc" style="color:var(--cyan)">${t("newDailyBest")}</div>` : ""}<div class="best-line">${t("todaysBest")}: ${daily.best}</div><button class="btn" id="againBtn">${t("again")}</button><br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button></div>`);
+    node.querySelector("#againBtn").onclick = () => { sfx.click(); show(null); ui.classList.add("passthrough"); this.start(); };
+    node.querySelector("#menuBtn").onclick = () => { sfx.click(); menu(); };
+    show(node);
+  },
+};
+
+
+/* ================================================
+   VERSUS : HAND BLAST — a board each
+   Two independent boards with their own tray, using the same pinch-to-grab
+   controls as the solo game. A player whose board jams sits out the rest of
+   the clock rather than ending the match, so the other can keep scoring.
+================================================ */
+// Each player reads their own hand, so pinch has to be derived per side
+// rather than from the single shared `engine.norm`.
+function pinchStateFor(i) {
+  const norm = engine.multiNorm[i], hand = engine.multi[i];
+  if (!norm || !hand) return null;
+  const f = fingerStates(norm);
+  const thumb = hand[4], index = hand[8];
+  return { ...f, thumb, index, center: { x: (thumb.x + index.x) / 2, y: (thumb.y + index.y) / 2 } };
+}
+
+const BLAST_VS = {
+  track: "blast",
+  emoji: "🧱", titleKey: "vsBlastTitle", howKey: "vsBlastHow", bgToggle: true, versus: true,
+  sides: [], timeLeft: VS_DURATION, running: false, hud: null, winner: null,
+
+  makeSide(i) {
+    return {
+      i, color: VS_COLORS[i],
+      board: Array.from({ length: BLAST_GRID }, () => Array(BLAST_GRID).fill(null)),
+      pieces: [], score: 0, lines: 0, dragging: null, dragPos: null,
+      pinchLog: [], openSince: 0, handLostSince: 0,
+      flashCells: [], flashT: 0, banner: null, jammed: false,
+    };
+  },
+  // Region for one player, then a tray column and a square board inside it.
+  layoutFor(i) {
+    const half = innerWidth / 2;
+    const x0 = i === 0 ? 0 : half;
+    const topSafe = 132, bottomSafe = 56;
+    const trayW = Math.round(Math.min(96, Math.max(58, half * .2)));
+    const avail = Math.min(half - trayW - 26, innerHeight - topSafe - bottomSafe);
+    const boardSize = Math.max(150, Math.floor(avail / BLAST_GRID) * BLAST_GRID);
+    const cell = boardSize / BLAST_GRID;
+    const gx = Math.round(x0 + trayW + 18);
+    const gy = Math.round(topSafe + Math.max(0, (innerHeight - topSafe - bottomSafe - boardSize) / 2));
+    return {
+      gx, gy, cell, boardSize,
+      trayX: Math.round(x0 + trayW / 2 + 6), trayY: gy, trayH: boardSize,
+      trayCell: Math.max(11, Math.min(20, cell * .42)),
+    };
+  },
+
+  start() {
+    this.cleanup();
+    this.sides = [this.makeSide(0), this.makeSide(1)];
+    this.sides.forEach(s => this.spawnPieces(s));
+    this.timeLeft = VS_DURATION; this.running = true; this.winner = null;
+    this.hud = el(`<div class="hud vs-hud">
+      <div class="stat vs-p1"><div class="lbl">${t("p1")}</div><div class="num cyan" id="vbS0">0</div><div class="vs-lives" id="vbL0">0 ${t("lines")}</div></div>
+      <div class="stat"><div class="lbl">${t("time")}</div><div class="num amber" id="vbTime">${VS_DURATION}</div></div>
+      <div class="stat vs-p2"><div class="lbl">${t("p2")}</div><div class="num pink" id="vbS1">0</div><div class="vs-lives" id="vbL1">0 ${t("lines")}</div></div>
+    </div>`);
+    document.body.append(this.hud);
+    engine.setHandCount(2);
+  },
+  cleanup() {
+    this.hud?.remove(); this.hud = null; this.running = false;
+    engine.setHandCount(1);
+  },
+
+  spawnPieces(s) {
+    for (let a = 0; a < 30; a++) {
+      const set = [0, 1, 2].map(() => BLAST.makePiece());
+      if (set.some(p => this.canFit(s, p.shape, p))) { s.pieces = set; return; }
+    }
+    s.pieces = [0, 1, 2].map(() => ({ shape: [[0, 0]], color: BLAST_COLORS[0] }));
+  },
+  valid(s, shape, col, row, piece) {
+    if (piece && piece.power) return row >= 0 && row < BLAST_GRID && col >= 0 && col < BLAST_GRID;
+    return shape.every(([x, y]) => row + y >= 0 && row + y < BLAST_GRID && col + x >= 0 && col + x < BLAST_GRID && !s.board[row + y][col + x]);
+  },
+  canFit(s, shape, piece) {
+    if (piece && piece.power) return true;
+    for (let y = 0; y < BLAST_GRID; y++) for (let x = 0; x < BLAST_GRID; x++) if (this.valid(s, shape, x, y)) return true;
+    return false;
+  },
+  countBuild() { return 0; },
+  dragCell(s, L, cursor, piece) {
+    const d = BLAST.pieceOrigin(piece);
+    const col = Math.round((cursor.x - L.gx - d.w * L.cell / 2) / L.cell);
+    const row = Math.round((cursor.y - L.gy - d.h * L.cell / 2) / L.cell);
+    return { col, row };
+  },
+  hoveredPiece(s, L, cursor) {
+    if (!cursor) return -1;
+    return s.pieces.findIndex((piece, index) => {
+      if (!piece) return false;
+      const p = { x: L.trayX, y: L.trayY + L.trayH * ((index + .5) / 3) };
+      const d = BLAST.pieceOrigin(piece);
+      const w = d.w * L.trayCell, h = d.h * L.trayCell;
+      const padX = 30, padY = Math.max(22, L.trayH / 9);
+      return cursor.x >= p.x - w / 2 - padX && cursor.x <= p.x + w / 2 + padX &&
+             cursor.y >= p.y - h / 2 - padY && cursor.y <= p.y + h / 2 + padY;
+    });
+  },
+
+  place(s, index, L, cursor) {
+    const piece = s.pieces[index], { col, row } = this.dragCell(s, L, cursor, piece);
+    if (!this.valid(s, piece.shape, col, row, piece)) { sfx.bad(); shakeScreen(); return; }
+    if (piece.power) {
+      const hits = [];
+      if (piece.power.id === "bomb") {
+        for (let y = row - 1; y <= row + 1; y++) for (let x = col - 1; x <= col + 1; x++)
+          if (y >= 0 && y < BLAST_GRID && x >= 0 && x < BLAST_GRID && s.board[y][x]) hits.push([x, y]);
+      } else {
+        for (let x = 0; x < BLAST_GRID; x++) if (s.board[row][x]) hits.push([x, row]);
+        for (let y = 0; y < BLAST_GRID; y++) if (s.board[y][col]) hits.push([col, y]);
+      }
+      const uniq = [...new Map(hits.map(p => [`${p[0]},${p[1]}`, p])).values()];
+      uniq.forEach(([x, y]) => { s.board[y][x] = null; });
+      s.pieces[index] = null;
+      s.score += uniq.length * 15;
+      s.flashCells = uniq.length ? uniq : [[col, row]]; s.flashT = .5;
+      s.banner = { text: t(piece.power.key), color: piece.power.color, life: 1.3 };
+      if (uniq.length) { sfx.bomb(); shakeScreen(); } else sfx.slice();
+    } else {
+      piece.shape.forEach(([x, y]) => { s.board[row + y][col + x] = piece.color; });
+      s.pieces[index] = null; s.score += piece.shape.length * 10;
+      const clear = [];
+      s.board.forEach((r, y) => { if (r.every(Boolean)) for (let x = 0; x < BLAST_GRID; x++) clear.push([x, y]); });
+      for (let x = 0; x < BLAST_GRID; x++) if (s.board.every(r => r[x])) for (let y = 0; y < BLAST_GRID; y++) clear.push([x, y]);
+      const uniq = [...new Map(clear.map(p => [`${p[0]},${p[1]}`, p])).values()];
+      if (uniq.length) {
+        uniq.forEach(([x, y]) => { s.board[y][x] = null; });
+        const cleared = Math.round(uniq.length / BLAST_GRID);
+        s.lines += cleared; s.score += cleared * 100;
+        s.flashCells = uniq; s.flashT = .42; sfx.good();
+      } else sfx.slice();
+    }
+    if (s.pieces.every(p => !p)) this.spawnPieces(s);
+    this.refreshHud();
+    // A jammed board sits out the rest of the clock; the match keeps going.
+    if (!s.pieces.some(p => p && this.canFit(s, p.shape, p))) {
+      s.jammed = true;
+      s.banner = { text: t("vsJammed"), color: "#f43f5e", life: 2.4 };
+      if (this.sides.every(x => x.jammed)) this.end();
+    }
+  },
+  refreshHud() {
+    if (!this.hud) return;
+    this.sides.forEach((s, i) => {
+      const sc = this.hud.querySelector(`#vbS${i}`), ln = this.hud.querySelector(`#vbL${i}`);
+      if (sc) sc.textContent = s.score;
+      if (ln) ln.textContent = `${s.lines} ${t("lines")}`;
+    });
+  },
+
+  onFrame(dt) {
+    if (!this.running) return;
+    this.timeLeft -= dt;
+    if (this.timeLeft <= 0) return this.end();
+    const tEl = this.hud?.querySelector("#vbTime");
+    if (tEl) tEl.textContent = Math.ceil(this.timeLeft);
+
+    if (!camBgOn) { ctx.fillStyle = "#0b0518"; ctx.fillRect(0, 0, innerWidth, innerHeight); }
+    else { ctx.fillStyle = "rgba(5,8,28,.3)"; ctx.fillRect(0, 0, innerWidth, innerHeight); }
+    const now = performance.now();
+
+    this.sides.forEach(s => {
+      const L = this.layoutFor(s.i);
+      s.flashT = Math.max(0, s.flashT - dt);
+      if (s.banner) { s.banner.life -= dt; if (s.banner.life <= 0) s.banner = null; }
+
+      /* board frame + grid */
+      ctx.save();
+      ctx.fillStyle = "rgba(11,5,24,.6)"; ctx.strokeStyle = s.color; ctx.lineWidth = 2;
+      ctx.shadowColor = s.color; ctx.shadowBlur = 14;
+      ctx.beginPath(); ctx.roundRect(L.gx - 9, L.gy - 9, L.boardSize + 18, L.boardSize + 18, 16);
+      ctx.fill(); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "rgba(255,255,255,.05)"; ctx.strokeStyle = "rgba(255,255,255,.12)"; ctx.lineWidth = 1;
+      for (let y = 0; y < BLAST_GRID; y++) for (let x = 0; x < BLAST_GRID; x++) {
+        ctx.beginPath();
+        ctx.roundRect(L.gx + x * L.cell + 2, L.gy + y * L.cell + 2, L.cell - 4, L.cell - 4, 6);
+        ctx.fill(); ctx.stroke();
+      }
+      ctx.restore();
+
+      /* settled blocks */
+      for (let y = 0; y < BLAST_GRID; y++) for (let x = 0; x < BLAST_GRID; x++) {
+        const c = s.board[y][x];
+        if (!c) continue;
+        ctx.save();
+        ctx.fillStyle = c; ctx.shadowColor = c; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.roundRect(L.gx + x * L.cell + 2, L.gy + y * L.cell + 2, L.cell - 4, L.cell - 4, 6);
+        ctx.fill(); ctx.restore();
+      }
+      /* clear flash */
+      if (s.flashT > 0) {
+        ctx.save();
+        ctx.globalAlpha = s.flashT / .5;
+        ctx.fillStyle = "#fff";
+        s.flashCells.forEach(([x, y]) => {
+          ctx.beginPath(); ctx.roundRect(L.gx + x * L.cell + 2, L.gy + y * L.cell + 2, L.cell - 4, L.cell - 4, 6); ctx.fill();
+        });
+        ctx.restore();
+      }
+
+      /* tray */
+      ctx.save();
+      ctx.fillStyle = "rgba(11,5,24,.5)"; ctx.strokeStyle = "rgba(255,255,255,.14)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(L.trayX - L.trayCell * 2.2, L.trayY - 8, L.trayCell * 4.4, L.trayH + 16, 14);
+      ctx.fill(); ctx.stroke(); ctx.restore();
+      s.pieces.forEach((piece, index) => {
+        if (!piece || index === s.dragging) return;
+        const p = { x: L.trayX, y: L.trayY + L.trayH * ((index + .5) / 3) };
+        BLAST.drawPiece(piece, p.x, p.y, L.trayCell, .85);
+      });
+
+      /* per-player pinch handling, mirroring the solo game's thresholds */
+      const pinch = s.jammed ? null : pinchStateFor(s.i);
+      if (pinch) s.pinchLog.push({ t: now, v: pinch.pinch, cursor: { x: pinch.center.x, y: pinch.center.y } });
+      while (s.pinchLog.length && now - s.pinchLog[0].t > 160) s.pinchLog.shift();
+
+      if (s.dragging === null) {
+        const closest = s.pinchLog.reduce((best, e) => (!best || e.v < best.v ? e : best), null);
+        if (closest && closest.v < .48) {
+          const idx = this.hoveredPiece(s, L, closest.cursor);
+          if (idx >= 0) { s.dragging = idx; sfx.click(); s.dragPos = { ...closest.cursor }; s.openSince = 0; }
+        }
+      } else if (!pinch) {
+        s.handLostSince = s.handLostSince || now;
+        if (now - s.handLostSince > 900) { s.dragging = null; s.dragPos = null; sfx.bad(); }
+      } else {
+        s.handLostSince = 0;
+        s.dragPos = { x: pinch.center.x, y: pinch.center.y };
+        if (pinch.pinch >= .62) s.openSince = s.openSince || now; else s.openSince = 0;
+        if (s.openSince && now - s.openSince > 70 && s.dragPos) {
+          this.place(s, s.dragging, L, s.dragPos);
+          s.dragging = null; s.dragPos = null; s.openSince = 0;
+        }
+      }
+
+      /* carried piece + landing preview */
+      if (s.dragging !== null && s.dragPos && s.pieces[s.dragging]) {
+        const piece = s.pieces[s.dragging];
+        const c = this.dragCell(s, L, s.dragPos, piece);
+        const ok = this.valid(s, piece.shape, c.col, c.row, piece);
+        if (piece.power) {
+          const foot = [];
+          if (piece.power.id === "bomb") {
+            for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) {
+              const gx = c.col + x, gy = c.row + y;
+              if (gx >= 0 && gx < BLAST_GRID && gy >= 0 && gy < BLAST_GRID) foot.push([x, y]);
+            }
+          } else {
+            for (let x = 0; x < BLAST_GRID; x++) foot.push([x - c.col, 0]);
+            for (let y = 0; y < BLAST_GRID; y++) foot.push([0, y - c.row]);
+          }
+          BLAST.drawCells(foot, L.gx + c.col * L.cell, L.gy + c.row * L.cell, L.cell, piece.power.color, .34);
+        } else {
+          BLAST.drawCells(piece.shape, L.gx + c.col * L.cell, L.gy + c.row * L.cell, L.cell,
+            ok ? "#ffffff" : "#f43f5e", ok ? .28 : .22);
+        }
+        BLAST.drawPiece(piece, s.dragPos.x, s.dragPos.y - L.cell * .35, L.cell, .95, ok ? piece.color : "#f43f5e", 16);
+      }
+
+      /* cursor + labels */
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.font = "900 12px Orbitron, system-ui"; ctx.fillStyle = s.color;
+      ctx.fillText(t(s.i === 0 ? "p1" : "p2"), L.gx + L.boardSize / 2, L.gy - 20);
+      if (pinch) {
+        const closed = pinch.pinch < .5;
+        ctx.strokeStyle = closed ? "#a855f7" : s.color; ctx.lineWidth = 3;
+        ctx.shadowColor = closed ? "#a855f7" : s.color; ctx.shadowBlur = 14;
+        ctx.beginPath(); ctx.arc(pinch.center.x, pinch.center.y, closed ? 8 : 14, 0, 7); ctx.stroke();
+      } else if (!s.jammed) {
+        ctx.globalAlpha = .5 + Math.sin(now / 300) * .3;
+        ctx.font = "800 14px system-ui"; ctx.fillStyle = s.color;
+        ctx.fillText(t("vsShowHand"), L.gx + L.boardSize / 2, L.gy + L.boardSize / 2);
+      }
+      ctx.restore();
+
+      if (s.banner) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, s.banner.life / .4);
+        ctx.font = "900 clamp(14px,2.4vw,22px) Orbitron, system-ui";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillStyle = s.banner.color; ctx.shadowColor = s.banner.color; ctx.shadowBlur = 18;
+        ctx.fillText(s.banner.text, L.gx + L.boardSize / 2, L.gy + L.boardSize / 2);
+        ctx.restore();
+      }
+    });
+
+    /* divider */
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,.28)"; ctx.lineWidth = 2;
+    ctx.setLineDash([12, 10]);
+    ctx.beginPath(); ctx.moveTo(innerWidth / 2, 96); ctx.lineTo(innerWidth / 2, innerHeight - 20); ctx.stroke();
+    ctx.restore();
+  },
+
+  end() {
+    if (!this.running) return;
+    this.running = false;
+    sfx.win();
+    const [a, b] = this.sides;
+    const win = a.score === b.score ? -1 : (a.score > b.score ? 0 : 1);
+    this.winner = win;
+    this.hud?.remove(); this.hud = null;
+    engine.setHandCount(1);
+    ui.classList.remove("passthrough");
+    const node = el(`<div class="panel">
+      <div class="big-emoji">${win === -1 ? "🤝" : "🏆"}</div>
+      <h2>${win === -1 ? t("vsDraw") : t("vsWinner")(win + 1)}</h2>
+      <div class="vs-result">
+        <div class="vs-col" style="--c:${VS_COLORS[0]}"><b>${t("p1")}</b><span>${a.score}</span><i>${a.lines} ${t("lines")}</i></div>
+        <div class="vs-col" style="--c:${VS_COLORS[1]}"><b>${t("p2")}</b><span>${b.score}</span><i>${b.lines} ${t("lines")}</i></div>
+      </div>
+      <button class="btn" id="againBtn">${t("again")}</button>
+      <br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button>
+    </div>`);
     node.querySelector("#againBtn").onclick = () => { sfx.click(); show(null); ui.classList.add("passthrough"); this.start(); };
     node.querySelector("#menuBtn").onclick = () => { sfx.click(); menu(); };
     show(node);
@@ -3386,7 +4008,7 @@ document.getElementById("soundBtn").textContent = soundOn ? "🔊" : "🔇";
 })();
 
 /* debug hook (harmless in production) */
-window.__ha = { calibrate, music, NINJA_VS, TRACKS, NINJA_POWERS, SNAKE_FOODS, BLAST_POWERS, BLAST_GRID, t, engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60),
+window.__ha = { calibrate, music, NINJA_VS, SNAKE_VS, BLAST_VS, pinchStateFor, TRACKS, NINJA_POWERS, SNAKE_FOODS, BLAST_POWERS, BLAST_GRID, t, engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60),
   _setActive: (g) => { activeGame = g; } };
 
 menu();
