@@ -53,6 +53,7 @@ const STR = {
     ninjaRanks: ["🥷 FRUIT NINJA MASTER", "⚔️ BLADE WARRIOR", "🍃 ROOKIE SLICER"],
     puSlow: "SLOW-MO!", puDouble: "DOUBLE POINTS!", puMagnet: "BIG BLADE!", puLife: "EXTRA LIFE!",
     puGhost: "GHOST MODE!", puBonus: "BONUS!", puShrink: "SHRINK!", puPull: "MAGNET!",
+    puBomb: "BOOM!", puZap: "ZAP!",
     ninjaModeTime: "⏱ TIME ATTACK",
     ninjaModeTimeDesc: "60 seconds on the clock — score as much as you can!",
     ninjaModeLife: "❤️ SURVIVAL",
@@ -135,6 +136,7 @@ const STR = {
     ninjaRanks: ["🥷 NINJA BUAH", "⚔️ PAHLAWAN PEDANG", "🍃 PEMULA"],
     puSlow: "GERAK PERLAHAN!", puDouble: "MATA BERGANDA!", puMagnet: "BILAH BESAR!", puLife: "NYAWA TAMBAHAN!",
     puGhost: "MOD HANTU!", puBonus: "BONUS!", puShrink: "MENGECUT!", puPull: "MAGNET!",
+    puBomb: "BOOM!", puZap: "ZAP!",
     ninjaModeTime: "⏱ SERANGAN MASA",
     ninjaModeTimeDesc: "60 saat di jam — kumpul skor sebanyak mungkin!",
     ninjaModeLife: "❤️ BERTAHAN",
@@ -1800,6 +1802,14 @@ const BLAST_COLORS = ["#22d3ee", "#a855f7", "#ec4899", "#a3e635", "#fbbf24"];
    Tuned so a typical booth visit finishes well inside five minutes — raise
    BLAST_TIME_START or BLAST_TIME_PER_LINE to make runs longer. */
 const BLAST_TIME_START = 120, BLAST_TIME_PER_LINE = 6, BLAST_TIME_MAX = 240;
+/* Power pieces ride in the tray and are placed exactly like ordinary blocks,
+   so they need no extra controls. What makes them worth waiting for is that
+   they ignore what is already on the board — dropping one on a crowded grid
+   is the way out of a board that is closing in. */
+const BLAST_POWERS = [
+  { id: "bomb", emoji: "💣", color: "#fb7185", key: "puBomb" },
+  { id: "zap",  emoji: "⚡", color: "#fbbf24", key: "puZap" },
+];
 const BLAST = {
   track: "blast",
   emoji: "🧱", titleKey: "blastTitle", howKey: "blastHow", bgToggle: true,
@@ -1807,7 +1817,7 @@ const BLAST = {
   flashCells: [], flashT: 0, hud: null, resetBtn: null, running: false,
   timeLeft: BLAST_TIME_START, bonusT: 0, bonusN: 0, endReason: "noMoves",
 
-  cursorPos: null, dragPos: null, bg: null, bgKey: "",
+  cursorPos: null, dragPos: null, bg: null, bgKey: "", powerBanner: null,
   pinchLog: [], openSince: 0, handLostSince: 0,
 
   start() {
@@ -1817,6 +1827,7 @@ const BLAST = {
     this.cursorPos = null; this.dragPos = null; this.bg = null; this.bgKey = "";
     this.pinchLog = []; this.openSince = 0; this.handLostSince = 0;
     this.timeLeft = BLAST_TIME_START; this.bonusT = 0; this.bonusN = 0; this.endReason = "noMoves";
+    this.powerBanner = null;
     this.spawnPieces(); this.running = true;
     this.hud = el(`<div class="hud"><div class="stat"><div class="lbl">${t("time")}</div><div class="num" id="bTime">2:00</div></div><div class="stat"><div class="lbl">${t("score")}</div><div class="num cyan" id="bScore">0</div></div><div class="stat"><div class="lbl">${t("lines")}</div><div class="num pink" id="bLines">0</div></div></div>`);
     this.resetBtn = el(`<button class="reset-btn" type="button">↺ ${t("reset")}</button>`);
@@ -1835,13 +1846,17 @@ const BLAST = {
     return BLAST_BAG[0].s;
   },
   makePiece() {
+    if (Math.random() < 0.12) {
+      const P = BLAST_POWERS[Math.floor(Math.random() * BLAST_POWERS.length)];
+      return { shape: [[0, 0]], color: P.color, power: P };
+    }
     return { shape: this.randomShape(), color: BLAST_COLORS[Math.floor(Math.random() * BLAST_COLORS.length)] };
   },
   spawnPieces() {
     // Never hand out a set that is dead on arrival.
     for (let attempt = 0; attempt < 30; attempt++) {
       const set = [0, 1, 2].map(() => this.makePiece());
-      if (set.some(p => this.canFit(p.shape))) { this.pieces = set; return; }
+      if (set.some(p => this.canFit(p.shape, p))) { this.pieces = set; return; }
     }
     this.pieces = [0, 1, 2].map(() => ({ shape: [[0, 0]], color: BLAST_COLORS[0] }));
   },
@@ -1875,10 +1890,13 @@ const BLAST = {
   trayPosition(index, layout) {
     return { x: layout.trayX, y: layout.trayY + layout.trayH * ((index + .5) / 3) };
   },
-  valid(shape, col, row) {
+  valid(shape, col, row, piece) {
+    // A power piece only has to land on the board; it clears whatever is there.
+    if (piece && piece.power) return row >= 0 && row < BLAST_GRID && col >= 0 && col < BLAST_GRID;
     return shape.every(([x, y]) => row + y >= 0 && row + y < BLAST_GRID && col + x >= 0 && col + x < BLAST_GRID && !this.board[row + y][col + x]);
   },
-  canFit(shape) {
+  canFit(shape, piece) {
+    if (piece && piece.power) return true;   // always playable, so never a dead tray
     for (let y = 0; y < BLAST_GRID; y++) for (let x = 0; x < BLAST_GRID; x++) if (this.valid(shape, x, y)) return true;
     return false;
   },
@@ -1916,11 +1934,12 @@ const BLAST = {
   },
   place(index, layout, cursor) {
     const piece = this.pieces[index], { col, row } = this.dragCell(layout, cursor, piece);
-    if (!this.valid(piece.shape, col, row)) {
+    if (!this.valid(piece.shape, col, row, piece)) {
       sfx.bad();
       shakeScreen();
       return;
     }
+    if (piece.power) return this.detonate(index, piece, col, row);
     piece.shape.forEach(([x, y]) => { this.board[row + y][col + x] = piece.color; });
     this.pieces[index] = null; this.score += piece.shape.length * 10;
     const clear = [];
@@ -1941,7 +1960,39 @@ const BLAST = {
     else sfx.slice();
     if (this.pieces.every(p => !p)) this.spawnPieces();
     this.updateHud();
-    if (!this.pieces.some(p => p && this.canFit(p.shape))) { this.endReason = "noMoves"; this.end(); }
+    if (!this.pieces.some(p => p && this.canFit(p.shape, p))) { this.endReason = "noMoves"; this.end(); }
+  },
+
+  /* 💣 clears the 3x3 around where it lands, ⚡ clears the whole row and
+     column. Both count as cleared cells, so they pay out time and score the
+     same way a normal line does. */
+  detonate(index, piece, col, row) {
+    const hits = [];
+    if (piece.power.id === "bomb") {
+      for (let y = row - 1; y <= row + 1; y++) for (let x = col - 1; x <= col + 1; x++) {
+        if (y >= 0 && y < BLAST_GRID && x >= 0 && x < BLAST_GRID && this.board[y][x]) hits.push([x, y]);
+      }
+    } else {
+      for (let x = 0; x < BLAST_GRID; x++) if (this.board[row][x]) hits.push([x, row]);
+      for (let y = 0; y < BLAST_GRID; y++) if (this.board[y][col]) hits.push([col, y]);
+    }
+    const unique = [...new Map(hits.map(p => [`${p[0]},${p[1]}`, p])).values()];
+    unique.forEach(([x, y]) => { this.board[y][x] = null; });
+    this.pieces[index] = null;
+    this.score += unique.length * 15;
+    // Time back is proportional to how much it actually freed up.
+    const bonus = Math.min(BLAST_TIME_PER_LINE * 2, Math.ceil(unique.length / 2));
+    if (bonus > 0) {
+      this.timeLeft = Math.min(BLAST_TIME_MAX, this.timeLeft + bonus);
+      this.bonusN = bonus; this.bonusT = 1.1;
+    }
+    this.flashCells = unique.length ? unique : [[col, row]];
+    this.flashT = .5;
+    this.powerBanner = { text: t(piece.power.key), color: piece.power.color, life: 1.4 };
+    if (unique.length) { sfx.bomb(); shakeScreen(); } else sfx.slice();
+    if (this.pieces.every(p => !p)) this.spawnPieces();
+    this.updateHud();
+    if (!this.pieces.some(p => p && this.canFit(p.shape, p))) { this.endReason = "noMoves"; this.end(); }
   },
 
   /* Empty board frame + grid cached offscreen: it is identical every frame and
@@ -1986,6 +2037,21 @@ const BLAST = {
     if (!piece) return;
     const d = this.pieceOrigin(piece);
     this.drawCells(piece.shape, cx - d.w * cell / 2, cy - d.h * cell / 2, cell, color || piece.color, alpha, glow);
+    if (piece.power) {
+      // Marked clearly so nobody mistakes it for an ordinary single block.
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = piece.power.color; ctx.lineWidth = 2.5;
+      ctx.shadowColor = piece.power.color; ctx.shadowBlur = 16;
+      ctx.globalAlpha = alpha * (.55 + Math.sin(performance.now() / 180) * .35);
+      ctx.beginPath(); ctx.arc(cx, cy, cell * .62, 0, 7); ctx.stroke();
+      ctx.globalAlpha = alpha;
+      ctx.shadowBlur = 0;
+      ctx.font = `${cell * .72}px sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(piece.power.emoji, cx, cy);
+      ctx.restore();
+    }
   },
 
   onFrame(dt) {
@@ -2106,11 +2172,42 @@ const BLAST = {
     if (this.dragging !== null && this.dragPos) {
       const piece = this.pieces[this.dragging];
       const cell = this.dragCell(layout, this.dragPos, piece);
-      const ok = this.valid(piece.shape, cell.col, cell.row);
-      this.drawCells(piece.shape, layout.gx + cell.col * layout.cell, layout.gy + cell.row * layout.cell,
-        layout.cell, ok ? "#ffffff" : "#f43f5e", ok ? .28 : .22);
+      const ok = this.valid(piece.shape, cell.col, cell.row, piece);
+      if (piece.power) {
+        // Preview exactly which cells this power would take out.
+        const foot = [];
+        if (piece.power.id === "bomb") {
+          for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) {
+            const gx = cell.col + x, gy = cell.row + y;
+            if (gx >= 0 && gx < BLAST_GRID && gy >= 0 && gy < BLAST_GRID) foot.push([x, y]);
+          }
+        } else {
+          for (let x = 0; x < BLAST_GRID; x++) foot.push([x - cell.col, 0]);
+          for (let y = 0; y < BLAST_GRID; y++) foot.push([0, y - cell.row]);
+        }
+        this.drawCells(foot, layout.gx + cell.col * layout.cell, layout.gy + cell.row * layout.cell,
+          layout.cell, piece.power.color, .34);
+      } else {
+        this.drawCells(piece.shape, layout.gx + cell.col * layout.cell, layout.gy + cell.row * layout.cell,
+          layout.cell, ok ? "#ffffff" : "#f43f5e", ok ? .28 : .22);
+      }
       this.drawPiece(piece, this.dragPos.x, this.dragPos.y - layout.cell * .35, layout.cell, .95,
         ok ? piece.color : "#f43f5e", 18);
+    }
+
+    if (this.powerBanner) {
+      this.powerBanner.life -= dt;
+      if (this.powerBanner.life <= 0) this.powerBanner = null;
+      else {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, this.powerBanner.life / 0.4);
+        ctx.font = "900 clamp(20px,5vw,36px) Orbitron, system-ui";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillStyle = this.powerBanner.color;
+        ctx.shadowColor = this.powerBanner.color; ctx.shadowBlur = 24;
+        ctx.fillText(this.powerBanner.text, layout.gx + layout.boardSize / 2, layout.gy + layout.boardSize / 2);
+        ctx.restore();
+      }
     }
 
     if (this.bonusT > 0) {
@@ -2796,7 +2893,7 @@ document.getElementById("soundBtn").textContent = soundOn ? "🔊" : "🔇";
 })();
 
 /* debug hook (harmless in production) */
-window.__ha = { music, TRACKS, NINJA_POWERS, SNAKE_FOODS, t, engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60),
+window.__ha = { music, TRACKS, NINJA_POWERS, SNAKE_FOODS, BLAST_POWERS, BLAST_GRID, t, engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60),
   _setActive: (g) => { activeGame = g; } };
 
 menu();
