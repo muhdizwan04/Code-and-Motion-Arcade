@@ -52,6 +52,13 @@ const STR = {
     debugged: "SYSTEM DEBUGGED!",
     newBest: "🎉 NEW HIGH SCORE!",
     ninjaRanks: ["🥷 FRUIT NINJA MASTER", "⚔️ BLADE WARRIOR", "🍃 ROOKIE SLICER"],
+    vsNinjaTitle: "Ninja Duel",
+    vsNinjaDesc: "Two players, one camera — slice your own side!",
+    vsNinjaHow: "Player 1 stands LEFT, player 2 stands RIGHT. Each of you shows ONE hand on your own side of the line. Slice the fruit in your half, dodge the bombs — 3 lives each. Highest score after 90 seconds wins! ⚔️",
+    p1: "P1", p2: "P2", twoPlayer: "2 PEMAIN", twoPlayer: "2 PLAYERS",
+    vsShowHand: "show your hand ✋",
+    vsWinner: (n) => `PLAYER ${n} WINS!`,
+    vsDraw: "IT'S A DRAW!",
     puSlow: "SLOW-MO!", puDouble: "DOUBLE POINTS!", puMagnet: "BIG BLADE!", puLife: "EXTRA LIFE!",
     puGhost: "GHOST MODE!", puBonus: "BONUS!", puShrink: "SHRINK!", puPull: "MAGNET!",
     puBomb: "BOOM!", puZap: "ZAP!",
@@ -136,6 +143,13 @@ const STR = {
     debugged: "SISTEM DIBAIKI!",
     newBest: "🎉 REKOD BARU!",
     ninjaRanks: ["🥷 NINJA BUAH", "⚔️ PAHLAWAN PEDANG", "🍃 PEMULA"],
+    vsNinjaTitle: "Pertarungan Ninja",
+    vsNinjaDesc: "Dua pemain, satu kamera — tetak bahagian anda!",
+    vsNinjaHow: "Pemain 1 di KIRI, pemain 2 di KANAN. Setiap seorang tunjuk SATU tangan di bahagian sendiri. Tetak buah di bahagian anda, elak bom — 3 nyawa setiap seorang. Skor tertinggi selepas 90 saat menang! ⚔️",
+    p1: "P1", p2: "P2",
+    vsShowHand: "tunjuk tangan ✋",
+    vsWinner: (n) => `PEMAIN ${n} MENANG!`,
+    vsDraw: "SERI!",
     puSlow: "GERAK PERLAHAN!", puDouble: "MATA BERGANDA!", puMagnet: "BILAH BESAR!", puLife: "NYAWA TAMBAHAN!",
     puGhost: "MOD HANTU!", puBonus: "BONUS!", puShrink: "MENGECUT!", puPull: "MAGNET!",
     puBomb: "BOOM!", puZap: "ZAP!",
@@ -496,6 +510,8 @@ const engine = {
   renderNorm: null,  // tiny velocity prediction: makes 30fps camera input feel continuous at 60fps
   velocity: [],
   hands: [], handsNorm: [],
+  // Versus mode tracks two hands and assigns them to a side of the screen.
+  handCount: 1, multi: [null, null], multiNorm: [null, null],
   lastVideoTime: -1, frameUpdated: false, lastSeenAt: 0, frameAt: 0, frameDelta: 0,
   speed: 0,          // peak landmark speed, normalized units/sec — drives the
                      // prediction window and the hand-lost grace period below
@@ -535,6 +551,48 @@ const engine = {
       onStatus(t("loadingCam"));
       await this.startVideoStream();
     }
+  },
+  /* One hand is the default: it keeps inference light and stops a bystander's
+     hand stealing the cursor. Versus games ask for two, and the model is
+     reconfigured in place when possible rather than reloaded. */
+  async setHandCount(n) {
+    if (this.handCount === n) return;
+    this.handCount = n;
+    this.multi = [null, null]; this.multiNorm = [null, null];
+    if (!this.landmarker) return;
+    try {
+      await this.landmarker.setOptions({ numHands: n });
+    } catch (e) {
+      // Older builds cannot change it live; rebuilding is slower but works.
+      try {
+        const fileset = await FilesetResolver.forVisionTasks("vendor/wasm");
+        this.landmarker = await HandLandmarker.createFromOptions(fileset, {
+          baseOptions: { modelAssetPath: "vendor/hand_landmarker.task", delegate: "GPU" },
+          runningMode: "VIDEO", numHands: n,
+          minHandDetectionConfidence: 0.42, minHandPresenceConfidence: 0.32, minTrackingConfidence: 0.30,
+        });
+      } catch (e2) {}
+    }
+  },
+  /* Leftmost hand is player 1, rightmost is player 2. Sorting by wrist x each
+     frame keeps the assignment stable without needing MediaPipe's handedness,
+     which reports which hand it is, not which side of the screen it is on. */
+  updateMulti(rawHands, toScreen) {
+    const sorted = rawHands.slice().sort((a, b) => a[0].x - b[0].x);
+    const out = [null, null];
+    for (let i = 0; i < 2; i++) {
+      const raw = sorted[i];
+      if (!raw) { this.multiNorm[i] = null; continue; }
+      const prev = this.multiNorm[i];
+      const sm = !prev ? raw.map(p => ({ ...p })) : raw.map((p, k) => {
+        const q = prev[k], d = dist(p, q);
+        const a = Math.min(0.96, 0.22 + d * 10);   // same adaptive idea as the solo filter
+        return { x: q.x + (p.x - q.x) * a, y: q.y + (p.y - q.y) * a, z: q.z + (p.z - q.z) * a };
+      });
+      this.multiNorm[i] = sm;
+      out[i] = toScreen(sm);
+    }
+    this.multi = out;
   },
   async startVideoStream() {
     const stream = await navigator.mediaDevices.getUserMedia(CAM_CONSTRAINTS);
@@ -634,6 +692,7 @@ const engine = {
       const toScreen = hand => hand.map(p => ({ x: p.x * dw + ox, y: p.y * dh + oy, z: p.z }));
       this.handsNorm = rawHands;
       this.hands = rawHands.map(toScreen);
+      if (this.handCount === 2) this.updateMulti(rawHands, toScreen);
       this.updateRenderedHand(toScreen);
       this.lastSeenAt = performance.now();
     } else if (performance.now() - this.lastSeenAt > this.lostGraceMs()) {
@@ -644,6 +703,7 @@ const engine = {
       this.velocity = [];
       this.hands = [];
       this.handsNorm = [];
+      this.multi = [null, null]; this.multiNorm = [null, null];
     }
     handStatus.classList.toggle("seen", !!this.hand);
     return true;
@@ -974,6 +1034,10 @@ function menu() {
         <div class="emo">🧱</div>
         <div><h3>${t("blastTitle")} <span style="font-size:14px">🧩</span></h3><p>${t("blastDesc")}</p>${dailyBadge("blast")}</div>
       </div>
+      <div class="card vs" id="cNinjaVs">
+        <div class="emo">⚔️</div>
+        <div><h3>${t("vsNinjaTitle")} <span style="font-size:14px">👥</span></h3><p>${t("vsNinjaDesc")}</p><span class="card-badge vs-badge">${t("twoPlayer")}</span></div>
+      </div>
       <div class="card lab" id="cLab">
         <div class="emo">🧪</div>
         <div><h3>${t("labTitle")} <span style="font-size:14px">🔬</span></h3><p>${t("labDesc")}</p></div>
@@ -984,6 +1048,7 @@ function menu() {
   node.querySelector("#cNinja").onclick = () => { sfx.open(); intro(NINJA); };
   node.querySelector("#cSnake").onclick = () => { sfx.open(); intro(SNAKE); };
   node.querySelector("#cBlast").onclick = () => { sfx.open(); intro(BLAST); };
+  node.querySelector("#cNinjaVs").onclick = () => { sfx.open(); intro(NINJA_VS); };
   node.querySelector("#cLab").onclick = () => { sfx.open(); intro(LAB); };
   // Secret booth-operator gesture: 5 taps on the title within 3s opens the
   // play-count overlay, out of the way of normal kid usage.
@@ -1562,6 +1627,320 @@ const NINJA = {
       <div class="result-rank">${t("ninjaRanks")[rank]}</div>
       ${isNew ? `<div class="desc" style="color:var(--amber)">${t("newBest")}</div>` : daily.isNew ? `<div class="desc" style="color:var(--cyan)">${t("newDailyBest")}</div>` : ""}
       <div class="best-line">${t("best")}: ${best} · ${t("todaysBest")}: ${daily.best}</div>
+      <button class="btn" id="againBtn">${t("again")}</button>
+      <br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button>
+    </div>`);
+    node.querySelector("#againBtn").onclick = () => { sfx.click(); show(null); ui.classList.add("passthrough"); this.start(); };
+    node.querySelector("#menuBtn").onclick = () => { sfx.click(); menu(); };
+    show(node);
+  },
+};
+
+
+/* ================================================
+   VERSUS : AIR NINJA — two players, one camera
+   Player 1 owns the left half of the screen, player 2 the right. Each side
+   spawns its own fruit and reads its own hand, so neither can reach into the
+   other's lane. Three lives each; a bomb costs one. Whoever still has lives
+   when the clock runs out and has scored most, wins.
+================================================ */
+const VS_DURATION = 90, VS_LIVES = 3;
+const VS_COLORS = ["#22d3ee", "#f472b6"];
+
+const NINJA_VS = {
+  track: "ninja",
+  emoji: "⚔️", titleKey: "vsNinjaTitle", howKey: "vsNinjaHow", bgToggle: true, versus: true,
+  sides: [], timeLeft: VS_DURATION, running: false, hud: null, shake: 0, winner: null,
+
+  makeSide(i) {
+    return {
+      i, color: VS_COLORS[i],
+      objs: [], parts: [], trail: [], floaties: [],
+      score: 0, combo: 0, comboT: 0, lives: VS_LIVES,
+      spawnT: 0.6 + i * 0.3, powers: {}, banner: null, lastTipAt: 0, out: false,
+    };
+  },
+  bounds(i) {
+    const mid = innerWidth / 2;
+    return i === 0 ? { x0: 0, x1: mid } : { x0: mid, x1: innerWidth };
+  },
+
+  start() {
+    this.cleanup();
+    this.sides = [this.makeSide(0), this.makeSide(1)];
+    this.timeLeft = VS_DURATION; this.shake = 0; this.winner = null; this.running = true;
+    this.hud = el(`<div class="hud vs-hud">
+      <div class="stat vs-p1"><div class="lbl">${t("p1")}</div><div class="num cyan" id="vsS0">0</div><div class="vs-lives" id="vsL0">❤️❤️❤️</div></div>
+      <div class="stat"><div class="lbl">${t("time")}</div><div class="num amber" id="vsTime">${VS_DURATION}</div></div>
+      <div class="stat vs-p2"><div class="lbl">${t("p2")}</div><div class="num pink" id="vsS1">0</div><div class="vs-lives" id="vsL1">❤️❤️❤️</div></div>
+    </div>`);
+    document.body.append(this.hud);
+    engine.setHandCount(2);
+  },
+
+  cleanup() {
+    this.hud?.remove(); this.hud = null; this.running = false;
+    engine.setHandCount(1);
+  },
+
+  spawn(side) {
+    const b = this.bounds(side.i);
+    const pool = NINJA_POWERS.filter(p => p.id !== "magnet");   // no reach-extending power in a split lane
+    const power = Math.random() < 0.08 ? pool[Math.floor(Math.random() * pool.length)] : null;
+    const isBomb = !power && Math.random() < 0.16;
+    const pad = 50;
+    const x = b.x0 + pad + Math.random() * Math.max(10, (b.x1 - b.x0) - pad * 2);
+    side.objs.push({
+      emoji: power ? power.emoji : isBomb ? "💣" : FRUITS[Math.floor(Math.random() * FRUITS.length)],
+      bomb: isBomb, power,
+      x, y: innerHeight + 60,
+      vx: ((b.x0 + b.x1) / 2 - x) * (0.3 + Math.random() * 0.5) / 100 * 60,
+      vy: -(innerHeight * (0.95 + Math.random() * 0.3)),
+      r: 32 + Math.random() * 12,
+      rot: Math.random() * 6, vrot: -2 + Math.random() * 4,
+      sliced: false, age: 0,
+    });
+  },
+
+  hit(side, o) {
+    o.sliced = true;
+    if (o.power) {
+      const P = o.power;
+      sfx.win();
+      side.banner = { text: t(P.key), color: P.color, life: 1.3 };
+      if (P.id === "life") {
+        if (side.lives < VS_LIVES) side.lives++;
+        else { side.score += 50; }
+      } else side.powers[P.id] = P.secs;
+      for (let k = 0; k < 14; k++) side.parts.push({
+        x: o.x, y: o.y, vx: -240 + Math.random() * 480, vy: -300 + Math.random() * 400,
+        size: 3 + Math.random() * 5, color: P.color, life: 0.4 + Math.random() * 0.3,
+      });
+      this.refreshHud();
+      return;
+    }
+    if (o.bomb) {
+      sfx.bomb(); shakeScreen();
+      this.shake = 20;
+      side.combo = 0;
+      side.score = Math.max(0, side.score - 20);
+      side.lives = Math.max(0, side.lives - 1);
+      side.floaties.push({ x: o.x, y: o.y, text: "-1 ❤️", color: "#f43f5e", life: 1 });
+      for (let k = 0; k < 20; k++) side.parts.push({
+        x: o.x, y: o.y, vx: -340 + Math.random() * 680, vy: -400 + Math.random() * 480,
+        size: 3 + Math.random() * 6, color: ["#f43f5e", "#fbbf24", "#fff"][k % 3], life: 0.5 + Math.random() * 0.4,
+      });
+      if (side.lives <= 0) { side.out = true; this.refreshHud(); return this.end(); }
+    } else {
+      sfx.slice();
+      side.combo++; side.comboT = 1.1;
+      const mult = Math.min(5, 1 + Math.floor(side.combo / 3));
+      const pts = 10 * mult * (side.powers.double > 0 ? 2 : 1);
+      side.score += pts;
+      side.floaties.push({ x: o.x, y: o.y, text: "+" + pts, color: "#a3e635", life: 0.9 });
+      side.parts.push({ x: o.x, y: o.y, vx: 0, vy: 0, size: 12, ring: true, color: side.color, life: .42 });
+      for (let k = 0; k < 9; k++) side.parts.push({
+        x: o.x, y: o.y, vx: -220 + Math.random() * 440, vy: -280 + Math.random() * 360,
+        size: 2 + Math.random() * 4, color: side.color, life: 0.35 + Math.random() * 0.3,
+      });
+    }
+    this.refreshHud();
+  },
+
+  refreshHud() {
+    if (!this.hud) return;
+    this.sides.forEach((s, i) => {
+      const sc = this.hud.querySelector(`#vsS${i}`), lv = this.hud.querySelector(`#vsL${i}`);
+      if (sc) sc.textContent = s.score;
+      if (lv) lv.textContent = "❤️".repeat(s.lives) + "🤍".repeat(VS_LIVES - s.lives);
+    });
+  },
+
+  onFrame(dt) {
+    if (!this.running) return;
+    this.timeLeft -= dt;
+    if (this.timeLeft <= 0) return this.end();
+    const tEl = this.hud?.querySelector("#vsTime");
+    if (tEl) tEl.textContent = Math.ceil(this.timeLeft);
+
+    this.shake = Math.max(0, this.shake - dt * 34);
+    ctx.save();
+    if (this.shake > 0) ctx.translate((Math.random() - .5) * this.shake, (Math.random() - .5) * this.shake);
+    if (!camBgOn) { ctx.fillStyle = "#0b0518"; ctx.fillRect(0, 0, innerWidth, innerHeight); }
+
+    const G = innerHeight * 1.1, nowT = performance.now();
+
+    this.sides.forEach((side) => {
+      const b = this.bounds(side.i);
+
+      // each player only ever sees their own hand, clamped into their lane
+      const raw = engine.multi[side.i];
+      let tip = null;
+      if (raw) {
+        const p = raw[8];
+        tip = { x: Math.max(b.x0 + 6, Math.min(b.x1 - 6, p.x)), y: p.y };
+        const last = side.trail[side.trail.length - 1];
+        if (!last || nowT - side.lastTipAt > 180 || dist(last, tip) > 1.5) {
+          if (last && nowT - side.lastTipAt > 180) side.trail = [];
+          side.trail.push({ x: tip.x, y: tip.y, t: nowT });
+          side.lastTipAt = nowT;
+        }
+      }
+      pruneInPlace(side.trail, p => nowT - p.t < 260);
+
+      Object.keys(side.powers).forEach(k => { side.powers[k] -= dt; if (side.powers[k] <= 0) delete side.powers[k]; });
+      if (side.banner) { side.banner.life -= dt; if (side.banner.life <= 0) side.banner = null; }
+
+      side.spawnT -= dt;
+      if (side.spawnT <= 0) {
+        const prog = 1 - this.timeLeft / VS_DURATION;
+        const wave = 1 + Math.floor(Math.random() * (prog > .5 ? 2 : 1.4));
+        for (let k = 0; k < wave; k++) setTimeout(() => this.running && this.spawn(side), k * 150);
+        side.spawnT = prog > .66 ? 0.85 : prog > .33 ? 1.05 : 1.3;
+      }
+
+      const slowF = side.powers.slow > 0 ? 0.45 : 1;
+      side.objs.forEach(o => {
+        o.age += dt; o.vy += G * dt * slowF;
+        o.x += o.vx * dt * slowF; o.y += o.vy * dt * slowF; o.rot += o.vrot * dt * slowF;
+        ctx.save();
+        ctx.translate(o.x, o.y); ctx.rotate(o.rot * 0.15);
+        ctx.font = `${o.r * 2}px sans-serif`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        if (o.bomb) { ctx.shadowColor = "#f43f5e"; ctx.shadowBlur = 18; }
+        if (o.power) {
+          ctx.shadowColor = o.power.color; ctx.shadowBlur = 24;
+          ctx.strokeStyle = o.power.color; ctx.lineWidth = 3;
+          ctx.globalAlpha = .55 + Math.sin(o.age * 7) * .35;
+          ctx.beginPath(); ctx.arc(0, 0, o.r * 1.15, 0, 7); ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+        ctx.fillText(o.emoji, 0, 0);
+        ctx.restore();
+      });
+      pruneInPlace(side.objs, o => o.y < innerHeight + 120 && !o.sliced);
+
+      if (side.trail.length >= 2) {
+        const a = side.trail[side.trail.length - 2], c = side.trail[side.trail.length - 1];
+        if (dist(a, c) > 3.5) {
+          side.objs.forEach(o => {
+            if (o.sliced) return;
+            const dx = c.x - a.x, dy = c.y - a.y;
+            const len2 = dx * dx + dy * dy || 1e-6;
+            let u = ((o.x - a.x) * dx + (o.y - a.y) * dy) / len2;
+            u = Math.max(0, Math.min(1, u));
+            const px = a.x + u * dx, py = a.y + u * dy;
+            if (Math.hypot(o.x - px, o.y - py) < o.r + 26) this.hit(side, o);
+          });
+        }
+      }
+
+      side.comboT -= dt;
+      if (side.comboT <= 0) side.combo = 0;
+
+      side.parts.forEach(p => {
+        if (!p.ring) p.vy += 600 * dt;
+        p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+        ctx.globalAlpha = Math.max(0, p.life * 2);
+        if (p.ring) {
+          p.size += 260 * dt;
+          ctx.strokeStyle = p.color; ctx.lineWidth = Math.max(1, 8 * p.life);
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 7); ctx.stroke();
+        } else {
+          ctx.fillStyle = p.color;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 7); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      });
+      pruneInPlace(side.parts, p => p.life > 0);
+
+      side.floaties.forEach(f => {
+        f.y -= 60 * dt; f.life -= dt;
+        ctx.globalAlpha = Math.max(0, f.life);
+        ctx.font = "bold 24px sans-serif"; ctx.textAlign = "center";
+        ctx.fillStyle = f.color; ctx.shadowColor = f.color; ctx.shadowBlur = 12;
+        ctx.fillText(f.text, f.x, f.y);
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+      });
+      pruneInPlace(side.floaties, f => f.life > 0);
+
+      if (side.trail.length >= 2) {
+        ctx.save();
+        ctx.lineCap = "round"; ctx.lineJoin = "round";
+        for (let k = 1; k < side.trail.length; k++) {
+          const p0 = side.trail[k - 1], p1 = side.trail[k];
+          const age = (nowT - p1.t) / 260;
+          ctx.strokeStyle = side.color.replace(")", `,${1 - age})`).replace("rgb", "rgba");
+          ctx.globalAlpha = 1 - age;
+          ctx.strokeStyle = side.color;
+          ctx.lineWidth = 12 * (1 - age) + 2;
+          ctx.shadowColor = side.color; ctx.shadowBlur = 16;
+          ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+        }
+        ctx.restore();
+      }
+      if (tip) {
+        ctx.save();
+        ctx.strokeStyle = side.color; ctx.lineWidth = 3;
+        ctx.shadowColor = side.color; ctx.shadowBlur = 14;
+        ctx.beginPath(); ctx.arc(tip.x, tip.y, 16, 0, 7); ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.globalAlpha = .5 + Math.sin(nowT / 300) * .3;
+        ctx.fillStyle = side.color; ctx.font = "800 15px system-ui";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(t("vsShowHand"), (b.x0 + b.x1) / 2, innerHeight / 2);
+        ctx.restore();
+      }
+
+      if (side.banner) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, side.banner.life / .4);
+        ctx.font = "900 clamp(16px,3vw,26px) Orbitron, system-ui";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillStyle = side.banner.color;
+        ctx.shadowColor = side.banner.color; ctx.shadowBlur = 20;
+        ctx.fillText(side.banner.text, (b.x0 + b.x1) / 2, innerHeight * 0.26);
+        ctx.restore();
+      }
+    });
+
+    /* the divider — makes the two lanes unmistakable */
+    ctx.save();
+    const grad = ctx.createLinearGradient(0, 0, 0, innerHeight);
+    grad.addColorStop(0, "rgba(255,255,255,.05)");
+    grad.addColorStop(.5, "rgba(255,255,255,.55)");
+    grad.addColorStop(1, "rgba(255,255,255,.05)");
+    ctx.strokeStyle = grad; ctx.lineWidth = 3;
+    ctx.setLineDash([12, 10]);
+    ctx.beginPath(); ctx.moveTo(innerWidth / 2, 0); ctx.lineTo(innerWidth / 2, innerHeight); ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+  },
+
+  end() {
+    if (!this.running) return;
+    this.running = false;
+    sfx.win();
+    const [a, b] = this.sides;
+    // Running out of lives loses it outright, whatever the score says.
+    let win;
+    if (a.out && !b.out) win = 1;
+    else if (b.out && !a.out) win = 0;
+    else win = a.score === b.score ? -1 : (a.score > b.score ? 0 : 1);
+    this.winner = win;
+    this.hud?.remove(); this.hud = null;
+    engine.setHandCount(1);
+    ui.classList.remove("passthrough");
+    const title = win === -1 ? t("vsDraw") : t("vsWinner")(win + 1);
+    const node = el(`<div class="panel">
+      <div class="big-emoji">${win === -1 ? "🤝" : "🏆"}</div>
+      <h2>${title}</h2>
+      <div class="vs-result">
+        <div class="vs-col" style="--c:${VS_COLORS[0]}"><b>${t("p1")}</b><span>${a.score}</span><i>${"❤️".repeat(a.lives) || "💀"}</i></div>
+        <div class="vs-col" style="--c:${VS_COLORS[1]}"><b>${t("p2")}</b><span>${b.score}</span><i>${"❤️".repeat(b.lives) || "💀"}</i></div>
+      </div>
       <button class="btn" id="againBtn">${t("again")}</button>
       <br><button class="btn ghost" id="menuBtn" style="font-size:15px;padding:10px 24px">← ${t("back")}</button>
     </div>`);
@@ -3007,7 +3386,7 @@ document.getElementById("soundBtn").textContent = soundOn ? "🔊" : "🔇";
 })();
 
 /* debug hook (harmless in production) */
-window.__ha = { calibrate, music, TRACKS, NINJA_POWERS, SNAKE_FOODS, BLAST_POWERS, BLAST_GRID, t, engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60),
+window.__ha = { calibrate, music, NINJA_VS, TRACKS, NINJA_POWERS, SNAKE_FOODS, BLAST_POWERS, BLAST_GRID, t, engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60),
   _setActive: (g) => { activeGame = g; } };
 
 menu();
