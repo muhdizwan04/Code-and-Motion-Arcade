@@ -93,13 +93,16 @@ const t = key => STR[lang][key];
 /* ---------- sound (WebAudio, no files) ---------- */
 let soundOn = localStorage.getItem("ch-sound") !== "off";
 let actx = null;
+/* The music bed is deliberately loud, so effects are lifted by the same
+   amount to stay on top of it — the relative mix between them is kept. */
+const SFX_GAIN = 3.4;
 function beep(freq = 660, dur = 0.08, type = "square", vol = 0.05) {
   if (!soundOn) return;
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     const o = actx.createOscillator(), g = actx.createGain();
     o.type = type; o.frequency.value = freq;
-    g.gain.setValueAtTime(vol, actx.currentTime);
+    g.gain.setValueAtTime(Math.min(0.5, vol * SFX_GAIN), actx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
     o.connect(g).connect(actx.destination);
     o.start(); o.stop(actx.currentTime + dur);
@@ -116,6 +119,164 @@ const sfx = {
   win: () => {
     [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => beep(f, 0.18, "triangle", 0.08), i * 140));
     setTimeout(() => [1319, 1568, 2093].forEach(f => beep(f, 0.5, "triangle", 0.05)), 580);
+  },
+};
+
+
+/* ---------------- background music ----------------
+   Procedural chiptune, same engine as the other two apps: nothing to
+   download and no licensed audio, so the mission still runs offline. Three
+   32-step loops follow the heist — a moody synthwave title, a relentless
+   arpeggio while you are inside the system, and a bright payoff on the way
+   out. Mixed through a compressor so it can sit loud without clipping. */
+const MUSIC_VOL = 0.30;
+const NOTE = (n) => 27.5 * Math.pow(2, (n + 3) / 12);   // n = 45 is A4 (440Hz)
+const R = null;
+
+const TRACKS = {
+  // Title: dark and patient. You are casing the building, not in it yet.
+  title: {
+    bpm: 100, wave: "sawtooth", swing: 0.12,
+    lead: [45, R, R, R, 48, R, 45, R, 44, R, R, R, 40, R, R, R,
+           45, R, R, R, 50, R, 48, R, 47, R, 45, R, 44, R, R, R],
+    harm: [33, R, R, R, 36, R, 33, R, 32, R, R, R, 28, R, R, R,
+           33, R, R, R, 38, R, 36, R, 35, R, 33, R, 32, R, R, R],
+    bass: [21, R, R, R, 21, R, 33, R, 20, R, R, R, 20, R, 32, R,
+           21, R, R, R, 21, R, 33, R, 16, R, R, R, 16, R, 28, R],
+    kick: [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0,  1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0],
+    snare:[0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0,  0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,1],
+    hat:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0,  0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,1],
+  },
+  // Inside the system: a driving arpeggio that will not let up while the
+  // clock is running.
+  heist: {
+    bpm: 134, wave: "square", swing: 0.02,
+    lead: [45, 52, 57, 52, 45, 52, 57, 60, 44, 51, 56, 51, 44, 51, 56, 59,
+           43, 50, 55, 50, 43, 50, 55, 58, 45, 52, 57, 52, 57, 60, 57, 52],
+    harm: [33, R, 40, R, 33, R, 40, R, 32, R, 39, R, 32, R, 39, R,
+           31, R, 38, R, 31, R, 38, R, 33, R, 40, R, 40, R, 45, R],
+    bass: [21,21,33,21, 21,21,33,21, 20,20,32,20, 20,20,32,20,
+           19,19,31,19, 19,19,31,19, 21,21,33,21, 21,33,21,33],
+    kick: [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0,  1,0,0,1, 0,0,1,0, 1,0,0,1, 0,1,0,1],
+    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1,  0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,1,0],
+    hat:  [1,1,0,1, 1,1,0,1, 1,1,0,1, 1,1,0,1,  1,1,0,1, 1,1,0,1, 1,1,0,1, 1,1,1,1],
+  },
+  // Out clean: the same shape, finally in major.
+  complete: {
+    bpm: 118, wave: "triangle", swing: 0.10,
+    lead: [48, R, 52, 55, 60, R, 55, R, 57, R, 60, 64, R, 60, R, R,
+           50, R, 53, 57, 62, R, 57, R, 55, R, 52, 55, 60, R, R, R],
+    harm: [40, R, 45, 48, 52, R, 48, R, 48, R, 52, 57, R, 52, R, R,
+           41, R, 45, 50, 53, R, 50, R, 48, R, 45, 48, 52, R, R, R],
+    bass: [24, R, 36, R, 24, R, 36, R, 21, R, 33, R, 21, R, 33, R,
+           26, R, 38, R, 26, R, 38, R, 24, R, 36, R, 24, R, 36, 36],
+    kick: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0,  1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1,  0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hat:  [0,0,1,0, 0,1,1,0, 0,0,1,0, 0,1,1,1,  0,0,1,0, 0,1,1,0, 0,0,1,0, 0,1,1,1],
+  },
+};
+
+const music = {
+  timer: null, step: 0, nextTime: 0, name: null, track: null, master: null, comp: null, noiseBuf: null,
+
+  start(name) {
+    if (!TRACKS[name]) return;
+    if (this.name === name && this.timer) return;
+    this.stop();
+    this.name = name;
+    if (!soundOn) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === "suspended") actx.resume();
+      this.track = TRACKS[name]; this.step = 0;
+      const comp = actx.createDynamicsCompressor();
+      comp.threshold.value = -18; comp.knee.value = 24;
+      comp.ratio.value = 8; comp.attack.value = 0.004; comp.release.value = 0.2;
+      this.master = actx.createGain();
+      this.master.gain.setValueAtTime(0.0001, actx.currentTime);
+      this.master.gain.linearRampToValueAtTime(MUSIC_VOL, actx.currentTime + 0.9);
+      this.master.connect(comp).connect(actx.destination);
+      this.comp = comp;
+      this.nextTime = actx.currentTime + 0.1;
+      this.timer = setInterval(() => this.schedule(), 40);
+    } catch (e) {}
+  },
+
+  stop() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    const m = this.master, c = this.comp;
+    if (m && actx) {
+      try {
+        m.gain.cancelScheduledValues(actx.currentTime);
+        m.gain.setValueAtTime(m.gain.value, actx.currentTime);
+        m.gain.linearRampToValueAtTime(0.0001, actx.currentTime + 0.25);
+        setTimeout(() => { try { m.disconnect(); c && c.disconnect(); } catch (e) {} }, 400);
+      } catch (e) {}
+    }
+    this.master = null; this.comp = null; this.name = null; this.track = null;
+  },
+
+  schedule() {
+    if (!actx || !this.track || !this.master) return;
+    const spb = 60 / this.track.bpm / 4;
+    while (this.nextTime < actx.currentTime + 0.22) {
+      const i = this.step % 32;
+      const at = this.nextTime + (i % 2 ? (this.track.swing || 0) * spb : 0);
+      this.playStep(i, at, spb);
+      this.nextTime += spb;
+      this.step++;
+    }
+  },
+
+  voice(freq, at, dur, type, vol, detune = 0) {
+    for (const d of (detune ? [-detune, detune] : [0])) {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, at);
+      o.detune.setValueAtTime(d, at);
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(vol / (detune ? 2 : 1), at + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      o.connect(g).connect(this.master);
+      o.start(at); o.stop(at + dur + 0.02);
+    }
+  },
+
+  noise() {
+    if (this.noiseBuf) return this.noiseBuf;
+    const n = actx.sampleRate * 0.2, b = actx.createBuffer(1, n, actx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    this.noiseBuf = b;
+    return b;
+  },
+
+  hit(at, dur, freq, vol, q = 1) {
+    const src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+    src.buffer = this.noise();
+    f.type = "bandpass"; f.frequency.value = freq; f.Q.value = q;
+    g.gain.setValueAtTime(vol, at);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    src.connect(f).connect(g).connect(this.master);
+    src.start(at); src.stop(at + dur + 0.02);
+  },
+
+  playStep(i, at, spb) {
+    const T = this.track;
+    if (T.lead[i] != null) this.voice(NOTE(T.lead[i]), at, spb * 1.8, T.wave, 0.40, 9);
+    if (T.harm && T.harm[i] != null) this.voice(NOTE(T.harm[i]), at, spb * 1.5, "triangle", 0.20);
+    if (T.bass[i] != null) this.voice(NOTE(T.bass[i]), at, spb * 2.2, "triangle", 0.80);
+    if (T.kick[i]) {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(150, at);
+      o.frequency.exponentialRampToValueAtTime(44, at + 0.12);
+      g.gain.setValueAtTime(1.0, at);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+      o.connect(g).connect(this.master);
+      o.start(at); o.stop(at + 0.18);
+    }
+    if (T.snare && T.snare[i]) this.hit(at, 0.13, 1900, 0.42, 0.7);
+    if (T.hat[i]) this.hit(at, 0.03, 9000, 0.16, 1.4);
   },
 };
 
@@ -257,6 +418,7 @@ function showPlayStats() {
 }
 
 function titleScreen() {
+  music.start("title");
   clearSkip();
   topbar.classList.remove("hidden");
   const diag = document.getElementById("diagnostics");
@@ -337,6 +499,7 @@ const S1_TARGETS = [
   () => 70 + Math.floor(Math.random() * 120),     // big
 ];
 function stage1() {
+  music.start("heist");
   currentDoor = 1; renderProgress();
   let round = 0, bits = new Array(8).fill(0), target = S1_TARGETS[0]();
   const node = el(`<div style="width:100%;max-width:680px;margin:auto">
@@ -654,6 +817,7 @@ function stage4() {
 
 /* ================= COMPLETE ================= */
 function completeScreen() {
+  music.start("complete");
   clearSkip();
   clearInterval(timerInt);
   const diag = document.getElementById("diagnostics");
@@ -748,6 +912,9 @@ document.getElementById("soundBtn").onclick = () => {
   soundOn = !soundOn;
   localStorage.setItem("ch-sound", soundOn ? "on" : "off");
   document.getElementById("soundBtn").textContent = soundOn ? "🔊" : "🔇";
+  // Muting silences the bed; unmuting resumes whichever stage we are on.
+  const wanted = music.name || "title";
+  if (soundOn) { music.name = null; music.start(wanted); } else music.stop();
   if (soundOn) sfx.click();
 };
 document.getElementById("resetScoreBtn").onclick = () => {
@@ -842,3 +1009,5 @@ document.getElementById("resetScoreBtn").textContent = t("resetScores");
 })();
 
 titleScreen();
+
+window.__ch = { music, TRACKS, titleScreen, stage1, completeScreen };
