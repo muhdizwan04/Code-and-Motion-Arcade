@@ -757,3 +757,26 @@ h1.arcade {
 }
 @keyframes noReactIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes noReactOut { to { opacity: 0; transform: translate(-50%, -8px); } }
+
+/* ── Three-second hold gate ───────────────────────────────── */
+.calib-ring { position: relative; }
+.calib-prog {
+  position: absolute; inset: -6px; width: calc(100% + 12px); height: calc(100% + 12px);
+  transform: rotate(-90deg); pointer-events: none;
+}
+.calib-prog circle { fill: none; stroke-width: 6; stroke-linecap: round; }
+.calib-track { stroke: rgba(255,255,255,.10); }
+.calib-fill {
+  stroke: var(--green, #4ade80);
+  filter: drop-shadow(0 0 6px var(--green, #4ade80));
+  transition: stroke-dashoffset .08s linear;
+}
+.calib-count {
+  position: absolute; right: -6px; bottom: -6px;
+  min-width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-size: 15px; font-weight: 900;
+  background: rgba(3,0,10,.9); color: var(--green, #4ade80);
+  border: 2px solid var(--green, #4ade80);
+}
+.calib-count:empty { display: none; }

@@ -30,7 +30,8 @@ const STR = {
     camFail: "Camera blocked! Allow camera access in your browser settings, then reload.",
     aiFail: "Could not load the AI. Reload the page to try again.",
     calibShow: "Show me your hand! ✋", calibHint: "Hold your hand up so the camera can see it clearly",
-    calibReady: "Got it! Ready…", calibSkip: "Can't see your hand? Start anyway →",
+    calibReady: "Got it! Ready…",
+    calibHold: "Hold it there… ✋", calibSkip: "Can't see your hand? Start anyway →",
     camTroubleTitle: "Camera trouble", camTroubleDesc: "The camera feed froze. Trying to reconnect…",
     camReconnecting: "Reconnecting camera…", camRetryBtn: "🔄 TRY AGAIN",
     handLost: "Show your hand or move the cursor to choose.",
@@ -146,7 +147,8 @@ const STR = {
     camFail: "Kamera disekat! Benarkan akses kamera dalam tetapan pelayar, kemudian muat semula.",
     aiFail: "AI gagal dimuatkan. Muat semula halaman untuk cuba lagi.",
     calibShow: "Tunjukkan tangan anda! ✋", calibHint: "Angkat tangan supaya kamera nampak dengan jelas",
-    calibReady: "Dapat! Bersedia…", calibSkip: "Kamera tak nampak tangan? Mula juga →",
+    calibReady: "Dapat! Bersedia…",
+    calibHold: "Tahan di situ… ✋", calibSkip: "Kamera tak nampak tangan? Mula juga →",
     camTroubleTitle: "Masalah kamera", camTroubleDesc: "Suapan kamera terhenti. Cuba sambung semula…",
     camReconnecting: "Menyambung semula kamera…", camRetryBtn: "🔄 CUBA LAGI",
     handLost: "Tunjukkan tangan atau gerakkan kursor untuk memilih.",
@@ -804,34 +806,66 @@ async function startCameraRecovery(attempt = 1) {
 /* ---------------- calibration ---------------- */
 function calibrate() {
   return new Promise((resolve) => {
+    // A three second hold, not a glimpse. Holding still while the ring fills
+    // gives the tracker a steady view of the hand and gives the player a
+    // moment to get their arm comfortable before anything starts moving.
+    const HOLD_MS = 3000, TICK = 50;
     const node = el(`<div class="panel calib-panel">
-      <div class="calib-ring"><span id="calibIcon">✋</span></div>
+      <div class="calib-ring">
+        <svg class="calib-prog" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="calib-track" cx="60" cy="60" r="54"></circle>
+          <circle class="calib-fill" id="calibFill" cx="60" cy="60" r="54"></circle>
+        </svg>
+        <span id="calibIcon">✋</span>
+        <span class="calib-count" id="calibCount"></span>
+      </div>
       <h2 id="calibTitle">${t("calibShow")}</h2>
-      <div class="desc">${t("calibHint")}</div>
+      <div class="desc" id="calibDesc">${t("calibHint")}</div>
       <button class="btn ghost hidden" id="calibSkip" style="font-size:15px;padding:10px 24px">${t("calibSkip")}</button>
     </div>`);
     show(node);
-    let seen = 0, done = false;
+    const CIRC = 2 * Math.PI * 54;
+    const fill = node.querySelector("#calibFill");
+    const countEl = node.querySelector("#calibCount");
+    const iconEl = node.querySelector("#calibIcon");
+    const titleEl = node.querySelector("#calibTitle");
+    if (fill) { fill.style.strokeDasharray = CIRC; fill.style.strokeDashoffset = CIRC; }
+    let held = 0, done = false, lastBeep = -1;
     const skipBtn = node.querySelector("#calibSkip");
-    const finish = () => { if (done) return; done = true; clearInterval(poll); clearTimeout(skipTimer); resolve(); };
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearInterval(poll);
+      clearTimeout(skipTimer);
+      resolve();
+    };
     skipBtn.onclick = () => { sfx.click(); finish(); };
     const poll = setInterval(() => {
       if (engine.hand) {
-        seen++;
-        if (seen === 1) {
-          node.querySelector("#calibIcon").textContent = "✅";
-          node.querySelector("#calibTitle").textContent = t("calibReady");
+        if (held === 0) {
+          iconEl.textContent = "✅";
+          titleEl.textContent = t("calibHold");
           node.classList.add("calib-ok");
         }
-        if (seen >= 10) { sfx.good(); finish(); }
-      } else if (seen > 0) {
-        seen = 0;
-        node.querySelector("#calibIcon").textContent = "✋";
-        node.querySelector("#calibTitle").textContent = t("calibShow");
+        held += TICK;
+        const frac = Math.min(1, held / HOLD_MS);
+        if (fill) fill.style.strokeDashoffset = CIRC * (1 - frac);
+        const left = Math.ceil((HOLD_MS - held) / 1000);
+        if (countEl) countEl.textContent = left > 0 ? left : "";
+        // one tick per second so the countdown is audible as well as visible
+        if (left !== lastBeep && left > 0) { lastBeep = left; sfx.click(); }
+        if (held >= HOLD_MS) { sfx.good(); finish(); }
+      } else if (held > 0) {
+        // Lost the hand: start the hold again rather than creeping forward.
+        held = 0; lastBeep = -1;
+        if (fill) fill.style.strokeDashoffset = CIRC;
+        if (countEl) countEl.textContent = "";
+        iconEl.textContent = "✋";
+        titleEl.textContent = t("calibShow");
         node.classList.remove("calib-ok");
       }
-    }, 60);
-    const skipTimer = setTimeout(() => skipBtn.classList.remove("hidden"), 4000);
+    }, TICK);
+    const skipTimer = setTimeout(() => { skipBtn.classList.remove("hidden"); }, 7000);
   });
 }
 
@@ -3343,7 +3377,7 @@ const SIM = {
     })
     .catch(() => {});
 })();
-window.__civ = { music, TRACKS, engine, SIM, CHOOSER, SPEC, CONFIRM, loadLearn, DISCOVERIES, TRAITS, ERAS, POLICIES,
+window.__civ = { calibrate, music, TRACKS, engine, SIM, CHOOSER, SPEC, CONFIRM, loadLearn, DISCOVERIES, TRAITS, ERAS, POLICIES,
   _confirm: (era, specs, policies = ["research", "food", "defend"], cb = () => {}) => { chosenEra = era; show(null); ui.classList.add("passthrough"); CONFIRM.open(specs, policies, cb); },
   _force: (era, specs, policies = ["research", "food", "defend"]) => { show(null); ui.classList.add("passthrough"); SIM.start(era, specs, policies); } };
 showIntro();

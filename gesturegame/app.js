@@ -33,6 +33,7 @@ const STR = {
     calibShow: "Show me your hand! ✋",
     calibHint: "Hold your hand up so the camera can see it clearly",
     calibReady: "Got it! Ready…",
+    calibHold: "Hold it there… ✋",
     calibSkip: "Can't see your hand? Start anyway →",
     // camera recovery
     camTroubleTitle: "Camera trouble",
@@ -117,6 +118,7 @@ const STR = {
     calibShow: "Tunjukkan tangan anda! ✋",
     calibHint: "Angkat tangan anda supaya kamera dapat melihatnya dengan jelas",
     calibReady: "Dapat! Bersedia…",
+    calibHold: "Tahan di situ… ✋",
     calibSkip: "Kamera tak nampak tangan? Mula juga →",
     // camera recovery
     camTroubleTitle: "Masalah kamera",
@@ -1062,14 +1064,31 @@ async function intro(game) {
    watches. Skippable after a few seconds so no one ever gets stuck. */
 function calibrate() {
   return new Promise((resolve) => {
+    // A three second hold, not a glimpse. Holding still while the ring fills
+    // gives the tracker a steady view of the hand and gives the player a
+    // moment to get their arm comfortable before anything starts moving.
+    const HOLD_MS = 3000, TICK = 50;
     const node = el(`<div class="panel calib-panel">
-      <div class="calib-ring"><span id="calibIcon">✋</span></div>
+      <div class="calib-ring">
+        <svg class="calib-prog" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="calib-track" cx="60" cy="60" r="54"></circle>
+          <circle class="calib-fill" id="calibFill" cx="60" cy="60" r="54"></circle>
+        </svg>
+        <span id="calibIcon">✋</span>
+        <span class="calib-count" id="calibCount"></span>
+      </div>
       <h2 id="calibTitle">${t("calibShow")}</h2>
       <div class="desc" id="calibDesc">${t("calibHint")}</div>
       <button class="btn ghost hidden" id="calibSkip" style="font-size:15px;padding:10px 24px">${t("calibSkip")}</button>
     </div>`);
     show(node);
-    let seenFrames = 0, done = false;
+    const CIRC = 2 * Math.PI * 54;
+    const fill = node.querySelector("#calibFill");
+    const countEl = node.querySelector("#calibCount");
+    const iconEl = node.querySelector("#calibIcon");
+    const titleEl = node.querySelector("#calibTitle");
+    if (fill) { fill.style.strokeDasharray = CIRC; fill.style.strokeDashoffset = CIRC; }
+    let held = 0, done = false, lastBeep = -1;
     const skipBtn = node.querySelector("#calibSkip");
     const finish = () => {
       if (done) return;
@@ -1081,21 +1100,30 @@ function calibrate() {
     skipBtn.onclick = () => { sfx.click(); finish(); };
     const poll = setInterval(() => {
       if (engine.hand) {
-        seenFrames++;
-        if (seenFrames === 1) {
-          node.querySelector("#calibIcon").textContent = "✅";
-          node.querySelector("#calibTitle").textContent = t("calibReady");
+        if (held === 0) {
+          iconEl.textContent = "✅";
+          titleEl.textContent = t("calibHold");
           node.classList.add("calib-ok");
         }
-        if (seenFrames >= 10) { sfx.good(); finish(); } // ~600ms of steady tracking
-      } else if (seenFrames > 0) {
-        seenFrames = 0;
-        node.querySelector("#calibIcon").textContent = "✋";
-        node.querySelector("#calibTitle").textContent = t("calibShow");
+        held += TICK;
+        const frac = Math.min(1, held / HOLD_MS);
+        if (fill) fill.style.strokeDashoffset = CIRC * (1 - frac);
+        const left = Math.ceil((HOLD_MS - held) / 1000);
+        if (countEl) countEl.textContent = left > 0 ? left : "";
+        // one tick per second so the countdown is audible as well as visible
+        if (left !== lastBeep && left > 0) { lastBeep = left; sfx.click(); }
+        if (held >= HOLD_MS) { sfx.good(); finish(); }
+      } else if (held > 0) {
+        // Lost the hand: start the hold again rather than creeping forward.
+        held = 0; lastBeep = -1;
+        if (fill) fill.style.strokeDashoffset = CIRC;
+        if (countEl) countEl.textContent = "";
+        iconEl.textContent = "✋";
+        titleEl.textContent = t("calibShow");
         node.classList.remove("calib-ok");
       }
-    }, 60);
-    const skipTimer = setTimeout(() => { skipBtn.classList.remove("hidden"); }, 4000);
+    }, TICK);
+    const skipTimer = setTimeout(() => { skipBtn.classList.remove("hidden"); }, 7000);
   });
 }
 
@@ -2979,7 +3007,7 @@ document.getElementById("soundBtn").textContent = soundOn ? "🔊" : "🔇";
 })();
 
 /* debug hook (harmless in production) */
-window.__ha = { music, TRACKS, NINJA_POWERS, SNAKE_FOODS, BLAST_POWERS, BLAST_GRID, t, engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60),
+window.__ha = { calibrate, music, TRACKS, NINJA_POWERS, SNAKE_FOODS, BLAST_POWERS, BLAST_GRID, t, engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60),
   _setActive: (g) => { activeGame = g; } };
 
 menu();
