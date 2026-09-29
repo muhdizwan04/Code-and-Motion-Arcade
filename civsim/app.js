@@ -883,14 +883,36 @@ function setBackgroundPaused(paused) {
     music.start(bgPausedTrack);
     bgPausedTrack = null;
   }
+  // Suspending the whole audio context is the hard guarantee: notes already
+  // scheduled a fraction of a second ahead cannot sneak through after the
+  // scheduler has been cleared, and no sound effect can fire while away.
+  try {
+    if (actx) { if (paused) actx.suspend(); else actx.resume(); }
+  } catch (e) {}
   // Disabling the track stops frames and the camera indicator without tearing
   // the stream down, so coming back is instant and needs no new permission.
   const stream = cam && cam.srcObject;
   if (stream && stream.getVideoTracks) stream.getVideoTracks().forEach(tr => { tr.enabled = !paused; });
   if (!paused && typeof engine !== "undefined") engine.lastFrameOkAt = performance.now();
 }
-document.addEventListener("visibilitychange", () => setBackgroundPaused(document.hidden));
-window.addEventListener("pagehide", () => setBackgroundPaused(true));
+/* visibilitychange alone is not enough: switching to another application
+   usually leaves the tab "visible", so the sound carried on playing behind
+   whatever the user moved to. Losing window focus counts as background too.
+   A short delay on blur avoids cutting out when focus flicks briefly to the
+   address bar or a permission prompt and comes straight back. */
+let bgBlurTimer = null;
+function bgGoBackground() {
+  clearTimeout(bgBlurTimer);
+  bgBlurTimer = setTimeout(() => setBackgroundPaused(true), 250);
+}
+function bgComeBack() {
+  clearTimeout(bgBlurTimer);
+  setBackgroundPaused(false);
+}
+document.addEventListener("visibilitychange", () => document.hidden ? setBackgroundPaused(true) : bgComeBack());
+window.addEventListener("blur", bgGoBackground);
+window.addEventListener("focus", bgComeBack);
+window.addEventListener("pagehide", () => { clearTimeout(bgBlurTimer); setBackgroundPaused(true); });
 
 /* ---------------- topbar ---------------- */
 homeBtn.onclick = () => { sfx.click(); stopAll(); location.href = "../"; };

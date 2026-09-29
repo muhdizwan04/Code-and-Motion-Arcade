@@ -488,6 +488,18 @@
       .crt-overlay::after { animation: none; }
     }
 
+    #soundBtn {
+      position: fixed; top: max(14px, env(safe-area-inset-top)); right: 16px; z-index: 50;
+      width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
+      font-size: 19px; line-height: 1;
+      background: rgba(255,255,255,.07); color: var(--text);
+      border: 1px solid rgba(255,255,255,.2);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      transition: background .18s, border-color .18s, transform .12s;
+    }
+    #soundBtn:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.38); }
+    #soundBtn:active { transform: scale(.92); }
+
     /* ---------------- idle screensaver / attract loop ---------------- */
     #screensaver {
       position: fixed; 
@@ -666,6 +678,8 @@
     <footer>LOCAL-FIRST • BM / BI • INSTALLABLE PWA • OFFLINE READY</footer>
   </main>
 
+  <button id="soundBtn" type="button" aria-label="Sound on/off">🔊</button>
+
   <div id="screensaver" aria-hidden="true">
     <div class="ss-bounce" id="ssB1">👋</div>
     <div class="ss-bounce" id="ssB2">💻</div>
@@ -787,6 +801,139 @@
           location.reload();
         })
         .catch(() => {});
+    })();
+  </script>
+
+  <script>
+    /* ---------------- hub music ----------------
+       Same procedural chiptune as the three apps, so the arcade has a theme
+       the moment you walk up to it and nothing extra has to be downloaded.
+       Browsers block audio until the visitor interacts, so it starts on the
+       first tap or key press rather than on load. */
+    (function () {
+      var R = null;
+      var TRACK = {
+        bpm: 104, wave: "triangle", swing: 0.15,
+        lead: [45, R, 48, 52, R, 50, 48, R, 45, R, 43, 45, R, 48, R, R,
+               52, R, 55, 52, R, 50, 48, R, 50, R, 48, 45, R, 43, R, R],
+        harm: [33, R, 36, 40, R, 38, 36, R, 33, R, 31, 33, R, 36, R, R,
+               40, R, 43, 40, R, 38, 36, R, 38, R, 36, 33, R, 31, R, R],
+        bass: [21, R, 33, R, 21, R, 33, R, 17, R, 29, R, 17, R, 29, R,
+               19, R, 31, R, 19, R, 31, R, 16, R, 28, R, 16, R, 28, 28],
+        kick: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0,  1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+        snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0,  0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+        hat:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,1,  0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,1]
+      };
+      var VOL = 0.30, actx = null, timer = null, step = 0, nextTime = 0, master = null, comp = null, noiseBuf = null;
+      var on = localStorage.getItem("ha-sound") !== "off";
+      var btn = document.getElementById("soundBtn");
+      function NOTE(n) { return 27.5 * Math.pow(2, (n + 3) / 12); }
+
+      function noise() {
+        if (noiseBuf) return noiseBuf;
+        var n = actx.sampleRate * 0.2, b = actx.createBuffer(1, n, actx.sampleRate), d = b.getChannelData(0);
+        for (var i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+        noiseBuf = b; return b;
+      }
+      function hit(at, dur, freq, vol, q) {
+        var src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+        src.buffer = noise();
+        f.type = "bandpass"; f.frequency.value = freq; f.Q.value = q || 1;
+        g.gain.setValueAtTime(vol, at);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+        src.connect(f).connect(g).connect(master);
+        src.start(at); src.stop(at + dur + 0.02);
+      }
+      function voice(freq, at, dur, type, vol, detune) {
+        var list = detune ? [-detune, detune] : [0];
+        for (var i = 0; i < list.length; i++) {
+          var o = actx.createOscillator(), g = actx.createGain();
+          o.type = type; o.frequency.setValueAtTime(freq, at);
+          o.detune.setValueAtTime(list[i], at);
+          g.gain.setValueAtTime(0.0001, at);
+          g.gain.exponentialRampToValueAtTime(vol / (detune ? 2 : 1), at + 0.012);
+          g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+          o.connect(g).connect(master);
+          o.start(at); o.stop(at + dur + 0.02);
+        }
+      }
+      function playStep(i, at, spb) {
+        if (TRACK.lead[i] != null) voice(NOTE(TRACK.lead[i]), at, spb * 1.8, TRACK.wave, 0.44, 9);
+        if (TRACK.harm[i] != null) voice(NOTE(TRACK.harm[i]), at, spb * 1.5, "triangle", 0.20, 0);
+        if (TRACK.bass[i] != null) voice(NOTE(TRACK.bass[i]), at, spb * 2.2, "triangle", 0.80, 0);
+        if (TRACK.kick[i]) {
+          var o = actx.createOscillator(), g = actx.createGain();
+          o.type = "sine";
+          o.frequency.setValueAtTime(150, at);
+          o.frequency.exponentialRampToValueAtTime(44, at + 0.12);
+          g.gain.setValueAtTime(1.0, at);
+          g.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+          o.connect(g).connect(master);
+          o.start(at); o.stop(at + 0.18);
+        }
+        if (TRACK.snare[i]) hit(at, 0.13, 1900, 0.42, 0.7);
+        if (TRACK.hat[i]) hit(at, 0.03, 9000, 0.16, 1.4);
+      }
+      function schedule() {
+        if (!actx || !master) return;
+        var spb = 60 / TRACK.bpm / 4;
+        while (nextTime < actx.currentTime + 0.22) {
+          var i = step % 32;
+          playStep(i, nextTime + (i % 2 ? TRACK.swing * spb : 0), spb);
+          nextTime += spb; step++;
+        }
+      }
+      function start() {
+        if (!on || timer) return;
+        try {
+          actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+          if (actx.state === "suspended") actx.resume();
+          comp = actx.createDynamicsCompressor();
+          comp.threshold.value = -18; comp.knee.value = 24;
+          comp.ratio.value = 8; comp.attack.value = 0.004; comp.release.value = 0.2;
+          master = actx.createGain();
+          master.gain.setValueAtTime(0.0001, actx.currentTime);
+          master.gain.linearRampToValueAtTime(VOL, actx.currentTime + 1.0);
+          master.connect(comp).connect(actx.destination);
+          step = 0; nextTime = actx.currentTime + 0.1;
+          timer = setInterval(schedule, 40);
+        } catch (e) {}
+      }
+      function stop() {
+        if (timer) { clearInterval(timer); timer = null; }
+        if (master && actx) {
+          try {
+            master.gain.cancelScheduledValues(actx.currentTime);
+            master.gain.setValueAtTime(master.gain.value, actx.currentTime);
+            master.gain.linearRampToValueAtTime(0.0001, actx.currentTime + 0.25);
+            var m = master, c = comp;
+            setTimeout(function () { try { m.disconnect(); c && c.disconnect(); } catch (e) {} }, 400);
+          } catch (e) {}
+        }
+        master = null; comp = null;
+      }
+      if (btn) {
+        btn.textContent = on ? "🔊" : "🔇";
+        btn.onclick = function (e) {
+          e.preventDefault(); e.stopPropagation();
+          on = !on;
+          localStorage.setItem("ha-sound", on ? "on" : "off");
+          btn.textContent = on ? "🔊" : "🔇";
+          if (on) start(); else stop();
+        };
+      }
+      // Autoplay is blocked until the visitor interacts, so wait for the first one.
+      function firstTouch() { start(); }
+      ["pointerdown", "keydown", "touchstart"].forEach(function (evt) {
+        document.addEventListener(evt, firstTouch, { once: true, passive: true });
+      });
+      // Leaving the hub for a game, or switching away, should leave it silent.
+      function away() { stop(); }
+      function back() { if (on) start(); }
+      document.addEventListener("visibilitychange", function () { document.hidden ? away() : back(); });
+      window.addEventListener("blur", away);
+      window.addEventListener("focus", back);
+      window.addEventListener("pagehide", away);
     })();
   </script>
 </body>

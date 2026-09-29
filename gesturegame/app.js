@@ -1462,8 +1462,17 @@ const NINJA = {
     if (live.length) {
       ctx.save();
       live.forEach((P, i) => {
-        const w = 108, h = 30, x = 14, y = innerHeight - 52 - i * 38;
-        const frac = Math.max(0, this.powers[P.id] / P.secs);
+        const left = Math.max(0, this.powers[P.id]);
+        const frac = Math.max(0, left / P.secs);
+        // Width follows the label so a long one like "GHOST MODE!" cannot
+        // collide with the seconds readout on the right.
+        const label = `${P.emoji} ${t(P.key)}`, secsTxt = `${Math.ceil(left)}s`;
+        ctx.font = "700 13px system-ui";
+        const labelW = ctx.measureText(label).width;
+        ctx.font = "900 13px Orbitron, system-ui";
+        const secsW = ctx.measureText(secsTxt).width;
+        const h = 30, x = 14, y = innerHeight - 52 - i * 38;
+        const w = Math.max(118, labelW + secsW + 30);
         ctx.fillStyle = "rgba(6,4,18,.82)";
         ctx.strokeStyle = P.color; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.roundRect(x, y, w, h, 15); ctx.fill(); ctx.stroke();
@@ -1472,7 +1481,15 @@ const NINJA = {
         ctx.globalAlpha = 1;
         ctx.fillStyle = "#fff"; ctx.font = "700 13px system-ui";
         ctx.textAlign = "left"; ctx.textBaseline = "middle";
-        ctx.fillText(`${P.emoji} ${t(P.key)}`, x + 9, y + h / 2);
+        ctx.fillText(label, x + 9, y + h / 2);
+        // Seconds remaining, so the player knows exactly when it runs out
+        // instead of guessing from the width of the bar. Flashes near the end.
+        ctx.font = "900 13px Orbitron, system-ui";
+        ctx.textAlign = "right";
+        ctx.fillStyle = left <= 3 ? "#ff5470" : P.color;
+        if (left <= 3) ctx.globalAlpha = .45 + Math.abs(Math.sin(performance.now() / 160)) * .55;
+        ctx.fillText(secsTxt, x + w - 10, y + h / 2);
+        ctx.globalAlpha = 1;
       });
       ctx.restore();
     }
@@ -2220,8 +2237,17 @@ const SNAKE = {
     if (liveS.length) {
       ctx.save();
       liveS.forEach((P, i) => {
-        const w = 108, h = 30, x = 14, y = innerHeight - 52 - i * 38;
-        const frac = Math.max(0, this.powers[P.id] / P.secs);
+        const left = Math.max(0, this.powers[P.id]);
+        const frac = Math.max(0, left / P.secs);
+        // Width follows the label so a long one like "GHOST MODE!" cannot
+        // collide with the seconds readout on the right.
+        const label = `${P.emoji} ${t(P.key)}`, secsTxt = `${Math.ceil(left)}s`;
+        ctx.font = "700 13px system-ui";
+        const labelW = ctx.measureText(label).width;
+        ctx.font = "900 13px Orbitron, system-ui";
+        const secsW = ctx.measureText(secsTxt).width;
+        const h = 30, x = 14, y = innerHeight - 52 - i * 38;
+        const w = Math.max(118, labelW + secsW + 30);
         ctx.fillStyle = "rgba(6,4,18,.82)";
         ctx.strokeStyle = P.color; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.roundRect(x, y, w, h, 15); ctx.fill(); ctx.stroke();
@@ -2230,7 +2256,15 @@ const SNAKE = {
         ctx.globalAlpha = 1;
         ctx.fillStyle = "#fff"; ctx.font = "700 13px system-ui";
         ctx.textAlign = "left"; ctx.textBaseline = "middle";
-        ctx.fillText(`${P.emoji} ${t(P.key)}`, x + 9, y + h / 2);
+        ctx.fillText(label, x + 9, y + h / 2);
+        // Seconds remaining, so the player knows exactly when it runs out
+        // instead of guessing from the width of the bar. Flashes near the end.
+        ctx.font = "900 13px Orbitron, system-ui";
+        ctx.textAlign = "right";
+        ctx.fillStyle = left <= 3 ? "#ff5470" : P.color;
+        if (left <= 3) ctx.globalAlpha = .45 + Math.abs(Math.sin(performance.now() / 160)) * .55;
+        ctx.fillText(secsTxt, x + w - 10, y + h / 2);
+        ctx.globalAlpha = 1;
       });
       ctx.restore();
     }
@@ -3926,14 +3960,36 @@ function setBackgroundPaused(paused) {
     music.start(bgPausedTrack);
     bgPausedTrack = null;
   }
+  // Suspending the whole audio context is the hard guarantee: notes already
+  // scheduled a fraction of a second ahead cannot sneak through after the
+  // scheduler has been cleared, and no sound effect can fire while away.
+  try {
+    if (actx) { if (paused) actx.suspend(); else actx.resume(); }
+  } catch (e) {}
   // Disabling the track stops frames and the camera indicator without tearing
   // the stream down, so coming back is instant and needs no new permission.
   const stream = cam && cam.srcObject;
   if (stream && stream.getVideoTracks) stream.getVideoTracks().forEach(tr => { tr.enabled = !paused; });
   if (!paused && typeof engine !== "undefined") engine.lastFrameOkAt = performance.now();
 }
-document.addEventListener("visibilitychange", () => setBackgroundPaused(document.hidden));
-window.addEventListener("pagehide", () => setBackgroundPaused(true));
+/* visibilitychange alone is not enough: switching to another application
+   usually leaves the tab "visible", so the sound carried on playing behind
+   whatever the user moved to. Losing window focus counts as background too.
+   A short delay on blur avoids cutting out when focus flicks briefly to the
+   address bar or a permission prompt and comes straight back. */
+let bgBlurTimer = null;
+function bgGoBackground() {
+  clearTimeout(bgBlurTimer);
+  bgBlurTimer = setTimeout(() => setBackgroundPaused(true), 250);
+}
+function bgComeBack() {
+  clearTimeout(bgBlurTimer);
+  setBackgroundPaused(false);
+}
+document.addEventListener("visibilitychange", () => document.hidden ? setBackgroundPaused(true) : bgComeBack());
+window.addEventListener("blur", bgGoBackground);
+window.addEventListener("focus", bgComeBack);
+window.addEventListener("pagehide", () => { clearTimeout(bgBlurTimer); setBackgroundPaused(true); });
 
 /* ---------------- top bar ---------------- */
 document.getElementById("langBtn").onclick = () => {
