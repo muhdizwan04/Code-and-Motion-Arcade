@@ -100,6 +100,8 @@ const STR = {
     evSpoil: "🥀 Food is spoiling — not enough storage!",
     cardWaiting: "waiting for a card…",
     whyRain: "…our people are begging for water.",
+    cardPlagueSafe: "💊 Our healers hold the cure — we are safe from it.",
+    barWater: "Water", barFood: "Food", barEnergy: "Energy", barHealth: "Health", barMorale: "Morale",
     whyFeast: "…the stores are low and spirits lower.",
     whyRally: "…the fighting has started — the warriors want orders.",
     whyGraft: "…too many of us are standing idle.",
@@ -270,6 +272,8 @@ const STR = {
     evSpoil: "🥀 Makanan rosak — tiada tempat simpanan!",
     cardWaiting: "menunggu kad…",
     whyRain: "…rakyat kita merayu meminta air.",
+    cardPlagueSafe: "💊 Tabib kita ada penawarnya — kita selamat.",
+    barWater: "Air", barFood: "Makanan", barEnergy: "Tenaga", barHealth: "Kesihatan", barMorale: "Semangat",
     whyFeast: "…simpanan makanan hampir habis dan semangat pun jatuh.",
     whyRally: "…pertempuran bermula — pahlawan menunggu arahan.",
     whyGraft: "…terlalu ramai antara kita menganggur.",
@@ -876,7 +880,12 @@ const CARDS = [
     },
     run(S, tr, foe) {
       foe.sick = Math.max(foe.sick, 0.9 + foe.pop * 0.06);
+      // They built this sickness and hold the cure, so it cannot blow back on
+      // them across the border — without this, playing the card infected your
+      // own tribe a few seconds later and the power punished you for using it.
+      tr.immuneT = 60;
       S.pushLog(tr, t("cardPlagueLog")(foe.name), "aggro");
+      S.pushLog(tr, t("cardPlagueSafe"), "int");
       S.pushLog(foe, t("cardPlagueVictim")(tr.name), "health");
       S.queueMoment("plague", `🦠 ${tr.name} → ${foe.name}`, "#7ee787", { left: tr.color, right: foe.color });
       return { on: foe, from: tr, fx: "plague", text: t("fxInfected")(foe.name) };
@@ -908,6 +917,7 @@ const CARDS = [
     },
     run(S, tr, foe) {
       const lost = Math.round(foe.food * 0.65);
+      tr.immuneT = 45;   // they know what they used, so it does not come back on them
       foe.food = Math.max(0, foe.food * 0.35);
       foe.morale = Math.max(0.3, foe.morale - 0.25);
       S.pushLog(tr, t("cardPoisonLog")(foe.name), "aggro");
@@ -1046,7 +1056,7 @@ function stopAll() {
   engine.stopCamera();
   document.body.classList.remove("playing");
   homeBtn.classList.add("hidden"); camBtn.classList.add("hidden"); handStatus.classList.add("hidden");
-  document.querySelectorAll(".speed-bar,.card-bar,.civ-log,.civ-hud,.review-chip").forEach(n => n.remove());
+  document.querySelectorAll(".speed-bar,.civ-log,.civ-hud,.review-chip").forEach(n => n.remove());
   camTroubleNode?.remove(); camTroubleNode = null; camRecovering = false;
 }
 
@@ -1595,7 +1605,7 @@ function startSetup() {
   // Play Again starts from a blank overlay state. The previous activity log
   // and review chip are removed before another selection screen is drawn.
   SIM.cleanup(); SIM.exitReview();
-  document.querySelectorAll(".speed-bar,.card-bar,.civ-log,.review-chip").forEach(n => n.remove());
+  document.querySelectorAll(".speed-bar,.civ-log,.review-chip").forEach(n => n.remove());
   chosenEra = "forest"; chosenSpecs.length = 0; chosenPolicies.length = 0;
   music.start("setup");
   canvas.style.cursor = "pointer";
@@ -1688,7 +1698,7 @@ const SIM = {
         int: spec.int, work: spec.work, health: spec.health, aggro: spec.aggro, boost,
         policy: policyOf(policies[i]), stage: 0, sick: 0, illnessLoss: 0, outbreaks: 0, cureLogged: false,
         lastThreat: "starvation", collapseT: 0, collapseWarned: false,
-        hand: [], dealT: 6 + i * 2.5, rainT: 0, rallyT: 0, graftT: 0, wardT: 0, stunT: 0,
+        hand: [], dealT: 6 + i * 2.5, rainT: 0, rallyT: 0, graftT: 0, wardT: 0, stunT: 0, immuneT: 0,
         pop: 6, food: 30, morale: 1, home, alive: true,
         known: new Set(), seen: new Set(), explore: 0,
         gainT: 0, expandT: 0, fightT: 0, buildT: 0, ignoreT: 0, lastPopLog: 6,
@@ -1722,8 +1732,10 @@ const SIM = {
         </div>
         <div class="log-traits">${TRAITS.map(x => `${x.emoji}${"●".repeat(tr.spec[x.id])}`).join(" ")}</div>
         <div class="log-needs" id="lgNeeds${i}"></div>
+        <div class="log-bars" id="lgBars${i}"></div>
         <div class="log-disc" id="lgDisc${i}">${t("nothing")}</div>
         <div class="log-meta" id="lgMeta${i}">${policyOf(policies[i]).emoji} ${t(policyOf(policies[i]).key)}</div>
+        <div class="log-cards" id="lgCards${i}"></div>
         <div class="log-goal" id="lgGoal${i}"></div>
         <div class="log-body" id="lgBody${i}"></div>
       </div>`).join("")}</div>`);
@@ -1731,8 +1743,6 @@ const SIM = {
     this.legendNode = el(`<div class="map-legend"><b>${t("legend")}</b><span>🌊 Water</span><span>🌉 Bridge</span><span>💎 Gem</span><span>🐑 Wild animals</span><span>⛓️ Iron</span><span>🏥 Clinic</span><span>🧱 Wall</span></div>`);
     document.body.appendChild(this.legendNode);
 
-    this.cardBar = el(`<div class="card-bar" id="cardBar"></div>`);
-    document.body.appendChild(this.cardBar);
     this.speedBar = el(`<div class="speed-bar"><span class="speed-lbl">${t("speed")}</span>
       ${SPEEDS.map(s => `<button class="speed-btn${s === 1 ? " active" : ""}" data-s="${s}">×${s}</button>`).join("")}<button class="stop-btn" id="stopBtn">⏸ STOP</button>
       <span class="event-divider"></span><button class="event-mode" id="eventMode">⚙ AUTO</button>
@@ -1758,7 +1768,6 @@ const SIM = {
   cleanup() {
     this.logNode?.remove(); this.logNode = null;
     this.speedBar?.remove(); this.speedBar = null;
-    this.cardBar?.remove(); this.cardBar = null;
     this.timelineNode?.remove(); this.timelineNode = null;
     this.legendNode?.remove(); this.legendNode = null;
     this.running = false;
@@ -1996,8 +2005,14 @@ const SIM = {
   updateIllness(tr, dt, water) {
     const clinic = this.countBuild(tr, 3);
     const crowded = Math.max(0, tr.pop - 16) * .0035;
-    const exposure = this.infectedNeighbor(tr) ? .035 : 0;
+    // A tribe that engineered the outbreak is protected from catching it back.
+    const exposure = (tr.immuneT > 0 || !this.infectedNeighbor(tr)) ? 0 : .035;
     const risk = crowded + exposure + (!water ? .018 : 0) + (tr.policy.id === "conquest" ? .012 : 0);
+    // Holding the cure means no new outbreak takes hold at all while it
+    // lasts — otherwise the tribe that engineered the plague could still
+    // fall ill from an unrelated cause and it would read as the card
+    // backfiring on them.
+    if (tr.immuneT > 0) { tr.sick = Math.max(0, tr.sick - 0.6 * dt); return; }
     if (tr.sick < .1 && Math.random() < risk * dt) {
       tr.sick = Math.min(tr.pop, 1.1 + tr.pop * .07); tr.outbreaks++;
       this.pushLog(tr, t("evIllness"), "health");
@@ -2047,7 +2062,8 @@ const SIM = {
     this.tribes.filter(tr => tr.alive).forEach(tr => {
       const home = this.xy(tr.home);
       this.effects.push({ type, x: home.x, y: home.y, life: 4.5, max: 4.5, color: type === "plague" ? "#7ee787" : type === "drought" ? "#ffd95a" : "#67e8f9" });
-      if (type === "plague") tr.sick = Math.max(tr.sick, .8 + tr.pop * .05);
+      // A tribe still holding the cure they brewed rides out a world plague too.
+      if (type === "plague" && !(tr.immuneT > 0)) tr.sick = Math.max(tr.sick, .8 + tr.pop * .05);
       if (type === "harvest") tr.food += 16 * (tr.policy.id === "food" ? 1.5 : 1);
       if (type === "migration" && tr.policy.id === "cooperate") tr.pop += 3;
       this.pushLog(tr, t("evEvent")(t(key)));
@@ -2311,7 +2327,7 @@ const SIM = {
     // Card effects are plain timers on the tribe, read where they apply below.
     let fxChanged = false;
     this.tribes.forEach(x => {
-      ["rainT", "rallyT", "graftT", "wardT", "stunT"].forEach(k => {
+      ["rainT", "rallyT", "graftT", "wardT", "stunT", "immuneT"].forEach(k => {
         if (x[k] > 0) {
           const before = Math.ceil(x[k]);
           x[k] = Math.max(0, x[k] - dt);
@@ -2579,9 +2595,11 @@ const SIM = {
   /* One row per player, in their tribe colour. Cards are clickable and also
      respond to the hand cursor, since the booth is played hands-free. */
   refreshCards() {
-    if (!this.cardBar) return;
-    const rows = this.tribes.map(tr => {
-      if (!tr.alive) return "";
+    if (!this.logNode) return;
+    this.tribes.forEach(tr => {
+      const slot = this.logNode.querySelector(`#lgCards${tr.idx}`);
+      if (!slot) return;
+      if (!tr.alive) { slot.innerHTML = ""; return; }
       const cards = tr.hand.map(id => {
         const c = CARDS.find(x => x.id === id);
         return `<button class="pcard" data-tribe="${tr.idx}" data-card="${id}" style="--c:${tr.color}" title="${t(c.key + "Desc")}">
@@ -2590,17 +2608,14 @@ const SIM = {
       }).join("");
       // Timed card effects are invisible otherwise — show them ticking down.
       const active = [
-        ["rainT", "🌧️"], ["rallyT", "🚩"], ["graftT", "💪"], ["wardT", "🧱"], ["stunT", "⛈️"],
+        ["rainT", "🌧️"], ["rallyT", "🚩"], ["graftT", "💪"], ["wardT", "🧱"],
+        ["stunT", "⛈️"], ["immuneT", "💊"],
       ].filter(([k]) => tr[k] > 0)
        .map(([k, e]) => `<span class="pfx">${e}${Math.ceil(tr[k])}s</span>`).join("");
-      return `<div class="card-row" style="--c:${tr.color}">
-        <span class="card-owner">${tr.name}</span>
-        ${cards || `<span class="card-empty">${t("cardWaiting")}</span>`}
-        ${active}
-      </div>`;
-    }).join("");
-    this.cardBar.innerHTML = rows;
-    this.cardBar.querySelectorAll(".pcard").forEach(b => {
+      slot.innerHTML = cards + active;
+      slot.classList.toggle("empty", !cards && !active);
+    });
+    this.logNode.querySelectorAll(".pcard").forEach(b => {
       b.onclick = () => {
         sfx.click();
         this.playCard(this.tribes[+b.dataset.tribe], b.dataset.card);
@@ -2935,6 +2950,33 @@ const SIM = {
             `<span class="${okWater ? "ok" : "bad"}" title="Water">💧</span>` +
             `<span class="${okFood ? "ok" : "bad"}" title="Food">🍖</span>` +
             `<span class="${okHome ? "ok" : "bad"}" title="Shelter">🏠</span>`;
+        }
+        /* Status bars: the numbers that decide a tribe's fate were only
+           visible as log lines after the fact. These show the state itself —
+           how fed, how rested, how healthy and how willing they are — so a
+           player can see trouble coming and reach for the right card. */
+        const barsEl = this.logNode?.querySelector(`#lgBars${i}`);
+        if (barsEl) {
+          const water = tr.rainT > 0 || tr.known.has("well") || this.hasWater(tr, ERAS[this.era]);
+          const fed = Math.max(0, Math.min(1, tr.food / Math.max(1, tr.pop * 2)));
+          const rest = Math.max(0, Math.min(1, tr.activeFrac));
+          const well = Math.max(0, Math.min(1, 1 - tr.sick / Math.max(1, tr.pop)));
+          const heart = Math.max(0, Math.min(1, (tr.morale - 0.3) / 1.3));
+          const thirst = water ? 1 : Math.max(0, 1 - (tr.thirstT || 0) / 45);
+          const bar = (icon, v, label) => {
+            const pct = Math.round(v * 100);
+            const tone = v > 0.6 ? "ok" : v > 0.3 ? "warn" : "bad";
+            return `<div class="sbar ${tone}" title="${label} ${pct}%">
+              <span class="sbar-i">${icon}</span>
+              <span class="sbar-track"><i style="width:${pct}%"></i></span>
+            </div>`;
+          };
+          barsEl.innerHTML =
+            bar("💧", thirst, t("barWater")) +
+            bar("🍖", fed, t("barFood")) +
+            bar("💪", rest, t("barEnergy")) +
+            bar("❤️", well, t("barHealth")) +
+            bar("😊", heart, t("barMorale"));
         }
         const p = this.logNode?.querySelector(`#lgPop${i}`), l = this.logNode?.querySelector(`#lgLand${i}`);
         if (p) p.textContent = Math.floor(tr.pop);

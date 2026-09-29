@@ -173,7 +173,7 @@ body.playing .bg-blobs { display: none; }
   position: fixed; z-index: 22;
   top: calc(58px + env(safe-area-inset-top));
   left: 10px;
-  bottom: calc(190px + env(safe-area-inset-bottom));
+  bottom: calc(74px + env(safe-area-inset-bottom));
   width: clamp(224px, 25vw, 320px);
   display: flex; flex-direction: column; gap: 8px;
   pointer-events: none;
@@ -403,41 +403,27 @@ body.playing .bg-blobs { display: none; }
 .calib-count:empty { display: none; }
 
 /* ── Power cards ──────────────────────────────────────────── */
-.card-bar {
-  position: fixed; left: 10px; bottom: calc(74px + env(safe-area-inset-bottom));
-  z-index: 28; display: flex; flex-direction: column; gap: 6px;
-  width: clamp(224px, 25vw, 320px); pointer-events: none;
+.log-cards {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  padding: 5px 0 1px; flex: 0 0 auto;
+  pointer-events: none;
 }
-.card-row {
-  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
-  padding: 5px 7px; border-radius: 12px;
-  background: rgba(8,4,20,.78); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
-}
-.card-owner {
-  font-family: var(--font-display); font-size: 9px; font-weight: 900;
-  letter-spacing: .1em; color: var(--c); flex: 0 0 auto;
-}
-.card-empty { font-size: 10.5px; color: var(--muted); opacity: .7; }
+.log-cards.empty { display: none; }
 .pcard {
   pointer-events: auto; cursor: pointer;
-  display: flex; align-items: center; gap: 4px;
-  padding: 4px 8px; border-radius: 999px;
-  background: color-mix(in srgb, var(--c) 18%, rgba(0,0,0,.4));
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 9px; border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 20%, rgba(0,0,0,.45));
   border: 1.5px solid var(--c); color: var(--text);
   font-family: var(--font-body); font-size: 11px; font-weight: 700;
   transition: transform .12s, box-shadow .2s, background .2s;
   animation: cardin .34s cubic-bezier(.22,1.6,.36,1) both;
 }
-.pcard:hover { background: color-mix(in srgb, var(--c) 34%, rgba(0,0,0,.3)); box-shadow: 0 0 14px color-mix(in srgb, var(--c) 55%, transparent); }
+.pcard:hover { background: color-mix(in srgb, var(--c) 36%, rgba(0,0,0,.3)); box-shadow: 0 0 14px color-mix(in srgb, var(--c) 55%, transparent); }
 .pcard:active { transform: scale(.92); }
 .pcard-emo { font-size: 13px; }
-@keyframes cardin { from { opacity: 0; transform: translateY(8px) scale(.85); } }
-@media (max-width: 720px) {
-  .card-bar { width: 150px; }
-  .pcard-name { display: none; }
-  .pcard { padding: 5px 9px; }
-}
-
+@keyframes cardin { from { opacity: 0; transform: translateY(6px) scale(.85); } }
+@media (max-width: 720px) { .pcard-name { display: none; } .pcard { padding: 4px 8px; } }
 .pfx {
   flex: 0 0 auto; font-size: 10px; font-weight: 800;
   padding: 2px 6px; border-radius: 999px;
@@ -445,3 +431,17 @@ body.playing .bg-blobs { display: none; }
   border: 1px solid color-mix(in srgb, var(--c) 60%, transparent);
   color: #fff; letter-spacing: .02em;
 }
+
+/* ── Per-tribe status bars ────────────────────────────────── */
+.log-bars { display: flex; gap: 5px; padding: 4px 0 2px; flex: 0 0 auto; }
+.sbar { display: flex; align-items: center; gap: 3px; flex: 1 1 0; min-width: 0; }
+.sbar-i { font-size: 9.5px; line-height: 1; flex: 0 0 auto; }
+.sbar-track {
+  flex: 1 1 auto; height: 5px; border-radius: 999px; min-width: 8px;
+  background: rgba(255,255,255,.12); overflow: hidden; display: block;
+}
+.sbar-track i { display: block; height: 100%; border-radius: 999px; transition: width .3s ease, background .3s; }
+.sbar.ok   .sbar-track i { background: #4ade80; }
+.sbar.warn .sbar-track i { background: #ffc857; }
+.sbar.bad  .sbar-track i { background: #ff3860; animation: sbarpulse 1s ease-in-out infinite; }
+@keyframes sbarpulse { 50% { opacity: .45; } }
