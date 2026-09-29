@@ -173,7 +173,7 @@ body.playing .bg-blobs { display: none; }
   position: fixed; z-index: 22;
   top: calc(58px + env(safe-area-inset-top));
   left: 10px;
-  bottom: calc(74px + env(safe-area-inset-bottom));
+  bottom: calc(190px + env(safe-area-inset-bottom));
   width: clamp(224px, 25vw, 320px);
   display: flex; flex-direction: column; gap: 8px;
   pointer-events: none;
@@ -404,9 +404,9 @@ body.playing .bg-blobs { display: none; }
 
 /* ── Power cards ──────────────────────────────────────────── */
 .card-bar {
-  position: fixed; right: 10px; bottom: calc(132px + env(safe-area-inset-bottom));
+  position: fixed; left: 10px; bottom: calc(74px + env(safe-area-inset-bottom));
   z-index: 28; display: flex; flex-direction: column; gap: 6px;
-  width: clamp(190px, 22vw, 260px); pointer-events: none;
+  width: clamp(224px, 25vw, 320px); pointer-events: none;
 }
 .card-row {
   display: flex; align-items: center; gap: 5px; flex-wrap: wrap;

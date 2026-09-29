@@ -99,6 +99,19 @@ const STR = {
     evNoTrees: "🪵 The last tree is gone!",
     evSpoil: "🥀 Food is spoiling — not enough storage!",
     cardWaiting: "waiting for a card…",
+    whyRain: "…our people are begging for water.",
+    whyFeast: "…the stores are low and spirits lower.",
+    whyRally: "…the fighting has started — the warriors want orders.",
+    whyGraft: "…too many of us are standing idle.",
+    whyEureka: "…our thinkers are close to something.",
+    whySpy: "…someone out there knows more than we do.",
+    whyPlague: "…our healers understand disease well enough to use it.",
+    whyBurn: "…we know fire, and they have much to lose.",
+    whyPoison: "…their stores are full, and we know what would ruin them.",
+    whyStorm: "…our writing could be used to confuse them.",
+    whyWall: "…we are under attack and the walls are thin.",
+    whySettlers: "…there is room and food for more of us.",
+    whyWell: "…if we dig deep enough, we need never thirst again.",
     fxRain: "WATER FOR 22s", fxFood: (n) => `+${n} FOOD`, fxAttack: "ATTACK ×1.6",
     fxWork: "WORK ×1.5", fxDefence: "DEFENCE ×1.7", fxPeople: (n) => `+${n} PEOPLE`,
     fxWater: "WELL DUG — NEVER THIRSTY", fxLearned: (d) => `LEARNED ${d}`,
@@ -256,6 +269,19 @@ const STR = {
     evNoTrees: "🪵 Pokok terakhir sudah habis!",
     evSpoil: "🥀 Makanan rosak — tiada tempat simpanan!",
     cardWaiting: "menunggu kad…",
+    whyRain: "…rakyat kita merayu meminta air.",
+    whyFeast: "…simpanan makanan hampir habis dan semangat pun jatuh.",
+    whyRally: "…pertempuran bermula — pahlawan menunggu arahan.",
+    whyGraft: "…terlalu ramai antara kita menganggur.",
+    whyEureka: "…pemikir kita hampir menemui sesuatu.",
+    whySpy: "…ada yang tahu lebih banyak daripada kita.",
+    whyPlague: "…tabib kita cukup faham penyakit untuk menggunakannya.",
+    whyBurn: "…kita tahu api, dan mereka banyak yang boleh hilang.",
+    whyPoison: "…simpanan mereka penuh, dan kita tahu apa yang merosakkannya.",
+    whyStorm: "…tulisan kita boleh digunakan untuk mengelirukan mereka.",
+    whyWall: "…kita diserang dan tembok kita nipis.",
+    whySettlers: "…ada ruang dan makanan untuk lebih ramai.",
+    whyWell: "…jika digali cukup dalam, kita tidak akan dahaga lagi.",
     fxRain: "AIR SELAMA 22s", fxFood: (n) => `+${n} MAKANAN`, fxAttack: "SERANGAN ×1.6",
     fxWork: "KERJA ×1.5", fxDefence: "PERTAHANAN ×1.7", fxPeople: (n) => `+${n} RAKYAT`,
     fxWater: "PERIGI DIGALI — TIDAK DAHAGA", fxLearned: (d) => `BELAJAR ${d}`,
@@ -770,30 +796,38 @@ const discName = (d) => d[lang];
    you watch, and a tribe that discovered medicine really can weaponise it. */
 const CARDS = [
   // --- everyone can eventually get these ---
-  { id: "rain", emoji: "🌧️", key: "cardRain", kind: "self", weight: 3,
+  { id: "rain", emoji: "🌧️", key: "cardRain", kind: "self", why: "whyRain",
     ok: () => true,
+    // Offered when the people are actually short of water.
+    want: (S, tr) => tr.thirstT > 2 ? 100 : (tr.rainT > 0 ? 0 : 4),
     run(S, tr) {
       tr.rainT = 22; tr.food += tr.pop * 0.5;
       S.pushLog(tr, t("cardRainLog"), "health");
       return { on: tr, fx: "harvest", text: t("fxRain") };
     } },
-  { id: "feast", emoji: "🎉", key: "cardFeast", kind: "self", weight: 3,
+  { id: "feast", emoji: "🎉", key: "cardFeast", kind: "self", why: "whyFeast",
     ok: (tr) => tr.health >= 2,
+    // A hungry or demoralised tribe wants a feast; a comfortable one does not.
+    want: (S, tr) => (tr.food < tr.pop * 1.2 ? 80 : 0) + (tr.morale < 0.9 ? 40 : 0),
     run(S, tr) {
       const gain = Math.round(tr.pop * 1.2);
       tr.morale = Math.min(1.6, tr.morale + 0.35); tr.food += gain;
       S.pushLog(tr, t("cardFeastLog"), "health");
       return { on: tr, fx: "harvest", text: t("fxFood")(gain) };
     } },
-  { id: "rally", emoji: "🚩", key: "cardRally", kind: "self", weight: 3,
+  { id: "rally", emoji: "🚩", key: "cardRally", kind: "self", why: "whyRally",
     ok: (tr) => tr.aggro >= 2,
+    // Only once the fighting has actually started.
+    want: (S, tr) => S.simT >= CONQUEST_AT ? 60 + tr.aggro * 8 : 0,
     run(S, tr) {
       tr.rallyT = 18;
       S.pushLog(tr, t("cardRallyLog"), "aggro");
       return { on: tr, fx: "gem", text: t("fxAttack") };
     } },
-  { id: "graft", emoji: "💪", key: "cardGraft", kind: "self", weight: 3,
+  { id: "graft", emoji: "💪", key: "cardGraft", kind: "self", why: "whyGraft",
     ok: (tr) => tr.work >= 2,
+    // When too many of them are standing around doing nothing.
+    want: (S, tr) => tr.activeFrac < 0.55 ? 70 : 10,
     run(S, tr) {
       tr.graftT = 20;
       S.pushLog(tr, t("cardGraftLog"), "work");
@@ -801,14 +835,24 @@ const CARDS = [
     } },
 
   // --- clever tribes ---
-  { id: "eureka", emoji: "💡", key: "cardEureka", kind: "self", weight: 2,
+  { id: "eureka", emoji: "💡", key: "cardEureka", kind: "self", why: "whyEureka",
     ok: (tr) => tr.int >= 2,
+    // A thinking tribe that has fallen behind on knowledge.
+    want: (S, tr) => {
+      const best = Math.max(...S.tribes.filter(o => o.alive).map(o => o.known.size));
+      return (best > tr.known.size ? 75 : 20) + tr.int * 6;
+    },
     run(S, tr) {
       const got = S.forceDiscovery(tr);
       return { on: tr, fx: "gem", text: got ? t("fxLearned")(got) : t("fxNothing") };
     } },
-  { id: "spy", emoji: "🕵️", key: "cardSpy", kind: "enemy", weight: 2,
+  { id: "spy", emoji: "🕵️", key: "cardSpy", kind: "enemy", why: "whySpy",
     ok: (tr) => tr.int >= 3,
+    // Only worth it when somebody genuinely knows more than they do.
+    want: (S, tr) => {
+      const ahead = S.tribes.some(o => o.alive && o !== tr && o.known.size > tr.known.size + 1);
+      return ahead ? 85 : 0;
+    },
     run(S, tr, foe) {
       const steal = [...foe.known].filter(k => !tr.known.has(k));
       if (!steal.length) { S.pushLog(tr, t("cardSpyFail"), "int"); return { on: tr, fx: "gem", text: t("fxNothing") }; }
@@ -821,8 +865,15 @@ const CARDS = [
     } },
 
   // --- research-gated, and deliberately nasty ---
-  { id: "plague", emoji: "🦠", key: "cardPlague", kind: "enemy", weight: 2,
+  { id: "plague", emoji: "🦠", key: "cardPlague", kind: "enemy", why: "whyPlague",
     ok: (tr) => tr.known.has("medicine") && tr.aggro >= 2,
+    // Their own study of medicine is what makes this possible — so it is
+    // offered soon after they learn it, and when a rival is pulling ahead.
+    want: (S, tr) => {
+      const leader = S.tribes[S.leaderIdx];
+      const behind = leader && leader !== tr;
+      return (behind ? 70 : 25) + tr.aggro * 10;
+    },
     run(S, tr, foe) {
       foe.sick = Math.max(foe.sick, 0.9 + foe.pop * 0.06);
       S.pushLog(tr, t("cardPlagueLog")(foe.name), "aggro");
@@ -830,8 +881,13 @@ const CARDS = [
       S.queueMoment("plague", `🦠 ${tr.name} → ${foe.name}`, "#7ee787", { left: tr.color, right: foe.color });
       return { on: foe, from: tr, fx: "plague", text: t("fxInfected")(foe.name) };
     } },
-  { id: "burn", emoji: "🔥", key: "cardBurn", kind: "enemy", weight: 2,
+  { id: "burn", emoji: "🔥", key: "cardBurn", kind: "enemy", why: "whyBurn",
     ok: (tr) => tr.known.has("fire") && tr.aggro >= 3,
+    // Worth playing only when a rival actually has something to lose.
+    want: (S, tr) => {
+      const juicy = S.tribes.some(o => o.alive && o !== tr && (S.countBuild(o, 1) + S.countBuild(o, 6)) >= 3);
+      return juicy ? 75 + tr.aggro * 6 : 0;
+    },
     run(S, tr, foe) {
       let burned = 0;
       for (let i = 0; i < S.build.length && burned < 4; i++) {
@@ -844,8 +900,12 @@ const CARDS = [
       return { on: foe, from: tr, fx: "drought",
                text: burned ? t("fxBurned")(burned) : t("fxBurnedNone") };
     } },
-  { id: "poison", emoji: "☠️", key: "cardPoison", kind: "enemy", weight: 1,
+  { id: "poison", emoji: "☠️", key: "cardPoison", kind: "enemy", why: "whyPoison",
     ok: (tr) => tr.known.has("medicine") && tr.int >= 3 && tr.aggro >= 3,
+    want: (S, tr) => {
+      const fat = S.tribes.some(o => o.alive && o !== tr && o.food > o.pop * 2);
+      return fat ? 70 : 15;
+    },
     run(S, tr, foe) {
       const lost = Math.round(foe.food * 0.65);
       foe.food = Math.max(0, foe.food * 0.35);
@@ -854,8 +914,9 @@ const CARDS = [
       S.pushLog(foe, t("cardPoisonVictim"), "health");
       return { on: foe, from: tr, fx: "drought", text: t("fxFoodLost")(lost) };
     } },
-  { id: "storm", emoji: "⛈️", key: "cardStorm", kind: "enemy", weight: 1,
+  { id: "storm", emoji: "⛈️", key: "cardStorm", kind: "enemy", why: "whyStorm",
     ok: (tr) => tr.known.has("writing") && tr.int >= 3,
+    want: (S, tr) => S.simT >= CONQUEST_AT ? 65 : 20,
     run(S, tr, foe) {
       foe.stunT = 12;
       S.pushLog(tr, t("cardStormLog")(foe.name), "int");
@@ -864,22 +925,28 @@ const CARDS = [
     } },
 
   // --- builders and defenders ---
-  { id: "wall", emoji: "🧱", key: "cardWall", kind: "self", weight: 2,
+  { id: "wall", emoji: "🧱", key: "cardWall", kind: "self", why: "whyWall",
     ok: (tr) => tr.known.has("stone"),
+    // When they are the one under attack.
+    want: (S, tr) => (tr.stats.attacksTaken > 2 ? 90 : 0) + (tr.policy.id === "defend" ? 25 : 0),
     run(S, tr) {
       tr.stone += 9; tr.wardT = 20;
       S.pushLog(tr, t("cardWallLog"), "health");
       return { on: tr, fx: "gem", text: t("fxDefence") };
     } },
-  { id: "settlers", emoji: "🚶", key: "cardSettlers", kind: "self", weight: 2,
+  { id: "settlers", emoji: "🚶", key: "cardSettlers", kind: "self", why: "whySettlers",
     ok: (tr) => tr.known.has("huts"),
+    // When there is room and food to support more people.
+    want: (S, tr) => (!tr.capped && tr.food > tr.pop * 1.5) ? 60 : 10,
     run(S, tr) {
       tr.pop += 6; tr.wood += 6;
       S.pushLog(tr, t("cardSettlersLog"), "work");
       return { on: tr, fx: "migration", text: t("fxPeople")(6) };
     } },
-  { id: "well", emoji: "🪣", key: "cardWell", kind: "self", weight: 2,
+  { id: "well", emoji: "🪣", key: "cardWell", kind: "self", why: "whyWell",
     ok: (tr) => !tr.known.has("well"),
+    // The permanent answer to thirst — offered when thirst is the problem.
+    want: (S, tr) => tr.thirstT > 6 ? 120 : 0,
     run(S, tr) {
       tr.known.add("well");
       S.pushLog(tr, t("cardWellLog"), "int");
@@ -2545,17 +2612,29 @@ const SIM = {
       if (!tr.alive) return;
       tr.dealT -= dt;
       if (tr.dealT > 0 || tr.hand.length >= 2) return;
-      tr.dealT = 26 + Math.random() * 14;
-      const pool = [];
+      tr.dealT = 22 + Math.random() * 10;
+      /* The card offered is the one that fits this tribe's situation best —
+         what they have just discovered, what they are short of, who is ahead
+         of them — not a random draw. A thirsty tribe is offered water, a
+         besieged one walls, and only a tribe that has studied medicine is
+         ever offered a way to weaponise it. */
+      let best = null, bestScore = 0;
       CARDS.forEach(c => {
         if (!c.ok(tr)) return;
+        if (tr.hand.includes(c.id)) return;
         if (c.kind === "enemy" && !this.tribes.some(o => o.alive && o !== tr)) return;
-        for (let i = 0; i < c.weight; i++) pool.push(c);
+        const score = (c.want ? c.want(this, tr) : 10);
+        if (score <= 0) return;
+        // A small jitter breaks ties without making the choice arbitrary.
+        const v = score * (0.92 + Math.random() * 0.16);
+        if (v > bestScore) { bestScore = v; best = c; }
       });
-      if (!pool.length) return;
-      const card = pool[Math.floor(Math.random() * pool.length)];
+      if (!best) return;
+      const card = best;
       tr.hand.push(card.id);
+      // Say what prompted it, so the card never looks like it came from nowhere.
       this.pushLog(tr, t("cardDealt")(card.emoji, t(card.key)), "int");
+      if (card.why) this.pushLog(tr, t(card.why), "int");
       this.cardFlash = { tribe: tr.idx, emoji: card.emoji, life: 1.6 };
       sfx.discover();
       this.refreshCards();
