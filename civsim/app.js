@@ -99,11 +99,13 @@ const STR = {
     evNoTrees: "🪵 The last tree is gone!",
     evSpoil: "🥀 Food is spoiling — not enough storage!",
     cardWaiting: "waiting for a card…",
-    predictTitle: "WHO WILL WIN?",
-    predictHint: "Everyone watching — call it now! Hold over a tribe or tap it.",
-    predictPick: "back this tribe",
-    predictRight: (n) => `🎯 Called it! You backed Tribe ${n}.`,
-    predictWrong: (n, w) => `❌ You backed Tribe ${n} — ${w} took it.`,
+    fxRain: "WATER FOR 22s", fxFood: (n) => `+${n} FOOD`, fxAttack: "ATTACK ×1.6",
+    fxWork: "WORK ×1.5", fxDefence: "DEFENCE ×1.7", fxPeople: (n) => `+${n} PEOPLE`,
+    fxWater: "WELL DUG — NEVER THIRSTY", fxLearned: (d) => `LEARNED ${d}`,
+    fxNothing: "NO EFFECT", fxStole: (d) => `STOLE ${d}`,
+    fxInfected: (n) => `${n} INFECTED`, fxBurned: (n) => `-${n} BUILDINGS`,
+    fxBurnedNone: "NOTHING TO BURN — FOOD LOST",
+    fxFoodLost: (n) => `-${n} FOOD`, fxStalled: (n) => `${n} STALLED 12s`,
     cardDealt: (e, n) => `🃏 New card: ${e} ${n}`,
     cardRain: "Rain", cardRainDesc: "Water for a while, whatever the map says",
     cardRainLog: "🌧️ Rain falls — there is water again!",
@@ -254,11 +256,13 @@ const STR = {
     evNoTrees: "🪵 Pokok terakhir sudah habis!",
     evSpoil: "🥀 Makanan rosak — tiada tempat simpanan!",
     cardWaiting: "menunggu kad…",
-    predictTitle: "SIAPA AKAN MENANG?",
-    predictHint: "Semua yang menonton — teka sekarang! Tahan atau ketik satu puak.",
-    predictPick: "pilih puak ini",
-    predictRight: (n) => `🎯 Tepat! Anda pilih Puak ${n}.`,
-    predictWrong: (n, w) => `❌ Anda pilih Puak ${n} — ${w} yang menang.`,
+    fxRain: "AIR SELAMA 22s", fxFood: (n) => `+${n} MAKANAN`, fxAttack: "SERANGAN ×1.6",
+    fxWork: "KERJA ×1.5", fxDefence: "PERTAHANAN ×1.7", fxPeople: (n) => `+${n} RAKYAT`,
+    fxWater: "PERIGI DIGALI — TIDAK DAHAGA", fxLearned: (d) => `BELAJAR ${d}`,
+    fxNothing: "TIADA KESAN", fxStole: (d) => `CURI ${d}`,
+    fxInfected: (n) => `${n} DIJANGKITI`, fxBurned: (n) => `-${n} BANGUNAN`,
+    fxBurnedNone: "TIADA UNTUK DIBAKAR — MAKANAN HILANG",
+    fxFoodLost: (n) => `-${n} MAKANAN`, fxStalled: (n) => `${n} TERHENTI 12s`,
     cardDealt: (e, n) => `🃏 Kad baharu: ${e} ${n}`,
     cardRain: "Hujan", cardRainDesc: "Air untuk seketika, walau apa pun peta",
     cardRainLog: "🌧️ Hujan turun — ada air semula!",
@@ -768,31 +772,52 @@ const CARDS = [
   // --- everyone can eventually get these ---
   { id: "rain", emoji: "🌧️", key: "cardRain", kind: "self", weight: 3,
     ok: () => true,
-    run(S, tr) { tr.rainT = 22; tr.food += tr.pop * 0.5; S.pushLog(tr, t("cardRainLog"), "health"); } },
+    run(S, tr) {
+      tr.rainT = 22; tr.food += tr.pop * 0.5;
+      S.pushLog(tr, t("cardRainLog"), "health");
+      return { on: tr, fx: "harvest", text: t("fxRain") };
+    } },
   { id: "feast", emoji: "🎉", key: "cardFeast", kind: "self", weight: 3,
     ok: (tr) => tr.health >= 2,
-    run(S, tr) { tr.morale = Math.min(1.6, tr.morale + 0.35); tr.food += tr.pop * 1.2; S.pushLog(tr, t("cardFeastLog"), "health"); } },
+    run(S, tr) {
+      const gain = Math.round(tr.pop * 1.2);
+      tr.morale = Math.min(1.6, tr.morale + 0.35); tr.food += gain;
+      S.pushLog(tr, t("cardFeastLog"), "health");
+      return { on: tr, fx: "harvest", text: t("fxFood")(gain) };
+    } },
   { id: "rally", emoji: "🚩", key: "cardRally", kind: "self", weight: 3,
     ok: (tr) => tr.aggro >= 2,
-    run(S, tr) { tr.rallyT = 18; S.pushLog(tr, t("cardRallyLog"), "aggro"); } },
+    run(S, tr) {
+      tr.rallyT = 18;
+      S.pushLog(tr, t("cardRallyLog"), "aggro");
+      return { on: tr, fx: "gem", text: t("fxAttack") };
+    } },
   { id: "graft", emoji: "💪", key: "cardGraft", kind: "self", weight: 3,
     ok: (tr) => tr.work >= 2,
-    run(S, tr) { tr.graftT = 20; S.pushLog(tr, t("cardGraftLog"), "work"); } },
+    run(S, tr) {
+      tr.graftT = 20;
+      S.pushLog(tr, t("cardGraftLog"), "work");
+      return { on: tr, fx: "gem", text: t("fxWork") };
+    } },
 
   // --- clever tribes ---
   { id: "eureka", emoji: "💡", key: "cardEureka", kind: "self", weight: 2,
     ok: (tr) => tr.int >= 2,
-    run(S, tr) { S.forceDiscovery(tr); } },
+    run(S, tr) {
+      const got = S.forceDiscovery(tr);
+      return { on: tr, fx: "gem", text: got ? t("fxLearned")(got) : t("fxNothing") };
+    } },
   { id: "spy", emoji: "🕵️", key: "cardSpy", kind: "enemy", weight: 2,
     ok: (tr) => tr.int >= 3,
     run(S, tr, foe) {
       const steal = [...foe.known].filter(k => !tr.known.has(k));
-      if (!steal.length) return S.pushLog(tr, t("cardSpyFail"), "int");
+      if (!steal.length) { S.pushLog(tr, t("cardSpyFail"), "int"); return { on: tr, fx: "gem", text: t("fxNothing") }; }
       const got = steal[steal.length - 1];
       tr.known.add(got);
       const d = DISCOVERIES.find(x => x.id === got);
       S.pushLog(tr, t("cardSpyLog")(foe.name, d ? d.emoji : "", d ? discName(d) : got), "int");
       S.pushLog(foe, t("cardSpyVictim")(tr.name), "int");
+      return { on: tr, from: foe, fx: "spy", text: t("fxStole")(d ? discName(d) : got) };
     } },
 
   // --- research-gated, and deliberately nasty ---
@@ -802,7 +827,8 @@ const CARDS = [
       foe.sick = Math.max(foe.sick, 0.9 + foe.pop * 0.06);
       S.pushLog(tr, t("cardPlagueLog")(foe.name), "aggro");
       S.pushLog(foe, t("cardPlagueVictim")(tr.name), "health");
-      S.queueMoment("plague", `${tr.emojiTag || "🦠"} ${tr.name} → ${foe.name}`, "#7ee787", { left: tr.color, right: foe.color });
+      S.queueMoment("plague", `🦠 ${tr.name} → ${foe.name}`, "#7ee787", { left: tr.color, right: foe.color });
+      return { on: foe, from: tr, fx: "plague", text: t("fxInfected")(foe.name) };
     } },
   { id: "burn", emoji: "🔥", key: "cardBurn", kind: "enemy", weight: 2,
     ok: (tr) => tr.known.has("fire") && tr.aggro >= 3,
@@ -814,14 +840,19 @@ const CARDS = [
       foe.food = Math.max(0, foe.food - foe.pop * 0.8);
       S.pushLog(tr, t("cardBurnLog")(foe.name, burned), "aggro");
       S.pushLog(foe, t("cardBurnVictim")(tr.name), "health");
+      // "-0 BUILDINGS" reads like a bug; say what actually happened.
+      return { on: foe, from: tr, fx: "drought",
+               text: burned ? t("fxBurned")(burned) : t("fxBurnedNone") };
     } },
   { id: "poison", emoji: "☠️", key: "cardPoison", kind: "enemy", weight: 1,
     ok: (tr) => tr.known.has("medicine") && tr.int >= 3 && tr.aggro >= 3,
     run(S, tr, foe) {
+      const lost = Math.round(foe.food * 0.65);
       foe.food = Math.max(0, foe.food * 0.35);
       foe.morale = Math.max(0.3, foe.morale - 0.25);
       S.pushLog(tr, t("cardPoisonLog")(foe.name), "aggro");
       S.pushLog(foe, t("cardPoisonVictim"), "health");
+      return { on: foe, from: tr, fx: "drought", text: t("fxFoodLost")(lost) };
     } },
   { id: "storm", emoji: "⛈️", key: "cardStorm", kind: "enemy", weight: 1,
     ok: (tr) => tr.known.has("writing") && tr.int >= 3,
@@ -829,18 +860,31 @@ const CARDS = [
       foe.stunT = 12;
       S.pushLog(tr, t("cardStormLog")(foe.name), "int");
       S.pushLog(foe, t("cardStormVictim"), "health");
+      return { on: foe, from: tr, fx: "flood", text: t("fxStalled")(foe.name) };
     } },
 
   // --- builders and defenders ---
   { id: "wall", emoji: "🧱", key: "cardWall", kind: "self", weight: 2,
     ok: (tr) => tr.known.has("stone"),
-    run(S, tr) { tr.stone += 9; tr.wardT = 20; S.pushLog(tr, t("cardWallLog"), "health"); } },
+    run(S, tr) {
+      tr.stone += 9; tr.wardT = 20;
+      S.pushLog(tr, t("cardWallLog"), "health");
+      return { on: tr, fx: "gem", text: t("fxDefence") };
+    } },
   { id: "settlers", emoji: "🚶", key: "cardSettlers", kind: "self", weight: 2,
     ok: (tr) => tr.known.has("huts"),
-    run(S, tr) { tr.pop += 6; tr.wood += 6; S.pushLog(tr, t("cardSettlersLog"), "work"); } },
+    run(S, tr) {
+      tr.pop += 6; tr.wood += 6;
+      S.pushLog(tr, t("cardSettlersLog"), "work");
+      return { on: tr, fx: "migration", text: t("fxPeople")(6) };
+    } },
   { id: "well", emoji: "🪣", key: "cardWell", kind: "self", weight: 2,
     ok: (tr) => !tr.known.has("well"),
-    run(S, tr) { tr.known.add("well"); S.pushLog(tr, t("cardWellLog"), "int"); } },
+    run(S, tr) {
+      tr.known.add("well");
+      S.pushLog(tr, t("cardWellLog"), "int");
+      return { on: tr, fx: "harvest", text: t("fxWater") };
+    } },
 ];
 
 const LEARN_KEY = "civsim-learn";
@@ -1375,75 +1419,6 @@ const SPEC = {
 
 /* Final look at all three tribes before the run starts — it lets the player
    (and the crowd around the booth) predict who should win. */
-/* Before the run, everyone watching calls it. Costs nothing to build and it
-   is what makes a crowd care about a simulation they cannot control. */
-const PREDICT = {
-  open(onDone) {
-    Object.assign(this, { onDone, pick: null, hoverKey: "", hoverSince: 0, locked: false });
-    activeScreen = this;
-  },
-  boxes() {
-    const n = 3, w = Math.min(190, (innerWidth - 90) / n), gap = 18;
-    const total = w * n + gap * (n - 1);
-    return [0, 1, 2].map(i => ({
-      i, x: innerWidth / 2 - total / 2 + i * (w + gap) + w / 2,
-      y: innerHeight / 2, w, h: 190,
-    }));
-  },
-  onPointerDown(x, y) {
-    const b = this.boxes().find(c => Math.abs(x - c.x) < c.w / 2 && Math.abs(y - c.y) < c.h / 2);
-    if (b) this.choose(b.i);
-  },
-  choose(i) {
-    if (this.locked) return;
-    this.locked = true; this.pick = i;
-    sfx.pick();
-    setTimeout(() => this.onDone(i), 420);
-  },
-  onFrame() {
-    drawBackdrop();
-    ctx.save();
-    ctx.textAlign = "center";
-    ctx.font = "900 clamp(20px,4.6vw,34px) Orbitron, system-ui";
-    ctx.fillStyle = "#fff"; ctx.shadowColor = "#000"; ctx.shadowBlur = 12;
-    ctx.fillText(t("predictTitle"), innerWidth / 2, 116);
-    ctx.font = "700 13px system-ui"; ctx.fillStyle = "rgba(255,255,255,.8)"; ctx.shadowBlur = 5;
-    ctx.fillText(t("predictHint"), innerWidth / 2, 146);
-    ctx.restore();
-
-    const cur = selectionCursor();
-    let hoverKey = "";
-    const boxes = this.boxes();
-    if (cur && !this.locked) boxes.forEach(b => {
-      if (Math.abs(cur.x - b.x) < b.w / 2 && Math.abs(cur.y - b.y) < b.h / 2) hoverKey = String(b.i);
-    });
-    if (hoverKey !== this.hoverKey) { this.hoverKey = hoverKey; this.hoverSince = performance.now(); }
-    const prog = hoverKey && !cur?.pointer ? Math.min(1, (performance.now() - this.hoverSince) / DWELL_MS) : 0;
-
-    boxes.forEach(b => {
-      const col = TRIBE_COLORS[b.i];
-      const hot = String(b.i) === hoverKey, chosen = this.pick === b.i;
-      ctx.save();
-      ctx.fillStyle = chosen || hot ? `color-mix(in srgb, ${col} 22%, rgba(10,6,22,.85))` : "rgba(10,6,22,.85)";
-      ctx.strokeStyle = col; ctx.lineWidth = chosen || hot ? 4 : 2.5;
-      if (hot || chosen) { ctx.shadowColor = col; ctx.shadowBlur = 24; }
-      ctx.beginPath(); ctx.roundRect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h, 20); ctx.fill(); ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.textAlign = "center";
-      ctx.font = "44px sans-serif"; ctx.textBaseline = "middle";
-      ctx.fillText(["🔴", "🔵", "🟡"][b.i], b.x, b.y - 34);
-      ctx.font = "900 15px Orbitron, system-ui"; ctx.fillStyle = col;
-      ctx.fillText(t("tribe")(b.i + 1), b.x, b.y + 26);
-      ctx.font = "600 11.5px system-ui"; ctx.fillStyle = "rgba(255,255,255,.7)";
-      ctx.fillText(t("predictPick"), b.x, b.y + 52);
-      ctx.restore();
-      if (hot && prog > 0) drawDwellRing(b.x, b.y + b.h / 2 - 16, prog, 15);
-    });
-    drawCursor(cur);
-    if (prog >= 1 && !this.locked) this.choose(+hoverKey);
-  },
-};
-
 const CONFIRM = {
   open(specs, policies, onStart) {
     Object.assign(this, { specs, policies, onStart, hover: false, hoverSince: 0, locked: false });
@@ -1548,7 +1523,6 @@ function drawCursor(cur) {
 }
 
 let chosenEra = null;
-let crowdPick = null;   // who the room backed before the run
 const chosenSpecs = [], chosenPolicies = [];
 function startSetup() {
   // Play Again starts from a blank overlay state. The previous activity log
@@ -1567,10 +1541,7 @@ function nextSpec(i) {
 }
 function nextPolicy(i) {
   if (i >= 3) return CONFIRM.open(chosenSpecs.slice(), chosenPolicies.slice(),
-    () => PREDICT.open((pick) => {
-      crowdPick = pick;
-      SIM.start(chosenEra, chosenSpecs.slice(), chosenPolicies.slice());
-    }));
+    () => SIM.start(chosenEra, chosenSpecs.slice(), chosenPolicies.slice()));
   CHOOSER.open(t("pickPolicy")(i + 1), POLICIES.map(p => ({
     id: p.id, emoji: p.emoji, label: t(p.key), sub: t(p.subKey),
   })), (id) => { chosenPolicies.push(id); nextPolicy(i + 1); }, { tribeIndex: i, spec: chosenSpecs[i] });
@@ -1591,7 +1562,7 @@ const SIM = {
   start(era, specs, policies = []) {
     music.start("grow");
     this.era = era; this.simT = 0; this.speed = 1; this.running = true; this.ended = false;
-    this.battles = []; this.effects = []; this.terrainCache = null; this.toasts = []; this.banner = null; this.warAnnounced = false; this.timeline = []; this.announcedDiscoveries = new Set(); this.announcementQueue = []; this.momentQueue = []; this.currentMoment = null;
+    this.battles = []; this.effects = []; this.terrainCache = null; this.toasts = []; this.banner = null; this.warAnnounced = false; this.cardHits = []; this.timeline = []; this.announcedDiscoveries = new Set(); this.announcementQueue = []; this.momentQueue = []; this.currentMoment = null;
     // Hand input is only needed for setup. Closing the stream here reduces
     // heat and battery use while the autonomous simulation is running.
     engine.stopCamera(); cam.style.display = "none"; canvas.style.cursor = "default"; pointerInput.inside = false;
@@ -2271,11 +2242,17 @@ const SIM = {
     this.refreshLeader(dt);
     this.dealCards(dt);
     // Card effects are plain timers on the tribe, read where they apply below.
+    let fxChanged = false;
     this.tribes.forEach(x => {
       ["rainT", "rallyT", "graftT", "wardT", "stunT"].forEach(k => {
-        if (x[k] > 0) x[k] = Math.max(0, x[k] - dt);
+        if (x[k] > 0) {
+          const before = Math.ceil(x[k]);
+          x[k] = Math.max(0, x[k] - dt);
+          if (Math.ceil(x[k]) !== before) fxChanged = true;   // only redraw on a whole second
+        }
       });
     });
+    if (fxChanged) this.refreshCards();
     this.eventT -= dt;
     if (this.autoEvents && this.eventT <= 0) { this.triggerEvent(); this.eventT = 23 + Math.random() * 18; }
     if (this.worldEvent && (this.worldEvent.life -= dt) <= 0) this.worldEvent = null;
@@ -2544,9 +2521,15 @@ const SIM = {
           <span class="pcard-emo">${c.emoji}</span><span class="pcard-name">${t(c.key)}</span>
         </button>`;
       }).join("");
+      // Timed card effects are invisible otherwise — show them ticking down.
+      const active = [
+        ["rainT", "🌧️"], ["rallyT", "🚩"], ["graftT", "💪"], ["wardT", "🧱"], ["stunT", "⛈️"],
+      ].filter(([k]) => tr[k] > 0)
+       .map(([k, e]) => `<span class="pfx">${e}${Math.ceil(tr[k])}s</span>`).join("");
       return `<div class="card-row" style="--c:${tr.color}">
         <span class="card-owner">${tr.name}</span>
         ${cards || `<span class="card-empty">${t("cardWaiting")}</span>`}
+        ${active}
       </div>`;
     }).join("");
     this.cardBar.innerHTML = rows;
@@ -2592,20 +2575,41 @@ const SIM = {
       if (!rivals.length) return;
       foe = rivals.reduce((best, o) => (!best || this.scoreOf(o).total > this.scoreOf(best).total ? o : best), null);
     }
-    card.run(this, tr, foe);
-    this.banner = { text: `${card.emoji} ${t(card.key)}`, color: tr.color, life: 2 };
-    this.markTimeline(card.emoji, `${tr.name}: ${t(card.key)}`);
+    const impact = card.run(this, tr, foe) || { on: tr, fx: "gem", text: t(card.key) };
+
+    /* Playing a card used to change a number somewhere off-screen. The result
+       is now shown where it happened: an effect over the affected tribe's
+       home, a line from the caster when it was aimed at someone else, and a
+       plain statement of what actually changed. */
+    const target = impact.on || tr;
+    const hp = this.xy(target.home);
+    this.effects.push({
+      type: impact.fx || "gem", x: hp.x, y: hp.y,
+      life: 3.4, max: 3.4, color: target.color, label: impact.text,
+    });
+    if (impact.from && impact.from !== target) {
+      const sp = this.xy(impact.from.home);
+      this.effects.push({
+        type: "spy", x: sp.x, y: sp.y, x2: hp.x, y2: hp.y,
+        life: 3, max: 3, color: impact.from.color,
+      });
+    }
+    // Floating readout pinned to the tribe it happened to, in their colour.
+    this.cardHits.push({ x: hp.x, y: hp.y, text: impact.text, color: target.color, life: 3.2 });
+    this.banner = { text: `${card.emoji} ${t(card.key)} — ${impact.text}`, color: tr.color, life: 2.4 };
+    this.markTimeline(card.emoji, `${tr.name}: ${t(card.key)} — ${impact.text}`);
     sfx.win();
     this.refreshCards();
   },
   // Used by the Eureka card: finish whatever they could learn next.
   forceDiscovery(tr) {
     const avail = DISCOVERIES.filter(d => !tr.known.has(d.id) && (d.needs || []).every(n => tr.known.has(n)));
-    if (!avail.length) { this.pushLog(tr, t("cardEurekaFail"), "int"); return; }
+    if (!avail.length) { this.pushLog(tr, t("cardEurekaFail"), "int"); return null; }
     const d = avail[0];
     tr.known.add(d.id);
     this.pushLog(tr, t("evDiscover")(d.emoji, discName(d)), "int");
     this.toasts.push({ text: `${d.emoji} ${tr.name}: ${discName(d)}`, color: tr.color, life: 2.4 });
+    return `${d.emoji} ${discName(d)}`;
   },
   refreshLeader(dt) {
     this.leaderT = (this.leaderT || 0) + dt;
@@ -2779,9 +2783,6 @@ const SIM = {
         <p><strong>${lang === "bm" ? "Menawan semua puak?" : "Conquered every tribe?"}</strong> ${conquestResult}</p>
         <p><strong>${lang === "bm" ? "Penemuan penting:" : "Important discoveries:"}</strong> ${discoveries.slice(-10).join(" · ") || "—"}</p>
       </div>
-      ${crowdPick === null ? "" : `<div class="predict-result ${crowdPick === win.tr.idx ? "right" : "wrong"}">
-        ${crowdPick === win.tr.idx ? t("predictRight")(crowdPick + 1) : t("predictWrong")(crowdPick + 1, win.tr.name)}
-      </div>`}
       <div class="story-box">
         <div class="story-title">${t("storyTitle")}</div>
         ${ranked.map((r, i) => `<div class="story-row" style="--c:${r.tr.color}">
@@ -2871,6 +2872,7 @@ const SIM = {
       this.battles = this.battles.filter(b => (b.life -= dt) > 0);
       this.effects = this.effects.filter(e => (e.life -= dt) > 0);
       this.toasts = this.toasts.filter(x => (x.life -= dt) > 0);
+    this.cardHits = (this.cardHits || []).filter(h => (h.life -= dt) > 0);
       if (this.banner && (this.banner.life -= dt) <= 0) this.banner = null;
       if (!this.currentMoment && this.momentQueue.length) this.currentMoment = this.momentQueue.shift();
       if (this.currentMoment && (this.currentMoment.life -= dt) <= 0) this.currentMoment = null;
@@ -3667,6 +3669,25 @@ const SIM = {
     ctx.fillStyle = "rgba(255,255,255,.45)";
     ctx.fillRect(bx + barW * (CONQUEST_AT / SIM_DURATION) - 1, by - 3, 2, 13);
 
+    /* Card readouts: what the card actually did, floating up from the tribe
+       it happened to, so the effect is never just a number off-screen. */
+    this.cardHits.forEach(h => {
+      const a = Math.min(1, h.life / 0.6), rise = (3.2 - h.life) * 16;
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.font = "900 14px Orbitron, system-ui";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const px = ox + h.x * cell + cell / 2, py = oy + h.y * cell - 16 - rise;
+      const tw = ctx.measureText(h.text).width + 20;
+      ctx.fillStyle = "rgba(3,0,10,.88)";
+      ctx.strokeStyle = h.color; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(px - tw / 2, py - 14, tw, 28, 14); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = h.color;
+      ctx.shadowColor = h.color; ctx.shadowBlur = 12;
+      ctx.fillText(h.text, px, py);
+      ctx.restore();
+    });
+
     // discovery toasts — so a milestone is not missed in the scrolling log
     this.toasts.slice(-4).forEach((tsl, i) => {
       const a = Math.min(1, tsl.life / 0.5);
@@ -3761,7 +3782,7 @@ const SIM = {
     })
     .catch(() => {});
 })();
-window.__civ = { CARDS, PREDICT, calibrate, music, TRACKS, engine, SIM, CHOOSER, SPEC, CONFIRM, loadLearn, DISCOVERIES, TRAITS, ERAS, POLICIES,
+window.__civ = { CARDS, calibrate, music, TRACKS, engine, SIM, CHOOSER, SPEC, CONFIRM, loadLearn, DISCOVERIES, TRAITS, ERAS, POLICIES,
   _confirm: (era, specs, policies = ["research", "food", "defend"], cb = () => {}) => { chosenEra = era; show(null); ui.classList.add("passthrough"); CONFIRM.open(specs, policies, cb); },
   _force: (era, specs, policies = ["research", "food", "defend"]) => { show(null); ui.classList.add("passthrough"); SIM.start(era, specs, policies); } };
 showIntro();
