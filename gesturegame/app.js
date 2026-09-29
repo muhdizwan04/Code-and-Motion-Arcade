@@ -108,6 +108,17 @@ const STR = {
     labBookTitle: "Discoveries",
     labDiscovered: (n, total) => `${n} / ${total} discovered`,
     labNew: "✨ NEW DISCOVERY!",
+    labHint: "HINT",
+    labGoals: "GOALS",
+    labMystery: (d) => `??? · ${d} steps deep`,
+    labHintBoth: (p) => `You have both already — try ${p}.`,
+    labHintOne: (a) => `You are one short — you still need ${a}.`,
+    labHintNone: (p) => `You will need ${p} first.`,
+    labHintSame: (g) => `two different kinds of ${g}`,
+    labNoHint: "No route to that one yet — keep exploring!",
+    labAllDone: "All goals done! New ones coming…",
+    labGoalsDone: "ALL GOALS COMPLETE!",
+    labGoalsNext: "Here come three new ones…",
     labClose: "CLOSE",
     labReset: "RESET",
     labRecipes: "RECIPES",
@@ -209,6 +220,17 @@ const STR = {
     labBookTitle: "Penemuan",
     labDiscovered: (n, total) => `${n} / ${total} dijumpai`,
     labNew: "✨ PENEMUAN BAHARU!",
+    labHint: "PETUNJUK",
+    labGoals: "MISI",
+    labMystery: (d) => `??? · ${d} langkah`,
+    labHintBoth: (p) => `Anda sudah ada kedua-duanya — cuba ${p}.`,
+    labHintOne: (a) => `Tinggal satu lagi — anda perlukan ${a}.`,
+    labHintNone: (p) => `Anda perlukan ${p} dahulu.`,
+    labHintSame: (g) => `dua jenis ${g} yang berbeza`,
+    labNoHint: "Belum ada jalan ke situ — teruskan meneroka!",
+    labAllDone: "Semua misi selesai! Misi baharu akan datang…",
+    labGoalsDone: "SEMUA MISI SELESAI!",
+    labGoalsNext: "Tiga misi baharu akan datang…",
     labClose: "TUTUP",
     labReset: "RESET",
     labRecipes: "RESIPI",
@@ -3591,9 +3613,15 @@ const LAB_TOTAL = Object.keys(LAB_ELEMENTS).length;
 
 const HEAT = ["fire", "lava", "sun", "volcano", "energy", "electricity"];
 const LIQUID = ["water", "ocean", "lake", "rain"];
-const EARTHY = ["earth", "dust", "sand"];
+const EARTHY = ["earth", "dust", "sand", "mud"];
 const WEATHER = ["cloud", "wind", "rain", "storm"];
-const GROWABLE = ["plant", "tree"];
+const GROWABLE = ["plant", "tree", "forest"];
+const SOLID = ["stone", "metal", "brick", "obsidian", "glass", "mountain"];
+const LIVING = ["life", "animal", "fish", "bird", "human"];
+const BUILT = ["city", "boat", "robot", "computer", "brick", "glass"];
+const SKY = ["cloud", "wind", "storm", "rain", "rainbow", "space", "sun"];
+const TINY = ["dust", "sand", "smoke"];
+const VAPOR = ["steam", "smoke"];
 
 /* Each rule is a plain physical statement. `when` matches either ordering. */
 const LAB_RULES = [
@@ -3608,6 +3636,53 @@ const LAB_RULES = [
   // Water and sunlight are what green things need.
   { when: [GROWABLE, LIQUID], result: "tree", why: "plants given water grow" },
   { when: [GROWABLE, ["sun"]], result: "forest", why: "plants given sunlight spread" },
+
+  /* Three quarters of all pairs used to produce nothing at all, which reads
+     as a broken game rather than a wrong guess. The rules below cover the
+     common shapes so an experiment almost always teaches something, while
+     still being a real physical statement rather than a random product. */
+  { when: [HEAT, ["mud"]], result: "brick", why: "baked mud hardens into brick" },
+  { when: [HEAT, VAPOR], result: "energy", why: "hot vapour carries energy" },
+  { when: [LIQUID, VAPOR], result: "cloud", why: "vapour over water gathers into cloud" },
+  { when: [VAPOR, VAPOR], result: "cloud", why: "vapour gathering becomes cloud" },
+  { when: [VAPOR, EARTHY], result: "mud", why: "vapour settling on ground dampens it" },
+  { when: [SKY, VAPOR], result: "cloud", why: "vapour rising joins the clouds" },
+  { when: [LIQUID, LIQUID], result: "ocean", why: "water gathering makes an ocean" },
+  { when: [HEAT, SOLID], result: "lava", why: "enough heat melts solid rock" },
+  { when: [HEAT, EARTHY], result: "glass", why: "fierce heat fuses sand into glass" },
+  { when: [HEAT, GROWABLE], result: "smoke", why: "burning plants give off smoke" },
+  { when: [HEAT, LIVING], result: "energy", why: "living things burn fuel for energy" },
+  { when: [HEAT, WEATHER], result: "storm", why: "heat drives the weather" },
+  { when: [HEAT, HEAT], result: "energy", why: "heat on heat is raw energy" },
+
+  { when: [LIQUID, SOLID], result: "sand", why: "water wears solid rock down to grains" },
+  { when: [LIQUID, GROWABLE], result: "forest", why: "well-watered plants spread" },
+  { when: [LIQUID, LIVING], result: "fish", why: "life in water becomes fish" },
+  { when: [LIQUID, WEATHER], result: "rain", why: "water in the sky falls as rain" },
+  { when: [LIQUID, TINY], result: "mud", why: "water and fine grains make mud" },
+
+  { when: [EARTHY, SOLID], result: "mountain", why: "ground piled on rock makes mountains" },
+  { when: [EARTHY, GROWABLE], result: "tree", why: "soil lets a plant grow tall" },
+  { when: [EARTHY, LIVING], result: "life", why: "living things take root in soil" },
+  { when: [EARTHY, EARTHY], result: "mountain", why: "ground on ground piles up" },
+
+  { when: [SKY, SOLID], result: "dust", why: "wind wears stone to dust" },
+  { when: [SKY, LIVING], result: "bird", why: "life that takes to the sky becomes a bird" },
+  { when: [SKY, GROWABLE], result: "forest", why: "rain and sky feed a whole forest" },
+
+  { when: [LIVING, LIVING], result: "human", why: "life building on life" },
+  { when: [LIVING, SOLID], result: "city", why: "living things build with stone" },
+  { when: [LIVING, BUILT], result: "city", why: "people gather where things are built" },
+  { when: [LIVING, ["idea"]], result: "human", why: "an idea is what makes us human" },
+
+  { when: [BUILT, BUILT], result: "city", why: "buildings together make a city" },
+  { when: [BUILT, ["energy", "electricity"]], result: "robot", why: "powered machinery becomes a robot" },
+  { when: [["idea"], ["energy", "electricity"]], result: "computer", why: "ideas plus electricity make a computer" },
+  { when: [["idea"], SOLID], result: "brick", why: "an idea shaped into building material" },
+
+  { when: [TINY, TINY], result: "dust", why: "fine grains gather as dust" },
+  { when: [SOLID, SOLID], result: "mountain", why: "rock upon rock" },
+  { when: [WEATHER, SOLID], result: "stone", why: "weather carves exposed rock" },
 ];
 
 function stableHash(key) {
@@ -3633,12 +3708,92 @@ function labCombinationResult(idA, idB) {
   return { id: null, exact: false, key };
 }
 
+/* Objectives give the sandbox a point without turning it into a checklist.
+   Targets are drawn from the middle of the tree — deep enough to need a few
+   steps, shallow enough to reach inside a booth visit. Depth is measured from
+   the four starting elements, so this stays correct if recipes change. */
+function labDepths() {
+  const depth = {};
+  LAB_BASE.forEach(b => { depth[b] = 0; });
+  let have = [...LAB_BASE];
+  for (let level = 1; level <= 12; level++) {
+    const next = [];
+    for (let i = 0; i < have.length; i++) for (let j = i; j < have.length; j++) {
+      const r = labCombinationResult(have[i], have[j]);
+      if (r && r.id && depth[r.id] === undefined) { depth[r.id] = level; next.push(r.id); }
+    }
+    if (!next.length) break;
+    have = have.concat(next);
+  }
+  return depth;
+}
+// Two mid-depth targets plus one stretch goal: enough to chase, not a grind.
+function pickObjectives(n = 3) {
+  const depth = labDepths();
+  const pool = (lo, hi) => Object.keys(depth).filter(id => depth[id] >= lo && depth[id] <= hi);
+  const pick = (arr, taken) => {
+    const free = arr.filter(x => !taken.includes(x));
+    return free.length ? free[Math.floor(Math.random() * free.length)] : null;
+  };
+  const out = [];
+  const mid = pool(2, 2), deep = pool(3, 3), deepest = pool(4, 9);
+  [pick(mid, out), pick(deep, out), pick(deepest.length ? deepest : deep, out)]
+    .forEach(x => { if (x && !out.includes(x)) out.push(x); });
+  while (out.length < n) {
+    const x = pick(pool(2, 4), out);
+    if (!x) break;
+    out.push(x);
+  }
+  return out.slice(0, n).map(id => ({ id, done: false, depth: depth[id] }));
+}
+/* A hint names the KIND of thing to try, never the answer. It looks up a real
+   recipe for the target, then describes each ingredient by the group it
+   belongs to, so the player still has to work out which one. */
+const LAB_GROUPS = [
+  { ids: HEAT, en: "something hot 🔥", bm: "sesuatu yang panas 🔥" },
+  { ids: LIQUID, en: "something wet 💧", bm: "sesuatu yang basah 💧" },
+  { ids: VAPOR, en: "something steamy ♨️", bm: "sesuatu berwap ♨️" },
+  { ids: EARTHY, en: "something from the ground 🌍", bm: "sesuatu dari tanah 🌍" },
+  { ids: SOLID, en: "something hard 🪨", bm: "sesuatu yang keras 🪨" },
+  { ids: SKY, en: "something from the sky ☁️", bm: "sesuatu dari langit ☁️" },
+  { ids: GROWABLE, en: "something that grows 🌱", bm: "sesuatu yang tumbuh 🌱" },
+  { ids: LIVING, en: "something alive 🐾", bm: "sesuatu yang hidup 🐾" },
+  { ids: BUILT, en: "something built 🏗️", bm: "sesuatu yang dibina 🏗️" },
+  { ids: TINY, en: "something tiny 🌫️", bm: "sesuatu yang halus 🌫️" },
+];
+function labGroupOf(id) {
+  const g = LAB_GROUPS.find(x => x.ids.includes(id));
+  return g ? g[lang] : (lang === "bm" ? "sesuatu lain ✨" : "something else ✨");
+}
+// Find any pair that makes the target, preferring ingredients already found.
+function labRecipeFor(targetId, found) {
+  const ids = Object.keys(LAB_ELEMENTS);
+  let best = null;
+  for (let i = 0; i < ids.length; i++) for (let j = i; j < ids.length; j++) {
+    const r = labCombinationResult(ids[i], ids[j]);
+    if (!r || r.id !== targetId) continue;
+    const owned = (found.has(ids[i]) ? 1 : 0) + (found.has(ids[j]) ? 1 : 0);
+    // Prefer a written recipe over a generic category rule, and prefer
+    // ingredients from different groups — "something hard and something
+    // hard" is a useless clue. Owning the pieces still matters most.
+    const cand = {
+      a: ids[i], b: ids[j], owned,
+      exact: !!r.exact,
+      distinct: labGroupOf(ids[i]) !== labGroupOf(ids[j]),
+    };
+    const rank = (c) => (c.owned * 4) + (c.exact ? 2 : 0) + (c.distinct ? 1 : 0);
+    if (!best || rank(cand) > rank(best)) best = cand;
+  }
+  return best;
+}
+
 const LAB = {
   track: "lab",
   emoji: "🧪", titleKey: "labTitle", howKey: "labHow",
   found: new Set(), workspace: [], drag: null, cursorPos: null, pinchLog: [],
   openSince: 0, grabReadyAt: 0, dwellKey: "", dwellSince: 0, bookOpen: false,
   history: new Map(), bookNode: null, noReactNode: null, recipeBtn: null, cheatBtn: null, running: false,
+  goals: [], goalNode: null, hintBtn: null, hintsUsed: 0, hintNode: null,
 
   start() {
     this.cleanup();
@@ -3653,7 +3808,13 @@ const LAB = {
     this.cheatBtn = el(`<button class="lab-tool-btn cheat" type="button" aria-label="${t("labCheatTitle")}" title="${t("labCheatTitle")}">⌘</button>`);
     this.recipeBtn.onclick = () => { sfx.click(); this.openRecipes(false); };
     this.cheatBtn.onclick = () => { sfx.click(); this.openRecipes(true); };
-    document.body.append(this.recipeBtn, this.cheatBtn);
+    this.goals = pickObjectives(3);
+    this.hintsUsed = 0;
+    this.hintBtn = el(`<button class="lab-tool-btn hint" type="button">💡 ${t("labHint")}</button>`);
+    this.hintBtn.onclick = () => { sfx.click(); this.showHint(); };
+    this.goalNode = el(`<div class="lab-goals" id="labGoals"></div>`);
+    document.body.append(this.recipeBtn, this.cheatBtn, this.hintBtn, this.goalNode);
+    this.refreshGoals();
     // Hand Lab draws a robot hand from the landmarks instead of the raw
     // feed, so the camera video itself stays hidden the whole time.
     cam.style.display = "none";
@@ -3661,7 +3822,9 @@ const LAB = {
 
   cleanup() {
     this.recipeBtn?.remove(); this.cheatBtn?.remove(); this.bookNode?.remove(); this.noReactNode?.remove();
-    this.recipeBtn = null; this.cheatBtn = null; this.bookNode = null; this.noReactNode = null; this.running = false;
+    this.hintBtn?.remove(); this.goalNode?.remove(); this.hintNode?.remove();
+    this.recipeBtn = null; this.cheatBtn = null; this.bookNode = null; this.noReactNode = null;
+    this.hintBtn = null; this.goalNode = null; this.hintNode = null; this.running = false;
     cam.style.display = "";
   },
 
@@ -3805,9 +3968,68 @@ const LAB = {
     // Infinite Craft only interrupts you for a genuinely NEW discovery — a
     // combo landing on something you already have just merges quietly on
     // the canvas (the resulting tag already shows its name), no popup.
+    const goal = this.goals.find(g => g.id === resultId && !g.done);
+    if (goal) {
+      goal.done = true;
+      this.refreshGoals();
+      if (this.goals.every(g => g.done)) setTimeout(() => this.showGoalsComplete(), 900);
+    }
     if (isNew) { sfx.win(); this.showReveal(resultId); }
     else sfx.good();
     return resultId;
+  },
+  refreshGoals() {
+    if (!this.goalNode) return;
+    const done = this.goals.filter(g => g.done).length;
+    this.goalNode.innerHTML =
+      `<div class="lab-goals-title">🎯 ${t("labGoals")} <b>${done}/${this.goals.length}</b></div>` +
+      this.goals.map(g => {
+        const info = LAB_ELEMENTS[g.id];
+        // An undiscovered target shows its silhouette, not its name — the
+        // point is to work out what it is, not to read it off a list.
+        return `<div class="lab-goal${g.done ? " done" : ""}">
+          <span class="lab-goal-emo">${g.done ? info.emoji : "❓"}</span>
+          <span class="lab-goal-name">${g.done ? info[lang].name : t("labMystery")(g.depth)}</span>
+        </div>`;
+      }).join("");
+  },
+  // Never names the answer: it describes the two ingredients by their kind.
+  showHint() {
+    const target = this.goals.find(g => !g.done);
+    this.hintNode?.remove();
+    let text;
+    if (!target) text = t("labAllDone");
+    else {
+      const r = labRecipeFor(target.id, this.found);
+      if (!r) text = t("labNoHint");
+      else {
+        const ga = labGroupOf(r.a), gb = labGroupOf(r.b);
+        const pair = ga === gb ? t("labHintSame")(ga) : `${ga} + ${gb}`;
+        if (r.owned === 2) text = t("labHintBoth")(pair);
+        else if (r.owned === 1) {
+          const missing = this.found.has(r.a) ? r.b : r.a;
+          text = t("labHintOne")(labGroupOf(missing));
+        } else text = t("labHintNone")(pair);
+      }
+      this.hintsUsed++;
+    }
+    this.hintNode = el(`<div class="lab-hint-pop">💡 ${text}</div>`);
+    document.body.appendChild(this.hintNode);
+    const n = this.hintNode;
+    setTimeout(() => { n.remove(); if (this.hintNode === n) this.hintNode = null; }, 4200);
+  },
+  showGoalsComplete() {
+    sfx.win();
+    const node = el(`<div class="lab-reveal goals-done">
+      <div class="lab-reveal-emo">🏅</div>
+      <div class="lab-reveal-name">${t("labGoalsDone")}</div>
+      <div class="lab-reveal-badge">${this.found.size}/${LAB_TOTAL}</div>
+      <div class="lab-reveal-fact">${t("labGoalsNext")}</div>
+    </div>`);
+    document.body.appendChild(node);
+    setTimeout(() => node.remove(), 3600);
+    // A fresh set keeps a curious player going instead of ending the session.
+    setTimeout(() => { this.goals = pickObjectives(3); this.refreshGoals(); }, 3700);
   },
   showNoReaction() {
     this.noReactNode?.remove();
@@ -4098,7 +4320,7 @@ document.getElementById("soundBtn").textContent = soundOn ? "🔊" : "🔇";
    intro screen rather than sitting on the menu as a separate game. */
 NINJA.duel = NINJA_VS; SNAKE.duel = SNAKE_VS; BLAST.duel = BLAST_VS;
 
-window.__ha = { calibrate, music, NINJA_VS, SNAKE_VS, BLAST_VS, pinchStateFor, TRACKS, NINJA_POWERS, SNAKE_FOODS, BLAST_POWERS, BLAST_GRID, t, engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60),
+window.__ha = { LAB_ELEMENTS, LAB_RECIPES, LAB_BASE, labCombinationResult, calibrate, music, NINJA_VS, SNAKE_VS, BLAST_VS, pinchStateFor, TRACKS, NINJA_POWERS, SNAKE_FOODS, BLAST_POWERS, BLAST_GRID, t, engine, NINJA, SNAKE, BLAST, LAB, ctx, step: (dt) => activeGame && activeGame.onFrame && activeGame.onFrame(dt || 1 / 60),
   _setActive: (g) => { activeGame = g; } };
 
 menu();

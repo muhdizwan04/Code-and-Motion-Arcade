@@ -799,3 +799,37 @@ h1.arcade {
 .vs-col b { font-family: var(--font-display); font-size: 12px; color: var(--c); letter-spacing: .1em; }
 .vs-col span { font-family: var(--font-display); font-size: 26px; font-weight: 900; }
 .vs-col i { font-style: normal; font-size: 13px; }
+
+/* ── Hand Lab: goals + hints ──────────────────────────────── */
+.lab-goals {
+  position: fixed; left: 12px; top: calc(96px + env(safe-area-inset-top)); z-index: 26;
+  width: clamp(150px, 20vw, 210px); padding: 10px 12px; border-radius: 14px;
+  background: rgba(8,4,20,.82); border: 1px solid rgba(255,255,255,.14);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+.lab-goals-title {
+  font-family: var(--font-display); font-size: 10px; font-weight: 900;
+  letter-spacing: .12em; color: var(--muted); margin-bottom: 7px;
+}
+.lab-goals-title b { color: var(--lime); }
+.lab-goal {
+  display: flex; align-items: center; gap: 7px; padding: 3px 0;
+  font-size: 12.5px; color: var(--text); opacity: .85;
+}
+.lab-goal.done { opacity: 1; }
+.lab-goal.done .lab-goal-name { color: var(--lime); text-decoration: line-through; }
+.lab-goal-emo { font-size: 15px; width: 20px; text-align: center; }
+.lab-tool-btn.hint { right: 12px; bottom: calc(118px + env(safe-area-inset-bottom)); }
+.lab-hint-pop {
+  position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom));
+  transform: translateX(-50%); z-index: 40;
+  max-width: min(88vw, 460px); padding: 12px 18px; border-radius: 16px;
+  background: rgba(8,4,20,.93); border: 2px solid var(--amber); color: var(--text);
+  font-size: 14px; font-weight: 600; line-height: 1.5; text-align: center;
+  box-shadow: 0 10px 34px rgba(0,0,0,.6);
+  animation: hintpop .32s cubic-bezier(.22,1.6,.36,1) both;
+}
+@keyframes hintpop { from { opacity: 0; transform: translate(-50%, 14px) scale(.94); } }
+.lab-reveal.goals-done { border-color: var(--lime); }
+@media (max-width: 620px) { .lab-goals { width: 132px; font-size: 11px; } }
