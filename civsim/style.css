@@ -401,3 +401,47 @@ body.playing .bg-blobs { display: none; }
   border: 2px solid var(--green, #4ade80);
 }
 .calib-count:empty { display: none; }
+
+/* ── Power cards ──────────────────────────────────────────── */
+.card-bar {
+  position: fixed; right: 10px; bottom: calc(132px + env(safe-area-inset-bottom));
+  z-index: 28; display: flex; flex-direction: column; gap: 6px;
+  width: clamp(190px, 22vw, 260px); pointer-events: none;
+}
+.card-row {
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  padding: 5px 7px; border-radius: 12px;
+  background: rgba(8,4,20,.78); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+}
+.card-owner {
+  font-family: var(--font-display); font-size: 9px; font-weight: 900;
+  letter-spacing: .1em; color: var(--c); flex: 0 0 auto;
+}
+.card-empty { font-size: 10.5px; color: var(--muted); opacity: .7; }
+.pcard {
+  pointer-events: auto; cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 18%, rgba(0,0,0,.4));
+  border: 1.5px solid var(--c); color: var(--text);
+  font-family: var(--font-body); font-size: 11px; font-weight: 700;
+  transition: transform .12s, box-shadow .2s, background .2s;
+  animation: cardin .34s cubic-bezier(.22,1.6,.36,1) both;
+}
+.pcard:hover { background: color-mix(in srgb, var(--c) 34%, rgba(0,0,0,.3)); box-shadow: 0 0 14px color-mix(in srgb, var(--c) 55%, transparent); }
+.pcard:active { transform: scale(.92); }
+.pcard-emo { font-size: 13px; }
+@keyframes cardin { from { opacity: 0; transform: translateY(8px) scale(.85); } }
+@media (max-width: 720px) {
+  .card-bar { width: 150px; }
+  .pcard-name { display: none; }
+  .pcard { padding: 5px 9px; }
+}
+
+/* ── Pre-run prediction result ────────────────────────────── */
+.predict-result {
+  margin: 14px 0 2px; padding: 11px 14px; border-radius: 14px;
+  font-size: 13.5px; font-weight: 700; text-align: center;
+}
+.predict-result.right { background: rgba(74,222,128,.14); border: 1px solid rgba(74,222,128,.55); color: #86efac; }
+.predict-result.wrong { background: rgba(255,56,96,.12); border: 1px solid rgba(255,56,96,.45); color: #fda4af; }
